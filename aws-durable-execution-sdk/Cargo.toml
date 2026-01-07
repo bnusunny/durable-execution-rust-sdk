@@ -1,0 +1,72 @@
+[package]
+name = "aws-durable-execution-sdk"
+version = "0.1.0"
+edition = "2021"
+description = "AWS Durable Execution SDK for Lambda Rust Runtime"
+license = "Apache-2.0"
+repository = "https://github.com/aws/aws-durable-execution-sdk-rust"
+keywords = ["aws", "lambda", "durable", "workflow", "serverless"]
+categories = ["asynchronous", "web-programming"]
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.0", features = ["full", "sync", "time", "rt-multi-thread"] }
+
+# Async trait support
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "1.0"
+
+# Logging/tracing
+tracing = "0.1"
+
+# AWS SDK
+aws-sdk-lambda = "1.0"
+aws-config = "1.0"
+aws-smithy-runtime-api = "1.0"
+
+# Lambda runtime
+lambda_runtime = "0.13"
+
+# Hashing for deterministic IDs
+blake2 = "0.10"
+hex = "0.4"
+
+# Static assertions for compile-time checks
+static_assertions = "1.1"
+
+# Proc macro support (for the durable_execution attribute)
+aws-durable-execution-sdk-macros = { path = "./macros", optional = true }
+
+[dev-dependencies]
+# Property-based testing
+proptest = "1.0"
+tokio-test = "0.4"
+tracing-subscriber = "0.3"
+
+[features]
+default = ["macros"]
+macros = ["dep:aws-durable-execution-sdk-macros"]
+
+[[example]]
+name = "simple_workflow"
+path = "examples/simple_workflow.rs"
+required-features = ["macros"]
+
+[[example]]
+name = "parallel_processing"
+path = "examples/parallel_processing.rs"
+required-features = ["macros"]
+
+[[example]]
+name = "callback_workflow"
+path = "examples/callback_workflow.rs"
+required-features = ["macros"]
+
+[workspace]
+members = [".", "macros"]

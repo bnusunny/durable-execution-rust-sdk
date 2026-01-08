@@ -100,10 +100,11 @@ impl CheckpointedResult {
     }
 
     /// Returns the serialized result if the operation succeeded.
+    /// This checks both type-specific details (e.g., StepDetails.Result) and the legacy Result field.
     pub fn result(&self) -> Option<&str> {
         self.operation
             .as_ref()
-            .and_then(|op| op.result.as_deref())
+            .and_then(|op| op.get_result())
     }
 
     /// Returns the error if the operation failed.

@@ -189,6 +189,10 @@ where
     if checkpoint_result.is_succeeded() {
         logger.debug(&format!("Replaying succeeded step: {}", op_id), &log_info);
         
+        // Track replay
+        state.track_replay(&op_id.operation_id).await;
+        
+        // Try to get the result from the checkpoint
         if let Some(result_str) = checkpoint_result.result() {
             let serdes = JsonSerDes::<T>::new();
             let serdes_ctx = SerDesContext::new(&op_id.operation_id, state.durable_execution_arn());
@@ -197,10 +201,20 @@ where
                     message: format!("Failed to deserialize checkpointed result: {}", e),
                 })?;
             
-            // Track replay
-            state.track_replay(&op_id.operation_id).await;
-            
             return Ok(Some(result));
+        } else {
+            // No result stored - try to deserialize from "null" for unit types
+            let serdes = JsonSerDes::<T>::new();
+            let serdes_ctx = SerDesContext::new(&op_id.operation_id, state.durable_execution_arn());
+            match serdes.deserialize("null", &serdes_ctx) {
+                Ok(result) => return Ok(Some(result)),
+                Err(_) => {
+                    // If null doesn't work, the type requires a value but none was stored
+                    return Err(DurableError::SerDes {
+                        message: "Step succeeded but no result was stored and type requires a value".to_string(),
+                    });
+                }
+            }
         }
     }
 
@@ -744,21 +758,6 @@ mod property_tests {
         use super::*;
         use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
-        fn create_mock_client_with_tracking(
-            checkpoint_called: Arc<AtomicBool>,
-        ) -> SharedDurableServiceClient {
-            // Create a mock client that tracks when checkpoint is called
-            Arc::new(
-                MockDurableServiceClient::new()
-                    .with_checkpoint_response(Ok(CheckpointResponse {
-                        checkpoint_token: "token-1".to_string(),
-                    }))
-                    .with_checkpoint_response(Ok(CheckpointResponse {
-                        checkpoint_token: "token-2".to_string(),
-                    }))
-            )
-        }
-
         fn create_test_state(client: SharedDurableServiceClient) -> Arc<ExecutionState> {
             Arc::new(ExecutionState::new(
                 "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
@@ -789,7 +788,7 @@ mod property_tests {
                     let execution_order = Arc::new(AtomicU32::new(0));
                     let order_counter = Arc::new(AtomicU32::new(0));
 
-                    let checkpoint_order_clone = checkpoint_order.clone();
+                    let _checkpoint_order_clone = checkpoint_order.clone();
                     let execution_order_clone = execution_order.clone();
                     let order_counter_clone = order_counter.clone();
 

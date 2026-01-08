@@ -14,18 +14,18 @@ use crate::error::ErrorObject;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Operation {
     /// Unique identifier for this operation
-    #[serde(rename = "OperationId")]
+    #[serde(rename = "Id", alias = "OperationId")]
     pub operation_id: String,
 
     /// The type of operation (Step, Wait, Callback, etc.)
-    #[serde(rename = "OperationType")]
+    #[serde(rename = "Type", alias = "OperationType")]
     pub operation_type: OperationType,
 
     /// Current status of the operation
     #[serde(rename = "Status")]
     pub status: OperationStatus,
 
-    /// Serialized result if the operation succeeded
+    /// Serialized result if the operation succeeded (legacy field, prefer type-specific details)
     #[serde(rename = "Result", skip_serializing_if = "Option::is_none")]
     pub result: Option<String>,
 
@@ -40,6 +40,110 @@ pub struct Operation {
     /// Optional human-readable name for the operation
     #[serde(rename = "Name", skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+
+    /// Start timestamp of the operation (milliseconds since epoch)
+    #[serde(rename = "StartTimestamp", skip_serializing_if = "Option::is_none")]
+    pub start_timestamp: Option<i64>,
+
+    /// End timestamp of the operation (milliseconds since epoch)
+    #[serde(rename = "EndTimestamp", skip_serializing_if = "Option::is_none")]
+    pub end_timestamp: Option<i64>,
+
+    /// Execution details for EXECUTION type operations
+    #[serde(rename = "ExecutionDetails", skip_serializing_if = "Option::is_none")]
+    pub execution_details: Option<ExecutionDetails>,
+
+    /// Step details for STEP type operations
+    #[serde(rename = "StepDetails", skip_serializing_if = "Option::is_none")]
+    pub step_details: Option<StepDetails>,
+
+    /// Wait details for WAIT type operations
+    #[serde(rename = "WaitDetails", skip_serializing_if = "Option::is_none")]
+    pub wait_details: Option<WaitDetails>,
+
+    /// Callback details for CALLBACK type operations
+    #[serde(rename = "CallbackDetails", skip_serializing_if = "Option::is_none")]
+    pub callback_details: Option<CallbackDetails>,
+
+    /// Chained invoke details for CHAINED_INVOKE type operations
+    #[serde(rename = "ChainedInvokeDetails", skip_serializing_if = "Option::is_none")]
+    pub chained_invoke_details: Option<ChainedInvokeDetails>,
+
+    /// Context details for CONTEXT type operations
+    #[serde(rename = "ContextDetails", skip_serializing_if = "Option::is_none")]
+    pub context_details: Option<ContextDetails>,
+}
+
+/// Details specific to EXECUTION type operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecutionDetails {
+    /// The input payload for the execution
+    #[serde(rename = "InputPayload", skip_serializing_if = "Option::is_none")]
+    pub input_payload: Option<String>,
+}
+
+/// Details specific to STEP type operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StepDetails {
+    /// The result payload if the step succeeded
+    #[serde(rename = "Result", skip_serializing_if = "Option::is_none")]
+    pub result: Option<String>,
+    /// The current retry attempt (0-indexed)
+    #[serde(rename = "Attempt", skip_serializing_if = "Option::is_none")]
+    pub attempt: Option<u32>,
+    /// Timestamp for the next retry attempt
+    #[serde(rename = "NextAttemptTimestamp", skip_serializing_if = "Option::is_none")]
+    pub next_attempt_timestamp: Option<i64>,
+    /// Error details if the step failed
+    #[serde(rename = "Error", skip_serializing_if = "Option::is_none")]
+    pub error: Option<ErrorObject>,
+}
+
+/// Details specific to WAIT type operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WaitDetails {
+    /// Timestamp when the wait is scheduled to end
+    #[serde(rename = "ScheduledEndTimestamp", skip_serializing_if = "Option::is_none")]
+    pub scheduled_end_timestamp: Option<i64>,
+}
+
+/// Details specific to CALLBACK type operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CallbackDetails {
+    /// The callback ID for external systems to use
+    #[serde(rename = "CallbackId", skip_serializing_if = "Option::is_none")]
+    pub callback_id: Option<String>,
+    /// The result payload if the callback succeeded
+    #[serde(rename = "Result", skip_serializing_if = "Option::is_none")]
+    pub result: Option<String>,
+    /// Error details if the callback failed
+    #[serde(rename = "Error", skip_serializing_if = "Option::is_none")]
+    pub error: Option<ErrorObject>,
+}
+
+/// Details specific to CHAINED_INVOKE type operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChainedInvokeDetails {
+    /// The result payload if the invocation succeeded
+    #[serde(rename = "Result", skip_serializing_if = "Option::is_none")]
+    pub result: Option<String>,
+    /// Error details if the invocation failed
+    #[serde(rename = "Error", skip_serializing_if = "Option::is_none")]
+    pub error: Option<ErrorObject>,
+}
+
+/// Details specific to CONTEXT type operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContextDetails {
+    /// The result payload if the context succeeded
+    #[serde(rename = "Result", skip_serializing_if = "Option::is_none")]
+    pub result: Option<String>,
+    /// Whether to replay children when loading state
+    #[serde(rename = "ReplayChildren", skip_serializing_if = "Option::is_none")]
+    pub replay_children: Option<bool>,
+    /// Error details if the context failed
+    #[serde(rename = "Error", skip_serializing_if = "Option::is_none")]
+    pub error: Option<ErrorObject>,
 }
 
 impl Operation {
@@ -53,6 +157,14 @@ impl Operation {
             error: None,
             parent_id: None,
             name: None,
+            start_timestamp: None,
+            end_timestamp: None,
+            execution_details: None,
+            step_details: None,
+            wait_details: None,
+            callback_details: None,
+            chained_invoke_details: None,
+            context_details: None,
         }
     }
 
@@ -92,6 +204,44 @@ impl Operation {
             OperationStatus::Failed | OperationStatus::Cancelled | OperationStatus::TimedOut
         )
     }
+
+    /// Gets the result from the appropriate details field based on operation type.
+    pub fn get_result(&self) -> Option<&str> {
+        // First check type-specific details
+        match self.operation_type {
+            OperationType::Step => {
+                if let Some(ref details) = self.step_details {
+                    if details.result.is_some() {
+                        return details.result.as_deref();
+                    }
+                }
+            }
+            OperationType::Callback => {
+                if let Some(ref details) = self.callback_details {
+                    if details.result.is_some() {
+                        return details.result.as_deref();
+                    }
+                }
+            }
+            OperationType::Invoke => {
+                if let Some(ref details) = self.chained_invoke_details {
+                    if details.result.is_some() {
+                        return details.result.as_deref();
+                    }
+                }
+            }
+            OperationType::Context => {
+                if let Some(ref details) = self.context_details {
+                    if details.result.is_some() {
+                        return details.result.as_deref();
+                    }
+                }
+            }
+            _ => {}
+        }
+        // Fall back to legacy result field
+        self.result.as_deref()
+    }
 }
 
 
@@ -99,16 +249,22 @@ impl Operation {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OperationType {
     /// The root execution operation
+    #[serde(rename = "EXECUTION")]
     Execution,
     /// A step operation (unit of work)
+    #[serde(rename = "STEP")]
     Step,
     /// A wait/sleep operation
+    #[serde(rename = "WAIT")]
     Wait,
     /// A callback operation waiting for external signal
+    #[serde(rename = "CALLBACK")]
     Callback,
     /// An invoke operation calling another Lambda function
+    #[serde(rename = "INVOKE")]
     Invoke,
     /// A context operation for nested child contexts
+    #[serde(rename = "CONTEXT")]
     Context,
 }
 
@@ -129,16 +285,22 @@ impl std::fmt::Display for OperationType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OperationStatus {
     /// Operation has started but not completed
+    #[serde(rename = "STARTED")]
     Started,
     /// Operation completed successfully
+    #[serde(rename = "SUCCEEDED")]
     Succeeded,
     /// Operation failed with an error
+    #[serde(rename = "FAILED")]
     Failed,
     /// Operation was cancelled
+    #[serde(rename = "CANCELLED")]
     Cancelled,
     /// Operation timed out
+    #[serde(rename = "TIMED_OUT")]
     TimedOut,
     /// Operation was stopped externally
+    #[serde(rename = "STOPPED")]
     Stopped,
 }
 
@@ -176,10 +338,13 @@ impl std::fmt::Display for OperationStatus {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OperationAction {
     /// Start a new operation
+    #[serde(rename = "START")]
     Start,
     /// Mark operation as succeeded
+    #[serde(rename = "SUCCEED")]
     Succeed,
     /// Mark operation as failed
+    #[serde(rename = "FAIL")]
     Fail,
 }
 
@@ -193,13 +358,60 @@ impl std::fmt::Display for OperationAction {
     }
 }
 
+/// Options for WAIT operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WaitOptions {
+    /// Number of seconds to wait
+    #[serde(rename = "WaitSeconds")]
+    pub wait_seconds: u64,
+}
+
+/// Options for STEP operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StepOptions {
+    /// Delay in seconds before the next retry attempt
+    #[serde(rename = "NextAttemptDelaySeconds", skip_serializing_if = "Option::is_none")]
+    pub next_attempt_delay_seconds: Option<u64>,
+}
+
+/// Options for CALLBACK operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CallbackOptions {
+    /// Timeout in seconds for the callback
+    #[serde(rename = "TimeoutSeconds", skip_serializing_if = "Option::is_none")]
+    pub timeout_seconds: Option<u64>,
+    /// Heartbeat timeout in seconds
+    #[serde(rename = "HeartbeatTimeoutSeconds", skip_serializing_if = "Option::is_none")]
+    pub heartbeat_timeout_seconds: Option<u64>,
+}
+
+/// Options for CHAINED_INVOKE operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChainedInvokeOptions {
+    /// The function name or ARN to invoke
+    #[serde(rename = "FunctionName")]
+    pub function_name: String,
+    /// Optional tenant ID for multi-tenant scenarios
+    #[serde(rename = "TenantId", skip_serializing_if = "Option::is_none")]
+    pub tenant_id: Option<String>,
+}
+
+/// Options for CONTEXT operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContextOptions {
+    /// Whether to replay children when the context is loaded
+    #[serde(rename = "ReplayChildren", skip_serializing_if = "Option::is_none")]
+    pub replay_children: Option<bool>,
+}
+
 /// Represents an update to be checkpointed for an operation.
 ///
 /// This struct is used to send checkpoint requests to the Lambda service.
+/// Field names match the CheckpointDurableExecution API format.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OperationUpdate {
     /// Unique identifier for this operation
-    #[serde(rename = "OperationId")]
+    #[serde(rename = "Id")]
     pub operation_id: String,
 
     /// The action to perform (Start, Succeed, Fail)
@@ -207,11 +419,11 @@ pub struct OperationUpdate {
     pub action: OperationAction,
 
     /// The type of operation
-    #[serde(rename = "OperationType")]
+    #[serde(rename = "Type")]
     pub operation_type: OperationType,
 
-    /// Serialized result if succeeding
-    #[serde(rename = "Result", skip_serializing_if = "Option::is_none")]
+    /// Serialized result if succeeding (called "Payload" in the API)
+    #[serde(rename = "Payload", skip_serializing_if = "Option::is_none")]
     pub result: Option<String>,
 
     /// Error details if failing
@@ -225,6 +437,26 @@ pub struct OperationUpdate {
     /// Optional human-readable name for the operation
     #[serde(rename = "Name", skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+
+    /// Options for WAIT operations
+    #[serde(rename = "WaitOptions", skip_serializing_if = "Option::is_none")]
+    pub wait_options: Option<WaitOptions>,
+
+    /// Options for STEP operations
+    #[serde(rename = "StepOptions", skip_serializing_if = "Option::is_none")]
+    pub step_options: Option<StepOptions>,
+
+    /// Options for CALLBACK operations
+    #[serde(rename = "CallbackOptions", skip_serializing_if = "Option::is_none")]
+    pub callback_options: Option<CallbackOptions>,
+
+    /// Options for CHAINED_INVOKE operations
+    #[serde(rename = "ChainedInvokeOptions", skip_serializing_if = "Option::is_none")]
+    pub chained_invoke_options: Option<ChainedInvokeOptions>,
+
+    /// Options for CONTEXT operations
+    #[serde(rename = "ContextOptions", skip_serializing_if = "Option::is_none")]
+    pub context_options: Option<ContextOptions>,
 }
 
 impl OperationUpdate {
@@ -241,6 +473,32 @@ impl OperationUpdate {
             error: None,
             parent_id: None,
             name: None,
+            wait_options: None,
+            step_options: None,
+            callback_options: None,
+            chained_invoke_options: None,
+            context_options: None,
+        }
+    }
+
+    /// Creates a new OperationUpdate to start a WAIT operation with the required WaitOptions.
+    pub fn start_wait(
+        operation_id: impl Into<String>,
+        wait_seconds: u64,
+    ) -> Self {
+        Self {
+            operation_id: operation_id.into(),
+            action: OperationAction::Start,
+            operation_type: OperationType::Wait,
+            result: None,
+            error: None,
+            parent_id: None,
+            name: None,
+            wait_options: Some(WaitOptions { wait_seconds }),
+            step_options: None,
+            callback_options: None,
+            chained_invoke_options: None,
+            context_options: None,
         }
     }
 
@@ -258,6 +516,11 @@ impl OperationUpdate {
             error: None,
             parent_id: None,
             name: None,
+            wait_options: None,
+            step_options: None,
+            callback_options: None,
+            chained_invoke_options: None,
+            context_options: None,
         }
     }
 
@@ -275,6 +538,11 @@ impl OperationUpdate {
             error: Some(error),
             parent_id: None,
             name: None,
+            wait_options: None,
+            step_options: None,
+            callback_options: None,
+            chained_invoke_options: None,
+            context_options: None,
         }
     }
 
@@ -287,6 +555,39 @@ impl OperationUpdate {
     /// Sets the name for this operation update.
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
+        self
+    }
+
+    /// Sets the wait options for this operation update.
+    pub fn with_wait_options(mut self, wait_seconds: u64) -> Self {
+        self.wait_options = Some(WaitOptions { wait_seconds });
+        self
+    }
+
+    /// Sets the step options for this operation update.
+    pub fn with_step_options(mut self, next_attempt_delay_seconds: Option<u64>) -> Self {
+        self.step_options = Some(StepOptions { next_attempt_delay_seconds });
+        self
+    }
+
+    /// Sets the callback options for this operation update.
+    pub fn with_callback_options(mut self, timeout_seconds: Option<u64>, heartbeat_timeout_seconds: Option<u64>) -> Self {
+        self.callback_options = Some(CallbackOptions { timeout_seconds, heartbeat_timeout_seconds });
+        self
+    }
+
+    /// Sets the chained invoke options for this operation update.
+    pub fn with_chained_invoke_options(mut self, function_name: impl Into<String>, tenant_id: Option<String>) -> Self {
+        self.chained_invoke_options = Some(ChainedInvokeOptions { 
+            function_name: function_name.into(), 
+            tenant_id 
+        });
+        self
+    }
+
+    /// Sets the context options for this operation update.
+    pub fn with_context_options(mut self, replay_children: Option<bool>) -> Self {
+        self.context_options = Some(ContextOptions { replay_children });
         self
     }
 }
@@ -455,19 +756,20 @@ mod tests {
             .with_name("my-step");
         
         let json = serde_json::to_string(&op).unwrap();
-        assert!(json.contains("\"OperationId\":\"op-123\""));
-        assert!(json.contains("\"OperationType\":\"Step\""));
-        assert!(json.contains("\"Status\":\"Started\""));
+        assert!(json.contains("\"Id\":\"op-123\""));
+        assert!(json.contains("\"Type\":\"STEP\""));
+        assert!(json.contains("\"Status\":\"STARTED\""));
         assert!(json.contains("\"ParentId\":\"parent-456\""));
         assert!(json.contains("\"Name\":\"my-step\""));
     }
 
     #[test]
     fn test_operation_deserialization() {
+        // Test with new API field names (Id, Type)
         let json = r#"{
-            "OperationId": "op-123",
-            "OperationType": "Step",
-            "Status": "Succeeded",
+            "Id": "op-123",
+            "Type": "STEP",
+            "Status": "SUCCEEDED",
             "Result": "{\"value\": 42}",
             "ParentId": "parent-456",
             "Name": "my-step"
@@ -483,6 +785,48 @@ mod tests {
     }
 
     #[test]
+    fn test_operation_deserialization_legacy_field_names() {
+        // Test with legacy field names (OperationId, OperationType) for backward compatibility
+        let json = r#"{
+            "OperationId": "op-123",
+            "OperationType": "STEP",
+            "Status": "SUCCEEDED",
+            "Result": "{\"value\": 42}",
+            "ParentId": "parent-456",
+            "Name": "my-step"
+        }"#;
+        
+        let op: Operation = serde_json::from_str(json).unwrap();
+        assert_eq!(op.operation_id, "op-123");
+        assert_eq!(op.operation_type, OperationType::Step);
+        assert_eq!(op.status, OperationStatus::Succeeded);
+    }
+
+    #[test]
+    fn test_operation_deserialization_with_timestamps() {
+        // Test with timestamps and execution details (as sent by the API)
+        let json = r#"{
+            "Id": "778f03ea-ab5a-3e77-8d6d-9119253f8565",
+            "Name": "21e26aa2-4866-4c09-958a-15a272f16c87",
+            "Type": "EXECUTION",
+            "StartTimestamp": 1767896523358,
+            "Status": "STARTED",
+            "ExecutionDetails": {
+                "InputPayload": "{\"order_id\":\"order-122342134\"}"
+            }
+        }"#;
+        
+        let op: Operation = serde_json::from_str(json).unwrap();
+        assert_eq!(op.operation_id, "778f03ea-ab5a-3e77-8d6d-9119253f8565");
+        assert_eq!(op.operation_type, OperationType::Execution);
+        assert_eq!(op.status, OperationStatus::Started);
+        assert_eq!(op.start_timestamp, Some(1767896523358));
+        assert!(op.execution_details.is_some());
+        let details = op.execution_details.unwrap();
+        assert!(details.input_payload.is_some());
+    }
+
+    #[test]
     fn test_operation_update_serialization() {
         let update = OperationUpdate::succeed(
             "op-123",
@@ -491,10 +835,10 @@ mod tests {
         ).with_parent_id("parent-456");
         
         let json = serde_json::to_string(&update).unwrap();
-        assert!(json.contains("\"OperationId\":\"op-123\""));
-        assert!(json.contains("\"Action\":\"Succeed\""));
-        assert!(json.contains("\"OperationType\":\"Step\""));
-        assert!(json.contains("\"Result\":\"{\\\"value\\\": 42}\""));
+        assert!(json.contains("\"Id\":\"op-123\""));
+        assert!(json.contains("\"Action\":\"SUCCEED\""));
+        assert!(json.contains("\"Type\":\"STEP\""));
+        assert!(json.contains("\"Payload\":\"{\\\"value\\\": 42}\""));
         assert!(json.contains("\"ParentId\":\"parent-456\""));
     }
 }

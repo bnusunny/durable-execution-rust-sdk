@@ -405,7 +405,11 @@ pub use lambda::{
     DurableExecutionInvocationInput, DurableExecutionInvocationOutput, InitialExecutionState,
     InvocationStatus,
 };
-pub use operation::{Operation, OperationAction, OperationStatus, OperationType, OperationUpdate};
+pub use operation::{
+    Operation, OperationAction, OperationStatus, OperationType, OperationUpdate,
+    WaitOptions, StepOptions, CallbackOptions, ChainedInvokeOptions, ContextOptions,
+    ExecutionDetails, StepDetails, WaitDetails, CallbackDetails, ChainedInvokeDetails, ContextDetails,
+};
 pub use serdes::{JsonSerDes, SerDes, SerDesContext, SerDesError};
 pub use state::{
     CheckpointBatcher, CheckpointBatcherConfig, CheckpointRequest, CheckpointSender,

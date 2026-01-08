@@ -2,13 +2,16 @@
 //!
 //! This module defines the `DurableServiceClient` trait and provides
 //! a Lambda-based implementation for communicating with the AWS Lambda
-//! durable execution service.
+//! durable execution service using the CheckpointDurableExecution and
+//! GetDurableExecutionState REST APIs.
 
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use async_trait::async_trait;
-use aws_sdk_lambda::operation::RequestId;
-use aws_sdk_lambda::Client as LambdaClient;
+use aws_credential_types::provider::ProvideCredentials;
+use aws_sigv4::http_request::{sign, SignableBody, SignableRequest, SigningSettings};
+use aws_sigv4::sign::v4;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{AwsError, DurableError};
@@ -76,84 +79,205 @@ pub struct GetOperationsResponse {
 }
 
 /// Configuration for the Lambda durable service client.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct LambdaClientConfig {
-    /// The Lambda function ARN to call for checkpoint operations
-    pub checkpoint_function_arn: Option<String>,
-    /// The Lambda function ARN to call for get_operations
-    pub get_operations_function_arn: Option<String>,
+    /// AWS region for the Lambda service
+    pub region: String,
+    /// Optional custom endpoint URL (for testing)
+    pub endpoint_url: Option<String>,
+}
+
+impl Default for LambdaClientConfig {
+    fn default() -> Self {
+        Self {
+            region: "us-east-1".to_string(),
+            endpoint_url: None,
+        }
+    }
 }
 
 impl LambdaClientConfig {
+    /// Creates a new LambdaClientConfig with the specified region.
+    pub fn with_region(region: impl Into<String>) -> Self {
+        Self {
+            region: region.into(),
+            endpoint_url: None,
+        }
+    }
+
     /// Creates a new LambdaClientConfig from AWS SDK config.
-    ///
-    /// This is a convenience method that creates a default configuration.
-    /// The actual Lambda client will be created separately.
-    pub fn from_aws_config(_config: &aws_config::SdkConfig) -> Self {
-        Self::default()
+    pub fn from_aws_config(config: &aws_config::SdkConfig) -> Self {
+        Self {
+            region: config.region().map(|r| r.to_string()).unwrap_or_else(|| "us-east-1".to_string()),
+            endpoint_url: None,
+        }
     }
 }
 
 /// Lambda-based implementation of the DurableServiceClient.
 ///
-/// This client uses the AWS Lambda SDK to communicate with the
-/// durable execution service.
+/// This client uses the AWS Lambda REST APIs (CheckpointDurableExecution and
+/// GetDurableExecutionState) to communicate with the durable execution service.
 pub struct LambdaDurableServiceClient {
-    /// The underlying Lambda client
-    lambda_client: LambdaClient,
+    /// HTTP client for making requests
+    http_client: reqwest::Client,
+    /// AWS credentials provider
+    credentials_provider: Arc<dyn ProvideCredentials>,
     /// Configuration for the client
     config: LambdaClientConfig,
 }
 
 impl LambdaDurableServiceClient {
-    /// Creates a new LambdaDurableServiceClient with the given Lambda client.
-    pub fn new(lambda_client: LambdaClient) -> Self {
-        Self {
-            lambda_client,
-            config: LambdaClientConfig::default(),
-        }
-    }
-
-    /// Creates a new LambdaDurableServiceClient with custom configuration.
-    pub fn with_config(lambda_client: LambdaClient, config: LambdaClientConfig) -> Self {
-        Self {
-            lambda_client,
-            config,
-        }
-    }
-
     /// Creates a new LambdaDurableServiceClient from AWS config.
     pub async fn from_env() -> Self {
         let aws_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
             .load()
             .await;
-        let lambda_client = LambdaClient::new(&aws_config);
-        Self::new(lambda_client)
+        Self::from_aws_config(&aws_config)
     }
 
-    /// Returns a reference to the underlying Lambda client.
-    pub fn lambda_client(&self) -> &LambdaClient {
-        &self.lambda_client
+    /// Creates a new LambdaDurableServiceClient from AWS SDK config.
+    pub fn from_aws_config(aws_config: &aws_config::SdkConfig) -> Self {
+        let credentials_provider = aws_config
+            .credentials_provider()
+            .expect("No credentials provider configured")
+            .clone();
+        
+        Self {
+            http_client: reqwest::Client::new(),
+            credentials_provider: Arc::from(credentials_provider),
+            config: LambdaClientConfig::from_aws_config(aws_config),
+        }
+    }
+
+    /// Creates a new LambdaDurableServiceClient with custom configuration.
+    pub fn with_config(
+        credentials_provider: Arc<dyn ProvideCredentials>,
+        config: LambdaClientConfig,
+    ) -> Self {
+        Self {
+            http_client: reqwest::Client::new(),
+            credentials_provider,
+            config,
+        }
+    }
+
+    /// Creates a new LambdaDurableServiceClient with a Lambda client (for backward compatibility).
+    /// Note: This extracts the region from the Lambda client but uses direct HTTP calls.
+    /// 
+    /// IMPORTANT: This method requires that the Lambda client was created with credentials.
+    /// If you're using this in a Lambda function, prefer using `from_env()` instead.
+    pub fn new(_lambda_client: aws_sdk_lambda::Client) -> Self {
+        // Note: We can't easily extract credentials from the Lambda client anymore
+        // as the credentials_provider() method is deprecated and returns None.
+        // This method is kept for backward compatibility but will panic if used.
+        // Users should use from_env() or from_aws_config() instead.
+        panic!(
+            "LambdaDurableServiceClient::new() is deprecated. \
+             Use LambdaDurableServiceClient::from_env() or from_aws_config() instead."
+        );
+    }
+
+    /// Returns the Lambda service endpoint URL.
+    fn endpoint_url(&self) -> String {
+        self.config.endpoint_url.clone().unwrap_or_else(|| {
+            format!("https://lambda.{}.amazonaws.com", self.config.region)
+        })
+    }
+
+    /// Signs an HTTP request using AWS SigV4 and returns the signed headers.
+    async fn sign_request(
+        &self,
+        method: &str,
+        uri: &str,
+        body: &[u8],
+    ) -> Result<Vec<(String, String)>, DurableError> {
+        let credentials = self
+            .credentials_provider
+            .provide_credentials()
+            .await
+            .map_err(|e| DurableError::Checkpoint {
+                message: format!("Failed to get AWS credentials: {}", e),
+                is_retriable: true,
+                aws_error: None,
+            })?;
+
+        let identity = credentials.into();
+        let signing_settings = SigningSettings::default();
+        let signing_params = v4::SigningParams::builder()
+            .identity(&identity)
+            .region(&self.config.region)
+            .name("lambda")
+            .time(SystemTime::now())
+            .settings(signing_settings)
+            .build()
+            .map_err(|e| DurableError::Checkpoint {
+                message: format!("Failed to build signing params: {}", e),
+                is_retriable: false,
+                aws_error: None,
+            })?;
+
+        let signable_request = SignableRequest::new(
+            method,
+            uri,
+            std::iter::empty::<(&str, &str)>(),
+            SignableBody::Bytes(body),
+        )
+        .map_err(|e| DurableError::Checkpoint {
+            message: format!("Failed to create signable request: {}", e),
+            is_retriable: false,
+            aws_error: None,
+        })?;
+
+        let (signing_instructions, _signature) = sign(signable_request, &signing_params.into())
+            .map_err(|e| DurableError::Checkpoint {
+                message: format!("Failed to sign request: {}", e),
+                is_retriable: false,
+                aws_error: None,
+            })?
+            .into_parts();
+
+        // Build a temporary HTTP request to apply signing instructions
+        let mut temp_request = http::Request::builder()
+            .method(method)
+            .uri(uri)
+            .body(())
+            .map_err(|e| DurableError::Checkpoint {
+                message: format!("Failed to build temp request: {}", e),
+                is_retriable: false,
+                aws_error: None,
+            })?;
+
+        signing_instructions.apply_to_request_http1x(&mut temp_request);
+
+        // Extract headers from the signed request
+        let headers: Vec<(String, String)> = temp_request
+            .headers()
+            .iter()
+            .map(|(name, value)| {
+                (
+                    name.to_string(),
+                    value.to_str().unwrap_or("").to_string(),
+                )
+            })
+            .collect();
+
+        Ok(headers)
     }
 }
 
-
 /// Request payload for checkpoint operations.
 #[derive(Debug, Clone, Serialize)]
-struct CheckpointRequest {
-    #[serde(rename = "DurableExecutionArn")]
-    durable_execution_arn: String,
+struct CheckpointRequestBody {
     #[serde(rename = "CheckpointToken")]
     checkpoint_token: String,
-    #[serde(rename = "Operations")]
-    operations: Vec<OperationUpdate>,
+    #[serde(rename = "Updates")]
+    updates: Vec<OperationUpdate>,
 }
 
 /// Request payload for get_operations.
 #[derive(Debug, Clone, Serialize)]
-struct GetOperationsRequest {
-    #[serde(rename = "DurableExecutionArn")]
-    durable_execution_arn: String,
+struct GetOperationsRequestBody {
     #[serde(rename = "NextMarker")]
     next_marker: String,
 }
@@ -166,55 +290,66 @@ impl DurableServiceClient for LambdaDurableServiceClient {
         checkpoint_token: &str,
         operations: Vec<OperationUpdate>,
     ) -> Result<CheckpointResponse, DurableError> {
-        let request = CheckpointRequest {
-            durable_execution_arn: durable_execution_arn.to_string(),
+        let request_body = CheckpointRequestBody {
             checkpoint_token: checkpoint_token.to_string(),
-            operations,
+            updates: operations,
         };
 
-        let payload = serde_json::to_vec(&request).map_err(|e| DurableError::SerDes {
+        let body = serde_json::to_vec(&request_body).map_err(|e| DurableError::SerDes {
             message: format!("Failed to serialize checkpoint request: {}", e),
         })?;
 
-        // Use the configured function ARN or derive from the durable execution ARN
-        let function_name = self
-            .config
-            .checkpoint_function_arn
-            .clone()
-            .unwrap_or_else(|| derive_checkpoint_function_arn(durable_execution_arn));
+        // URL-encode the durable execution ARN for the path
+        let encoded_arn = urlencoding::encode(durable_execution_arn);
+        let uri = format!(
+            "{}/2025-12-01/durable-executions/{}/checkpoint",
+            self.endpoint_url(),
+            encoded_arn
+        );
 
-        let response = self
-            .lambda_client
-            .invoke()
-            .function_name(&function_name)
-            .payload(aws_sdk_lambda::primitives::Blob::new(payload))
-            .send()
-            .await
-            .map_err(|e| map_lambda_error(e, "checkpoint"))?;
+        // Sign the request
+        let signed_headers = self.sign_request("POST", &uri, &body).await?;
 
-        // Check for function error
-        if let Some(function_error) = response.function_error() {
+        // Build and send the request
+        let mut request = self
+            .http_client
+            .post(&uri)
+            .header("Content-Type", "application/json")
+            .body(body);
+
+        for (name, value) in signed_headers {
+            request = request.header(&name, &value);
+        }
+
+        let response = request.send().await.map_err(|e| DurableError::Checkpoint {
+            message: format!("HTTP request failed: {}", e),
+            is_retriable: e.is_timeout() || e.is_connect(),
+            aws_error: None,
+        })?;
+
+        let status = response.status();
+        let response_body = response.bytes().await.map_err(|e| DurableError::Checkpoint {
+            message: format!("Failed to read response body: {}", e),
+            is_retriable: true,
+            aws_error: None,
+        })?;
+
+        if !status.is_success() {
+            let error_message = String::from_utf8_lossy(&response_body);
             return Err(DurableError::Checkpoint {
-                message: format!("Lambda function error: {}", function_error),
-                is_retriable: is_retriable_function_error(function_error),
-                aws_error: None,
+                message: format!("Checkpoint API returned {}: {}", status, error_message),
+                is_retriable: status.is_server_error() || status.as_u16() == 429,
+                aws_error: Some(AwsError {
+                    code: status.to_string(),
+                    message: error_message.to_string(),
+                    request_id: None,
+                }),
             });
         }
 
-        // Parse the response payload
-        let response_payload = response
-            .payload()
-            .ok_or_else(|| DurableError::Checkpoint {
-                message: "Empty response from checkpoint function".to_string(),
-                is_retriable: true,
-                aws_error: None,
-            })?;
-
         let checkpoint_response: CheckpointResponse =
-            serde_json::from_slice(response_payload.as_ref()).map_err(|e| {
-                DurableError::SerDes {
-                    message: format!("Failed to deserialize checkpoint response: {}", e),
-                }
+            serde_json::from_slice(&response_body).map_err(|e| DurableError::SerDes {
+                message: format!("Failed to deserialize checkpoint response: {}", e),
             })?;
 
         Ok(checkpoint_response)
@@ -225,113 +360,62 @@ impl DurableServiceClient for LambdaDurableServiceClient {
         durable_execution_arn: &str,
         next_marker: &str,
     ) -> Result<GetOperationsResponse, DurableError> {
-        let request = GetOperationsRequest {
-            durable_execution_arn: durable_execution_arn.to_string(),
+        let request_body = GetOperationsRequestBody {
             next_marker: next_marker.to_string(),
         };
 
-        let payload = serde_json::to_vec(&request).map_err(|e| DurableError::SerDes {
+        let body = serde_json::to_vec(&request_body).map_err(|e| DurableError::SerDes {
             message: format!("Failed to serialize get_operations request: {}", e),
         })?;
 
-        // Use the configured function ARN or derive from the durable execution ARN
-        let function_name = self
-            .config
-            .get_operations_function_arn
-            .clone()
-            .unwrap_or_else(|| derive_get_operations_function_arn(durable_execution_arn));
+        // URL-encode the durable execution ARN for the path
+        let encoded_arn = urlencoding::encode(durable_execution_arn);
+        let uri = format!(
+            "{}/2025-12-01/durable-executions/{}/state",
+            self.endpoint_url(),
+            encoded_arn
+        );
 
-        let response = self
-            .lambda_client
-            .invoke()
-            .function_name(&function_name)
-            .payload(aws_sdk_lambda::primitives::Blob::new(payload))
-            .send()
-            .await
-            .map_err(|e| map_lambda_error(e, "get_operations"))?;
+        // Sign the request
+        let signed_headers = self.sign_request("POST", &uri, &body).await?;
 
-        // Check for function error
-        if let Some(function_error) = response.function_error() {
+        // Build and send the request
+        let mut request = self
+            .http_client
+            .post(&uri)
+            .header("Content-Type", "application/json")
+            .body(body);
+
+        for (name, value) in signed_headers {
+            request = request.header(&name, &value);
+        }
+
+        let response = request.send().await.map_err(|e| DurableError::Invocation {
+            message: format!("HTTP request failed: {}", e),
+            termination_reason: crate::error::TerminationReason::InvocationError,
+        })?;
+
+        let status = response.status();
+        let response_body = response.bytes().await.map_err(|e| DurableError::Invocation {
+            message: format!("Failed to read response body: {}", e),
+            termination_reason: crate::error::TerminationReason::InvocationError,
+        })?;
+
+        if !status.is_success() {
+            let error_message = String::from_utf8_lossy(&response_body);
             return Err(DurableError::Invocation {
-                message: format!("Lambda function error: {}", function_error),
+                message: format!("GetDurableExecutionState API returned {}: {}", status, error_message),
                 termination_reason: crate::error::TerminationReason::InvocationError,
             });
         }
 
-        // Parse the response payload
-        let response_payload = response
-            .payload()
-            .ok_or_else(|| DurableError::Invocation {
-                message: "Empty response from get_operations function".to_string(),
-                termination_reason: crate::error::TerminationReason::InvocationError,
-            })?;
-
         let operations_response: GetOperationsResponse =
-            serde_json::from_slice(response_payload.as_ref()).map_err(|e| {
-                DurableError::SerDes {
-                    message: format!("Failed to deserialize get_operations response: {}", e),
-                }
+            serde_json::from_slice(&response_body).map_err(|e| DurableError::SerDes {
+                message: format!("Failed to deserialize get_operations response: {}", e),
             })?;
 
         Ok(operations_response)
     }
-}
-
-/// Derives the checkpoint function ARN from the durable execution ARN.
-fn derive_checkpoint_function_arn(durable_execution_arn: &str) -> String {
-    // The checkpoint function is typically a Lambda extension or internal service
-    // For now, we use a placeholder that would be replaced with actual service endpoint
-    format!("{}:checkpoint", durable_execution_arn)
-}
-
-/// Derives the get_operations function ARN from the durable execution ARN.
-fn derive_get_operations_function_arn(durable_execution_arn: &str) -> String {
-    // Similar to checkpoint, this would be the actual service endpoint
-    format!("{}:get_operations", durable_execution_arn)
-}
-
-/// Maps Lambda SDK errors to DurableError.
-fn map_lambda_error(
-    error: aws_sdk_lambda::error::SdkError<aws_sdk_lambda::operation::invoke::InvokeError>,
-    operation: &str,
-) -> DurableError {
-    let (is_retriable, aws_error) = match &error {
-        aws_sdk_lambda::error::SdkError::ServiceError(service_error) => {
-            let err = service_error.err();
-            let is_retriable = matches!(
-                err,
-                aws_sdk_lambda::operation::invoke::InvokeError::TooManyRequestsException(_)
-                    | aws_sdk_lambda::operation::invoke::InvokeError::ServiceException(_)
-            );
-            let aws_error = Some(AwsError {
-                code: format!("{:?}", err),
-                message: err.to_string(),
-                request_id: service_error
-                    .raw()
-                    .request_id()
-                    .map(|s| s.to_string()),
-            });
-            (is_retriable, aws_error)
-        }
-        aws_sdk_lambda::error::SdkError::TimeoutError(_) => (true, None),
-        aws_sdk_lambda::error::SdkError::DispatchFailure(_) => (true, None),
-        _ => (false, None),
-    };
-
-    DurableError::Checkpoint {
-        message: format!("Lambda {} failed: {}", operation, error),
-        is_retriable,
-        aws_error,
-    }
-}
-
-/// Determines if a function error is retriable.
-fn is_retriable_function_error(error: &str) -> bool {
-    // Common retriable error patterns
-    error.contains("ServiceException")
-        || error.contains("TooManyRequests")
-        || error.contains("Throttling")
-        || error.contains("InternalError")
 }
 
 /// A mock implementation of DurableServiceClient for testing.
@@ -450,9 +534,9 @@ mod tests {
         let json = r#"{
             "Operations": [
                 {
-                    "OperationId": "op-1",
-                    "OperationType": "Step",
-                    "Status": "Succeeded"
+                    "Id": "op-1",
+                    "Type": "STEP",
+                    "Status": "SUCCEEDED"
                 }
             ],
             "NextMarker": "marker-456"
@@ -476,34 +560,14 @@ mod tests {
     #[test]
     fn test_lambda_client_config_default() {
         let config = LambdaClientConfig::default();
-        assert!(config.checkpoint_function_arn.is_none());
-        assert!(config.get_operations_function_arn.is_none());
+        assert_eq!(config.region, "us-east-1");
+        assert!(config.endpoint_url.is_none());
     }
 
     #[test]
-    fn test_derive_checkpoint_function_arn() {
-        let arn = "arn:aws:lambda:us-east-1:123456789012:function:my-function:durable:abc123";
-        let checkpoint_arn = derive_checkpoint_function_arn(arn);
-        assert!(checkpoint_arn.contains(arn));
-        assert!(checkpoint_arn.contains(":checkpoint"));
-    }
-
-    #[test]
-    fn test_derive_get_operations_function_arn() {
-        let arn = "arn:aws:lambda:us-east-1:123456789012:function:my-function:durable:abc123";
-        let get_ops_arn = derive_get_operations_function_arn(arn);
-        assert!(get_ops_arn.contains(arn));
-        assert!(get_ops_arn.contains(":get_operations"));
-    }
-
-    #[test]
-    fn test_is_retriable_function_error() {
-        assert!(is_retriable_function_error("ServiceException: Internal error"));
-        assert!(is_retriable_function_error("TooManyRequests: Rate exceeded"));
-        assert!(is_retriable_function_error("Throttling: Request throttled"));
-        assert!(is_retriable_function_error("InternalError: Something went wrong"));
-        assert!(!is_retriable_function_error("ValidationError: Invalid input"));
-        assert!(!is_retriable_function_error("ResourceNotFound: Function not found"));
+    fn test_lambda_client_config_with_region() {
+        let config = LambdaClientConfig::with_region("us-west-2");
+        assert_eq!(config.region, "us-west-2");
     }
 
     #[tokio::test]
@@ -590,26 +654,22 @@ mod tests {
     }
 
     #[test]
-    fn test_checkpoint_request_serialization() {
-        let request = CheckpointRequest {
-            durable_execution_arn: "arn:test".to_string(),
+    fn test_checkpoint_request_body_serialization() {
+        let request = CheckpointRequestBody {
             checkpoint_token: "token-123".to_string(),
-            operations: vec![OperationUpdate::start("op-1", OperationType::Step)],
+            updates: vec![OperationUpdate::start("op-1", OperationType::Step)],
         };
         let json = serde_json::to_string(&request).unwrap();
-        assert!(json.contains(r#""DurableExecutionArn":"arn:test""#));
         assert!(json.contains(r#""CheckpointToken":"token-123""#));
-        assert!(json.contains(r#""Operations""#));
+        assert!(json.contains(r#""Updates""#));
     }
 
     #[test]
-    fn test_get_operations_request_serialization() {
-        let request = GetOperationsRequest {
-            durable_execution_arn: "arn:test".to_string(),
+    fn test_get_operations_request_body_serialization() {
+        let request = GetOperationsRequestBody {
             next_marker: "marker-123".to_string(),
         };
         let json = serde_json::to_string(&request).unwrap();
-        assert!(json.contains(r#""DurableExecutionArn":"arn:test""#));
         assert!(json.contains(r#""NextMarker":"marker-123""#));
     }
 }

@@ -315,9 +315,9 @@ mod tests {
             "InitialExecutionState": {
                 "Operations": [
                     {
-                        "OperationId": "op-1",
-                        "OperationType": "Step",
-                        "Status": "Succeeded",
+                        "Id": "op-1",
+                        "Type": "STEP",
+                        "Status": "SUCCEEDED",
                         "Result": "{\"value\": 42}"
                     }
                 ],

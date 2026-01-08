@@ -175,31 +175,73 @@ pub fn durable_execution(_attr: TokenStream, item: TokenStream) -> TokenStream {
             use ::aws_durable_execution_sdk::{
                 DurableContext, DurableError, DurableExecutionInvocationOutput,
                 ExecutionState, ErrorObject, CheckpointBatcherConfig,
-                SharedDurableServiceClient, LambdaDurableServiceClient, LambdaClientConfig,
+                SharedDurableServiceClient, LambdaDurableServiceClient,
+                OperationType,
             };
             
             let (durable_input, lambda_context) = lambda_event.into_parts();
             
             // Extract the user's event from the input
-            let user_event: #event_type = match &durable_input.input {
-                Some(value) => {
+            // First try the top-level Input field, then fall back to ExecutionDetails.InputPayload
+            let user_event: #event_type = {
+                // Try top-level Input first
+                if let Some(value) = &durable_input.input {
                     match ::serde_json::from_value(value.clone()) {
                         Ok(event) => event,
                         Err(e) => {
                             return Ok(DurableExecutionInvocationOutput::failed(
-                                ErrorObject::new("DeserializationError", format!("Failed to deserialize event: {}", e))
+                                ErrorObject::new("DeserializationError", format!("Failed to deserialize event from Input: {}", e))
                             ));
                         }
                     }
-                }
-                None => {
-                    // Try to deserialize from empty/default if the type supports it
-                    match ::serde_json::from_value(::serde_json::Value::Null) {
-                        Ok(event) => event,
-                        Err(_) => {
-                            return Ok(DurableExecutionInvocationOutput::failed(
-                                ErrorObject::new("DeserializationError", "No input provided and event type does not support default")
-                            ));
+                } else {
+                    // Try to extract from ExecutionDetails.InputPayload of the EXECUTION operation
+                    let execution_op = durable_input.initial_execution_state.operations.iter()
+                        .find(|op| op.operation_type == OperationType::Execution);
+                    
+                    if let Some(op) = execution_op {
+                        if let Some(details) = &op.execution_details {
+                            if let Some(payload) = &details.input_payload {
+                                // Parse the JSON string payload
+                                match ::serde_json::from_str::<#event_type>(payload) {
+                                    Ok(event) => event,
+                                    Err(e) => {
+                                        return Ok(DurableExecutionInvocationOutput::failed(
+                                            ErrorObject::new("DeserializationError", format!("Failed to deserialize event from ExecutionDetails.InputPayload: {}", e))
+                                        ));
+                                    }
+                                }
+                            } else {
+                                // No InputPayload, try default
+                                match ::serde_json::from_value(::serde_json::Value::Null) {
+                                    Ok(event) => event,
+                                    Err(_) => {
+                                        return Ok(DurableExecutionInvocationOutput::failed(
+                                            ErrorObject::new("DeserializationError", "No InputPayload in ExecutionDetails and event type does not support default")
+                                        ));
+                                    }
+                                }
+                            }
+                        } else {
+                            // No ExecutionDetails, try default
+                            match ::serde_json::from_value(::serde_json::Value::Null) {
+                                Ok(event) => event,
+                                Err(_) => {
+                                    return Ok(DurableExecutionInvocationOutput::failed(
+                                        ErrorObject::new("DeserializationError", "No ExecutionDetails in EXECUTION operation and event type does not support default")
+                                    ));
+                                }
+                            }
+                        }
+                    } else {
+                        // No EXECUTION operation found, try default
+                        match ::serde_json::from_value(::serde_json::Value::Null) {
+                            Ok(event) => event,
+                            Err(_) => {
+                                return Ok(DurableExecutionInvocationOutput::failed(
+                                    ErrorObject::new("DeserializationError", "No input provided and event type does not support default")
+                                ));
+                            }
                         }
                     }
                 }
@@ -207,9 +249,8 @@ pub fn durable_execution(_attr: TokenStream, item: TokenStream) -> TokenStream {
             
             // Create the service client
             let aws_config = ::aws_config::load_defaults(::aws_config::BehaviorVersion::latest()).await;
-            let lambda_client = ::aws_sdk_lambda::Client::new(&aws_config);
             let service_client: SharedDurableServiceClient = ::std::sync::Arc::new(
-                LambdaDurableServiceClient::new(lambda_client)
+                LambdaDurableServiceClient::from_aws_config(&aws_config)
             );
             
             // Create ExecutionState with batcher

@@ -29,9 +29,18 @@ tracing = "0.1"
 aws-sdk-lambda = "1.0"
 aws-config = "1.0"
 aws-smithy-runtime-api = "1.0"
+aws-credential-types = "1.0"
+aws-sigv4 = "1.0"
+aws-smithy-http = "0.60"
+
+# HTTP client
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+http = "1.0"
+url = "2.5"
+urlencoding = "2.1"
 
 # Lambda runtime
-lambda_runtime = "0.13"
+lambda_runtime = "1"
 
 # Hashing for deterministic IDs
 blake2 = "0.10"

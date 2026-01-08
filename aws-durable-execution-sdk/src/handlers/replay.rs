@@ -623,7 +623,6 @@ mod property_tests {
         use super::*;
         use crate::error::ErrorObject;
         use crate::operation::{Operation, OperationStatus};
-        use proptest::prelude::*;
 
         /// Strategy for generating valid operation types
         fn operation_type_strategy() -> impl Strategy<Value = OperationType> {

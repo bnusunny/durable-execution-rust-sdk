@@ -1,0 +1,39 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  simple_workflow
+
+  Sample SAM Template for simple_workflow
+
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 128
+
+Resources:
+  OrderProcessingFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Metadata:
+      BuildMethod: rust-cargolambda # More info about Cargo Lambda: https://github.com/cargo-lambda/cargo-lambda
+    Properties:
+      Runtime: python3.13
+      CodeUri: ./rust_app
+      Handler: bootstrap
+      AutoPublishAlias: live
+      Architectures:
+        - x86_64
+      DurableConfig:
+        ExecutionTimeout: 3600
+        RetentionPeriodInDays: 7        
+      Environment:
+        Variables:
+          AWS_LAMBDA_EXEC_WRAPPER: /var/task/bootstrap        
+
+Outputs:
+  OrderProcessingFunction:
+    Description: "Order Processing Lambda Function ARN"
+    Value: !GetAtt OrderProcessingFunction.Arn
+  OrderProcessingFunctionIamRole:
+    Description: "Implicit IAM Role created for Order Processing Function"
+    Value: !GetAtt OrderProcessingFunctionRole.Arn

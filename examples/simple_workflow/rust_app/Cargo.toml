@@ -1,0 +1,19 @@
+[package]
+name = "simple_workflow"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+lambda_runtime = "1"
+serde = "1.0.136"
+serde_json = "1"
+tokio = { version = "1", features = ["macros"] }
+tracing = { version = "0.1", features = ["log"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }
+aws-sdk-lambda = "1.0"
+aws-config = "1.0"
+aws-smithy-runtime-api = "1.0"
+aws-durable-execution-sdk = { version = "0.1", path = "../../../aws-durable-execution-sdk" }

@@ -1,0 +1,10 @@
+{
+  "order_id": "order-122342134",
+  "customer_id": "user-234134",
+  "amount_cents": 10000,
+  "items": [{
+    "sku": "book1",
+    "quantity": 4,
+    "unit_price_cents": 2500
+  }]
+}

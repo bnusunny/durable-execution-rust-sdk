@@ -3,6 +3,11 @@
 //! This module provides type-safe configuration structs for all
 //! durable operations including steps, callbacks, invocations,
 //! map, and parallel operations.
+//!
+//! ## Performance Configuration
+//!
+//! The SDK supports different checkpointing modes that trade off between
+//! durability and performance. See [`CheckpointingMode`] for details.
 
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -10,6 +15,153 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::duration::Duration;
+
+/// Checkpointing mode that controls the trade-off between durability and performance.
+///
+/// The checkpointing mode determines when and how often the SDK persists operation
+/// state to the durable execution service. Different modes offer different trade-offs:
+///
+/// ## Modes
+///
+/// ### Eager Mode
+/// - Checkpoints after every operation completes
+/// - Maximum durability: minimal work is lost on failure
+/// - More API calls: higher latency and cost
+/// - Best for: Critical workflows where every operation must be durable
+///
+/// ### Batched Mode (Default)
+/// - Groups multiple operations into batches before checkpointing
+/// - Balanced durability: some operations may be replayed on failure
+/// - Fewer API calls: better performance and lower cost
+/// - Best for: Most workflows with reasonable durability requirements
+///
+/// ### Optimistic Mode
+/// - Executes multiple operations before checkpointing
+/// - Minimal durability: more work may be replayed on failure
+/// - Best performance: fewest API calls
+/// - Best for: Workflows where replay is cheap and performance is critical
+///
+/// ## Example
+///
+/// ```rust
+/// use aws_durable_execution_sdk::CheckpointingMode;
+///
+/// // Use eager mode for maximum durability
+/// let eager = CheckpointingMode::Eager;
+///
+/// // Use batched mode for balanced performance (default)
+/// let batched = CheckpointingMode::default();
+///
+/// // Use optimistic mode for best performance
+/// let optimistic = CheckpointingMode::Optimistic;
+/// ```
+///
+/// ## Requirements
+///
+/// - 24.1: THE Performance_Configuration SHALL support eager checkpointing mode
+/// - 24.2: THE Performance_Configuration SHALL support batched checkpointing mode
+/// - 24.3: THE Performance_Configuration SHALL support optimistic execution mode
+/// - 24.4: THE Performance_Configuration SHALL document the default behavior and trade-offs
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CheckpointingMode {
+    /// Checkpoint after every operation for maximum durability.
+    ///
+    /// This mode provides the strongest durability guarantees but has the
+    /// highest overhead due to frequent API calls.
+    ///
+    /// ## Characteristics
+    /// - Every operation is immediately checkpointed
+    /// - Minimal work lost on failure (at most one operation)
+    /// - Higher latency due to synchronous checkpointing
+    /// - More API calls and higher cost
+    ///
+    /// ## Use Cases
+    /// - Financial transactions
+    /// - Critical business workflows
+    /// - Operations with expensive side effects
+    ///
+    /// ## Requirements
+    /// - 24.1: THE Performance_Configuration SHALL support eager checkpointing mode
+    Eager,
+
+    /// Batch multiple operations before checkpointing for balanced performance.
+    ///
+    /// This is the default mode that provides a good balance between durability
+    /// and performance. Operations are grouped into batches based on size, count,
+    /// or time limits before being checkpointed together.
+    ///
+    /// ## Characteristics
+    /// - Operations are batched before checkpointing
+    /// - Some operations may be replayed on failure
+    /// - Better performance than eager mode
+    /// - Configurable batch size and timing
+    ///
+    /// ## Use Cases
+    /// - Most general-purpose workflows
+    /// - Workflows with moderate durability requirements
+    /// - Cost-sensitive applications
+    ///
+    /// ## Requirements
+    /// - 24.2: THE Performance_Configuration SHALL support batched checkpointing mode
+    Batched,
+
+    /// Execute multiple operations before checkpointing for best performance.
+    ///
+    /// This mode prioritizes performance over durability by executing multiple
+    /// operations before creating a checkpoint. On failure, more work may need
+    /// to be replayed.
+    ///
+    /// ## Characteristics
+    /// - Multiple operations execute before checkpointing
+    /// - More work may be replayed on failure
+    /// - Best performance and lowest cost
+    /// - Suitable for idempotent operations
+    ///
+    /// ## Use Cases
+    /// - High-throughput batch processing
+    /// - Workflows with cheap, idempotent operations
+    /// - Performance-critical applications
+    ///
+    /// ## Requirements
+    /// - 24.3: THE Performance_Configuration SHALL support optimistic execution mode
+    Optimistic,
+}
+
+impl Default for CheckpointingMode {
+    /// Returns the default checkpointing mode (Batched).
+    ///
+    /// Batched mode is the default because it provides a good balance between
+    /// durability and performance for most use cases.
+    fn default() -> Self {
+        Self::Batched
+    }
+}
+
+impl CheckpointingMode {
+    /// Returns true if this mode checkpoints after every operation.
+    pub fn is_eager(&self) -> bool {
+        matches!(self, Self::Eager)
+    }
+
+    /// Returns true if this mode batches operations before checkpointing.
+    pub fn is_batched(&self) -> bool {
+        matches!(self, Self::Batched)
+    }
+
+    /// Returns true if this mode executes multiple operations before checkpointing.
+    pub fn is_optimistic(&self) -> bool {
+        matches!(self, Self::Optimistic)
+    }
+
+    /// Returns a human-readable description of this mode.
+    pub fn description(&self) -> &'static str {
+        match self {
+            Self::Eager => "Checkpoint after every operation (maximum durability)",
+            Self::Batched => "Batch operations before checkpointing (balanced)",
+            Self::Optimistic => "Execute multiple operations before checkpointing (best performance)",
+        }
+    }
+}
 
 /// Retry strategy trait for configuring step retry behavior.
 pub trait RetryStrategy: Send + Sync {
@@ -131,11 +283,87 @@ pub struct ParallelConfig {
 }
 
 /// Configuration for child context operations.
+///
+/// This configuration controls how child contexts behave, including
+/// whether to replay children when loading state for large parallel operations.
+///
+/// # Requirements
+///
+/// - 10.5: THE Child_Context_Operation SHALL support ReplayChildren option for large parallel operations
+/// - 10.6: WHEN ReplayChildren is true, THE Child_Context_Operation SHALL include child operations in state loads for replay
+/// - 12.8: THE Configuration_System SHALL provide ContextConfig with replay_children option
 #[derive(Debug, Clone, Default)]
 pub struct ChildConfig {
     /// Optional custom serializer/deserializer.
     pub serdes: Option<Arc<dyn SerDesAny>>,
+    /// Whether to replay children when loading state.
+    ///
+    /// When set to `true`, the child context will request child operations
+    /// to be included in state loads during replay. This is useful for large
+    /// parallel operations where the combined output needs to be reconstructed
+    /// by replaying each branch.
+    ///
+    /// Default is `false` for better performance in most cases.
+    ///
+    /// # Requirements
+    ///
+    /// - 10.5: THE Child_Context_Operation SHALL support ReplayChildren option for large parallel operations
+    /// - 10.6: WHEN ReplayChildren is true, THE Child_Context_Operation SHALL include child operations in state loads for replay
+    pub replay_children: bool,
 }
+
+impl ChildConfig {
+    /// Creates a new ChildConfig with default values.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Creates a ChildConfig with replay_children enabled.
+    ///
+    /// Use this when you need to reconstruct the combined output of a large
+    /// parallel operation by replaying each branch.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use aws_durable_execution_sdk::ChildConfig;
+    ///
+    /// let config = ChildConfig::with_replay_children();
+    /// assert!(config.replay_children);
+    /// ```
+    pub fn with_replay_children() -> Self {
+        Self {
+            replay_children: true,
+            ..Default::default()
+        }
+    }
+
+    /// Sets the replay_children option.
+    ///
+    /// # Arguments
+    ///
+    /// * `replay_children` - Whether to replay children when loading state
+    pub fn set_replay_children(mut self, replay_children: bool) -> Self {
+        self.replay_children = replay_children;
+        self
+    }
+
+    /// Sets the custom serializer/deserializer.
+    pub fn set_serdes(mut self, serdes: Arc<dyn SerDesAny>) -> Self {
+        self.serdes = Some(serdes);
+        self
+    }
+}
+
+/// Type alias for ChildConfig for consistency with the design document.
+///
+/// The design document refers to this as `ContextConfig`, but internally
+/// we use `ChildConfig` to be more descriptive of its purpose.
+///
+/// # Requirements
+///
+/// - 12.8: THE Configuration_System SHALL provide ContextConfig with replay_children option
+pub type ContextConfig = ChildConfig;
 
 /// Configuration defining success/failure criteria for concurrent operations.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -339,5 +567,88 @@ mod tests {
     fn test_parallel_config_default() {
         let config = ParallelConfig::default();
         assert!(config.max_concurrency.is_none());
+    }
+
+    #[test]
+    fn test_child_config_default() {
+        let config = ChildConfig::default();
+        assert!(!config.replay_children);
+        assert!(config.serdes.is_none());
+    }
+
+    #[test]
+    fn test_child_config_with_replay_children() {
+        let config = ChildConfig::with_replay_children();
+        assert!(config.replay_children);
+    }
+
+    #[test]
+    fn test_child_config_set_replay_children() {
+        let config = ChildConfig::new().set_replay_children(true);
+        assert!(config.replay_children);
+    }
+
+    #[test]
+    fn test_context_config_type_alias() {
+        // ContextConfig is a type alias for ChildConfig
+        let config: ContextConfig = ContextConfig::with_replay_children();
+        assert!(config.replay_children);
+    }
+
+    #[test]
+    fn test_checkpointing_mode_default() {
+        let mode = CheckpointingMode::default();
+        assert_eq!(mode, CheckpointingMode::Batched);
+        assert!(mode.is_batched());
+    }
+
+    #[test]
+    fn test_checkpointing_mode_eager() {
+        let mode = CheckpointingMode::Eager;
+        assert!(mode.is_eager());
+        assert!(!mode.is_batched());
+        assert!(!mode.is_optimistic());
+    }
+
+    #[test]
+    fn test_checkpointing_mode_batched() {
+        let mode = CheckpointingMode::Batched;
+        assert!(!mode.is_eager());
+        assert!(mode.is_batched());
+        assert!(!mode.is_optimistic());
+    }
+
+    #[test]
+    fn test_checkpointing_mode_optimistic() {
+        let mode = CheckpointingMode::Optimistic;
+        assert!(!mode.is_eager());
+        assert!(!mode.is_batched());
+        assert!(mode.is_optimistic());
+    }
+
+    #[test]
+    fn test_checkpointing_mode_description() {
+        assert!(CheckpointingMode::Eager.description().contains("maximum durability"));
+        assert!(CheckpointingMode::Batched.description().contains("balanced"));
+        assert!(CheckpointingMode::Optimistic.description().contains("best performance"));
+    }
+
+    #[test]
+    fn test_checkpointing_mode_serialization() {
+        // Test that CheckpointingMode can be serialized and deserialized
+        let mode = CheckpointingMode::Eager;
+        let serialized = serde_json::to_string(&mode).unwrap();
+        let deserialized: CheckpointingMode = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(mode, deserialized);
+
+        let mode = CheckpointingMode::Batched;
+        let serialized = serde_json::to_string(&mode).unwrap();
+        let deserialized: CheckpointingMode = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(mode, deserialized);
+
+        let mode = CheckpointingMode::Optimistic;
+        let serialized = serde_json::to_string(&mode).unwrap();
+        let deserialized: CheckpointingMode = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(mode, deserialized);
     }
 }

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This document specifies the requirements for implementing the AWS Durable Execution SDK for the Lambda Rust Runtime. The SDK enables developers to build reliable, long-running workflows in AWS Lambda using Rust, with automatic checkpointing, replay, and state management. The implementation should provide idiomatic Rust APIs while maintaining feature parity with the existing Python SDK.
+This document specifies the requirements for implementing the AWS Durable Execution SDK for the Lambda Rust Runtime. The SDK enables developers to build reliable, long-running workflows in AWS Lambda using Rust, with automatic checkpointing, replay, and state management. The implementation should provide idiomatic Rust APIs while conforming to the AWS Lambda Durable Functions Language SDK Specification v1.2.
 
 ## Glossary
 
@@ -17,6 +17,9 @@ This document specifies the requirements for implementing the AWS Durable Execut
 - **CompletionConfig**: Configuration defining success/failure criteria for concurrent operations
 - **SuspendExecution**: Signal to pause execution and return control to Lambda runtime
 - **OperationIdentifier**: Unique identifier for each operation combining operation_id, parent_id, and optional name
+- **EXECUTION_Operation**: Special operation representing the overall execution, providing access to original invocation input
+- **ReplayChildren**: Option for CONTEXT operations to include child state during replay for large parallel operations
+- **Checkpoint_Token**: A one-time-use token ensuring exactly-once checkpoint semantics
 
 ## Requirements
 
@@ -36,6 +39,7 @@ This document specifies the requirements for implementing the AWS Durable Execut
 8. THE DurableContext SHALL provide a `wait_for_condition` method that polls until a condition is met
 9. THE DurableContext SHALL provide a `wait_for_callback` method that combines callback creation with a submitter function
 10. THE DurableContext SHALL generate deterministic operation IDs using a thread-safe counter and parent context
+11. THE DurableContext SHALL provide access to the original user input from the EXECUTION operation
 
 ### Requirement 2: Checkpointing System
 
@@ -51,6 +55,11 @@ This document specifies the requirements for implementing the AWS Durable Execut
 6. WHEN a checkpoint fails with a non-retriable error, THE Checkpointing_System SHALL return FAILED status without retry
 7. THE Checkpointing_System SHALL use a background task for batch processing checkpoints
 8. THE Checkpointing_System SHALL track parent-child relationships to prevent orphaned operations from checkpointing
+9. THE Checkpointing_System SHALL use the CheckpointToken from invocation input for the first checkpoint
+10. THE Checkpointing_System SHALL use the returned CheckpointToken from each checkpoint response for subsequent checkpoints
+11. THE Checkpointing_System SHALL handle InvalidParameterValueException for invalid tokens by allowing propagation for retry
+12. WHEN batching operations, THE Checkpointing_System SHALL checkpoint in execution order with EXECUTION completion last
+13. THE Checkpointing_System SHALL support including both START and completion actions for STEP/CONTEXT in the same batch
 
 ### Requirement 3: Replay Mechanism
 
@@ -64,6 +73,7 @@ This document specifies the requirements for implementing the AWS Durable Execut
 4. WHEN an operation ID has no matching checkpoint, THE Replay_Mechanism SHALL execute the operation normally
 5. THE Replay_Mechanism SHALL detect non-deterministic execution when operation types don't match checkpointed state
 6. THE Replay_Mechanism SHALL support paginated loading of operations for large execution histories
+7. WHEN an operation is in READY status, THE Replay_Mechanism SHALL resume execution without re-checkpointing START
 
 ### Requirement 4: Step Operations
 
@@ -77,6 +87,9 @@ This document specifies the requirements for implementing the AWS Durable Execut
 4. THE Step_Operation SHALL support custom SerDes for result serialization
 5. WHEN a step succeeds, THE Step_Operation SHALL checkpoint the serialized result
 6. WHEN a step fails after all retries, THE Step_Operation SHALL checkpoint the error
+7. THE Step_Operation SHALL support RETRY action with NextAttemptDelaySeconds for backoff
+8. THE Step_Operation SHALL track attempt numbers in StepDetails.Attempt
+9. THE Step_Operation SHALL support RETRY action with Payload (not just Error) for wait-for-condition pattern
 
 ### Requirement 5: Wait Operations
 
@@ -88,6 +101,8 @@ This document specifies the requirements for implementing the AWS Durable Execut
 2. IF the wait duration has not elapsed, THEN THE Wait_Operation SHALL suspend execution
 3. WHEN the wait duration has elapsed, THE Wait_Operation SHALL allow execution to continue
 4. THE Wait_Operation SHALL validate that duration is at least 1 second
+5. THE Wait_Operation SHALL support cancellation of active waits via CANCEL action
+6. THE Wait_Operation SHALL accept duration specifications in seconds, minutes, hours, days, weeks, months, and years
 
 ### Requirement 6: Callback Operations
 
@@ -96,12 +111,12 @@ This document specifies the requirements for implementing the AWS Durable Execut
 #### Acceptance Criteria
 
 1. WHEN create_callback is called, THE Callback_Operation SHALL generate a unique callback_id
-2. THE Callback_Operation SHALL support configurable timeout duration
-3. THE Callback_Operation SHALL support configurable heartbeat timeout
+2. THE Callback_Operation SHALL support configurable timeout duration (TimeoutSeconds)
+3. THE Callback_Operation SHALL support configurable heartbeat timeout (HeartbeatTimeoutSeconds)
 4. WHEN Callback.result() is called and result is not available, THE Callback_Operation SHALL suspend execution
 5. WHEN the callback receives a success signal, THE Callback_Operation SHALL return the result
 6. WHEN the callback receives a failure signal, THE Callback_Operation SHALL return a CallbackError
-7. WHEN the callback times out, THE Callback_Operation SHALL return a timeout error
+7. WHEN the callback times out, THE Callback_Operation SHALL return a timeout error with TIMED_OUT status
 
 ### Requirement 7: Invoke Operations
 
@@ -110,10 +125,12 @@ This document specifies the requirements for implementing the AWS Durable Execut
 #### Acceptance Criteria
 
 1. WHEN invoke is called, THE Invoke_Operation SHALL call the target Lambda function
-2. THE Invoke_Operation SHALL support configurable timeout
+2. THE Invoke_Operation SHALL support function name or ARN as target
 3. THE Invoke_Operation SHALL support custom SerDes for payload and result
 4. THE Invoke_Operation SHALL checkpoint the invocation and result
 5. WHEN the invoked function fails, THE Invoke_Operation SHALL propagate the error
+6. THE Invoke_Operation SHALL support optional TenantId for tenant isolation scenarios
+7. THE Invoke_Operation SHALL handle STOPPED status when execution is stopped externally
 
 ### Requirement 8: Map Operations
 
@@ -128,6 +145,7 @@ This document specifies the requirements for implementing the AWS Durable Execut
 5. THE Map_Operation SHALL return a BatchResult containing results for all items
 6. WHEN min_successful is reached, THE Map_Operation SHALL complete successfully
 7. WHEN failure tolerance is exceeded, THE Map_Operation SHALL complete with failure
+8. THE Map_Operation SHALL use a parent CONTEXT operation with child CONTEXT operations for each item
 
 ### Requirement 9: Parallel Operations
 
@@ -140,6 +158,8 @@ This document specifies the requirements for implementing the AWS Durable Execut
 3. THE Parallel_Operation SHALL support CompletionConfig to define success/failure criteria
 4. THE Parallel_Operation SHALL return a BatchResult containing results for all branches
 5. WHEN a branch suspends, THE Parallel_Operation SHALL handle the suspension appropriately
+6. THE Parallel_Operation SHALL support named and unnamed branches
+7. THE Parallel_Operation SHALL use a parent CONTEXT operation with child CONTEXT operations for each branch
 
 ### Requirement 10: Child Context Operations
 
@@ -151,6 +171,8 @@ This document specifies the requirements for implementing the AWS Durable Execut
 2. THE Child_Context_Operation SHALL checkpoint the child context result when complete
 3. THE Child_Context_Operation SHALL support custom SerDes for result serialization
 4. WHEN a child context fails, THE Child_Context_Operation SHALL propagate the error to the parent
+5. THE Child_Context_Operation SHALL support ReplayChildren option for large parallel operations
+6. WHEN ReplayChildren is true, THE Child_Context_Operation SHALL include child operations in state loads for replay
 
 ### Requirement 11: Serialization System
 
@@ -162,6 +184,9 @@ This document specifies the requirements for implementing the AWS Durable Execut
 2. THE Serialization_System SHALL provide a default JSON SerDes implementation
 3. THE Serialization_System SHALL pass SerDesContext with operation_id and execution_arn to serializers
 4. WHEN serialization fails, THE Serialization_System SHALL return a SerDesError
+5. THE Serialization_System SHALL support primitive types (string, number, boolean, null)
+6. THE Serialization_System SHALL support complex types (objects, arrays)
+7. WHEN deserialization fails, THE Serialization_System SHALL treat it as a terminal failure
 
 ### Requirement 12: Configuration Types
 
@@ -171,11 +196,12 @@ This document specifies the requirements for implementing the AWS Durable Execut
 
 1. THE Configuration_System SHALL provide StepConfig with retry_strategy, step_semantics, and serdes
 2. THE Configuration_System SHALL provide CallbackConfig with timeout and heartbeat_timeout
-3. THE Configuration_System SHALL provide InvokeConfig with timeout and payload/result serdes
+3. THE Configuration_System SHALL provide InvokeConfig with function_name, tenant_id, and payload/result serdes
 4. THE Configuration_System SHALL provide MapConfig with max_concurrency, item_batcher, completion_config, and serdes
 5. THE Configuration_System SHALL provide ParallelConfig with max_concurrency, completion_config, and serdes
 6. THE Configuration_System SHALL provide CompletionConfig with min_successful, tolerated_failure_count, and tolerated_failure_percentage
-7. THE Configuration_System SHALL provide Duration type with constructors from seconds, minutes, hours, and days
+7. THE Configuration_System SHALL provide Duration type with constructors from seconds, minutes, hours, days, weeks, months, and years
+8. THE Configuration_System SHALL provide ContextConfig with replay_children option
 
 ### Requirement 13: Error Handling
 
@@ -187,10 +213,11 @@ This document specifies the requirements for implementing the AWS Durable Execut
 2. THE Error_System SHALL define ExecutionError for errors that return FAILED without retry
 3. THE Error_System SHALL define InvocationError for errors that trigger Lambda retry
 4. THE Error_System SHALL define CheckpointError for checkpoint failures with retriable/non-retriable distinction
-5. THE Error_System SHALL define CallbackError for callback-specific failures
+5. THE Error_System SHALL define CallbackError for callback-specific failures including TIMED_OUT
 6. THE Error_System SHALL define NonDeterministicExecutionError for replay mismatches
 7. THE Error_System SHALL define ValidationError for invalid configuration or arguments
 8. THE Error_System SHALL define SerDesError for serialization failures
+9. THE Error_System SHALL provide ErrorObject with ErrorType, ErrorMessage, StackTrace, and ErrorData fields
 
 ### Requirement 14: Concurrency Implementation
 
@@ -217,7 +244,9 @@ This document specifies the requirements for implementing the AWS Durable Execut
 5. WHEN the handler returns successfully, THE Lambda_Integration SHALL return SUCCEEDED status with result
 6. WHEN the handler fails, THE Lambda_Integration SHALL return FAILED status with error
 7. WHEN execution suspends, THE Lambda_Integration SHALL return PENDING status
-8. THE Lambda_Integration SHALL handle large responses by checkpointing before returning
+8. THE Lambda_Integration SHALL handle large responses by checkpointing via EXECUTION operation before returning
+9. THE Lambda_Integration SHALL extract original user input from ExecutionDetails.InputPayload
+10. THE Lambda_Integration SHALL recognize the first operation in state as the EXECUTION operation
 
 ### Requirement 16: Logging Integration
 
@@ -230,6 +259,8 @@ This document specifies the requirements for implementing the AWS Durable Execut
 3. THE Logging_System SHALL include operation_id in log context when available
 4. THE Logging_System SHALL include parent_id in log context for child operations
 5. THE DurableContext SHALL provide a method to set a custom logger
+6. THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
+7. THE Logging_System SHALL allow users to configure replay logging behavior
 
 ### Requirement 17: Thread Safety
 
@@ -252,3 +283,88 @@ This document specifies the requirements for implementing the AWS Durable Execut
 2. THE AWS_Integration SHALL support custom AWS SDK client configuration
 3. THE AWS_Integration SHALL handle AWS API errors and map them to SDK error types
 4. THE AWS_Integration SHALL support standard AWS credential resolution
+5. THE AWS_Integration SHALL handle ThrottlingException with appropriate retry behavior
+6. THE AWS_Integration SHALL handle ResourceNotFoundException appropriately
+
+### Requirement 19: EXECUTION Operation
+
+**User Story:** As a Rust developer, I want access to the original invocation input and the ability to complete execution via checkpointing, so that I can handle large results and access input data.
+
+#### Acceptance Criteria
+
+1. THE EXECUTION_Operation SHALL be recognized as the first operation in state
+2. THE EXECUTION_Operation SHALL provide access to original user input from ExecutionDetails.InputPayload
+3. THE EXECUTION_Operation SHALL support completing execution via SUCCEED action with result
+4. THE EXECUTION_Operation SHALL support completing execution via FAIL action with error
+5. WHEN execution result exceeds response size limits, THE EXECUTION_Operation SHALL checkpoint the result and return empty Result field
+
+### Requirement 20: Promise Combinators
+
+**User Story:** As a Rust developer, I want to coordinate multiple durable promises using familiar patterns, so that I can compose complex async workflows.
+
+#### Acceptance Criteria
+
+1. THE Promise_Combinators SHALL provide an `all` method that waits for all promises to complete successfully
+2. THE Promise_Combinators SHALL provide an `all_settled` method that waits for all promises to settle
+3. THE Promise_Combinators SHALL provide a `race` method that returns the first promise to settle
+4. THE Promise_Combinators SHALL provide an `any` method that returns the first promise to succeed
+5. THE Promise_Combinators SHALL be implemented within a STEP operation to ensure durability
+6. THE Promise_Combinators SHALL support proper error propagation and result collection
+
+### Requirement 21: Determinism Documentation
+
+**User Story:** As a Rust developer, I want clear documentation about determinism requirements, so that I can write correct durable functions that replay properly.
+
+#### Acceptance Criteria
+
+1. THE Documentation SHALL clearly explain why determinism is required for replay
+2. THE Documentation SHALL list common sources of non-determinism in Rust
+3. THE Documentation SHALL provide examples of correct and incorrect patterns
+4. THE Documentation SHALL explain how to refactor non-deterministic code
+5. THE Documentation SHALL warn about Rust-specific non-deterministic constructs (e.g., HashMap iteration order)
+
+### Requirement 22: Replay-Safe Helpers
+
+**User Story:** As a Rust developer, I want helpers to generate replay-safe non-deterministic values, so that I can use UUIDs and timestamps safely in my workflows.
+
+#### Acceptance Criteria
+
+1. THE Replay_Safe_Helpers MAY provide a deterministic UUID generator seeded by operation ID
+2. THE Replay_Safe_Helpers MAY provide replay-safe timestamps derived from execution state
+3. THE Replay_Safe_Helpers SHALL document how to use these helpers correctly
+
+### Requirement 23: Operation Metadata
+
+**User Story:** As a Rust developer, I want operations to include metadata like timestamps and subtypes, so that I can track operation timing and categorization.
+
+#### Acceptance Criteria
+
+1. THE Operation_Metadata SHALL include StartTimestamp when operation started
+2. THE Operation_Metadata SHALL include EndTimestamp when operation completed
+3. THE Operation_Metadata SHALL support SubType for SDK-level categorization of operations
+4. THE Operation_Metadata SHALL include Name for human-readable operation identification
+
+### Requirement 24: Performance Configuration
+
+**User Story:** As a Rust developer, I want to configure the trade-off between performance and durability, so that I can optimize for my specific use case.
+
+#### Acceptance Criteria
+
+1. THE Performance_Configuration SHALL support eager checkpointing mode (checkpoint after every operation)
+2. THE Performance_Configuration SHALL support batched checkpointing mode (group operations per checkpoint)
+3. THE Performance_Configuration SHALL support optimistic execution mode (execute multiple operations before checkpointing)
+4. THE Performance_Configuration SHALL document the default behavior and trade-offs
+
+### Requirement 25: Execution Limits Documentation
+
+**User Story:** As a Rust developer, I want clear documentation of execution limits, so that I can design my workflows within service constraints.
+
+#### Acceptance Criteria
+
+1. THE Limits_Documentation SHALL document maximum execution duration (1 year)
+2. THE Limits_Documentation SHALL document maximum response payload (6MB)
+3. THE Limits_Documentation SHALL document checkpoint and history size limits
+4. THE Limits_Documentation SHALL document minimum and maximum wait duration
+5. THE Limits_Documentation SHALL document maximum callback timeout
+6. THE SDK SHALL gracefully handle execution limits by returning clear error messages
+

@@ -112,6 +112,18 @@ where
             }
         }
 
+        // Handle STOPPED status (Requirement 7.7)
+        if checkpoint_result.is_stopped() {
+            logger.debug(&format!("Replaying stopped invoke: {}", op_id), &log_info);
+            
+            state.track_replay(&op_id.operation_id).await;
+            
+            return Err(DurableError::Invocation {
+                message: "Invoke was stopped externally".to_string(),
+                termination_reason: TerminationReason::InvocationError,
+            });
+        }
+
         // Handle other terminal states
         if checkpoint_result.is_terminal() {
             state.track_replay(&op_id.operation_id).await;
@@ -150,22 +162,24 @@ where
 }
 
 /// Creates a Start operation update for invoke.
+///
+/// # Requirements
+///
+/// - 7.6: THE Invoke_Operation SHALL support optional TenantId for tenant isolation scenarios
 fn create_invoke_start_update<P, R>(
     op_id: &OperationIdentifier,
     function_name: &str,
     payload_json: &str,
     config: &InvokeConfig<P, R>,
 ) -> OperationUpdate {
-    // Store invoke configuration in the result field as JSON
-    let config_json = serde_json::json!({
-        "function_name": function_name,
-        "payload": payload_json,
-        "timeout_seconds": config.timeout.to_seconds(),
-        "tenant_id": config.tenant_id,
-    });
-    
     let mut update = OperationUpdate::start(&op_id.operation_id, OperationType::Invoke);
-    update.result = Some(config_json.to_string());
+    
+    // Store the payload in the result field
+    update.result = Some(payload_json.to_string());
+    
+    // Set ChainedInvokeOptions with function name and optional tenant_id (Requirement 7.6)
+    update = update.with_chained_invoke_options(function_name, config.tenant_id.clone());
+    
     if let Some(ref parent_id) = op_id.parent_id {
         update = update.with_parent_id(parent_id);
     }
@@ -389,9 +403,64 @@ mod tests {
         assert_eq!(update.operation_id, "op-123");
         assert_eq!(update.operation_type, OperationType::Invoke);
         assert!(update.result.is_some());
-        assert!(update.result.as_ref().unwrap().contains("target-function"));
         assert_eq!(update.parent_id, Some("parent-456".to_string()));
         assert_eq!(update.name, Some("my-invoke".to_string()));
+        
+        // Verify ChainedInvokeOptions are set correctly (Requirement 7.6)
+        assert!(update.chained_invoke_options.is_some());
+        let invoke_options = update.chained_invoke_options.unwrap();
+        assert_eq!(invoke_options.function_name, "target-function");
+        assert_eq!(invoke_options.tenant_id, Some("tenant-123".to_string()));
+    }
+
+    #[test]
+    fn test_create_invoke_start_update_without_tenant_id() {
+        let op_id = OperationIdentifier::new("op-123", None, None);
+        let config: InvokeConfig<String, String> = InvokeConfig::default();
+        let update = create_invoke_start_update(&op_id, "target-function", r#"{"key":"value"}"#, &config);
+        
+        assert!(update.chained_invoke_options.is_some());
+        let invoke_options = update.chained_invoke_options.unwrap();
+        assert_eq!(invoke_options.function_name, "target-function");
+        assert!(invoke_options.tenant_id.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_invoke_handler_replay_stopped() {
+        let client = Arc::new(MockDurableServiceClient::new());
+        
+        // Create state with a pre-existing stopped invoke operation (Requirement 7.7)
+        let mut op = Operation::new("test-invoke-123", OperationType::Invoke);
+        op.status = OperationStatus::Stopped;
+        
+        let initial_state = InitialExecutionState::with_operations(vec![op]);
+        let state = Arc::new(ExecutionState::new(
+            "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+            "initial-token",
+            initial_state,
+            client,
+        ));
+        
+        let op_id = create_test_op_id();
+        let config = create_test_config();
+        let logger = create_test_logger();
+
+        let result: Result<String, DurableError> = invoke_handler(
+            "target-function",
+            "test-payload".to_string(),
+            &state,
+            &op_id,
+            &config,
+            &logger,
+        ).await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DurableError::Invocation { message, .. } => {
+                assert!(message.contains("stopped externally"));
+            }
+            e => panic!("Expected Invocation error, got {:?}", e),
+        }
     }
 
     #[test]

@@ -18,6 +18,7 @@ use crate::state::ExecutionState;
 ///
 /// This handler implements the child context semantics:
 /// - Creates a child context with the parent's operation_id
+/// - Checkpoints START with ReplayChildren option if enabled
 /// - Executes the function in the child context
 /// - Checkpoints the child result
 /// - Propagates errors to the parent
@@ -28,7 +29,7 @@ use crate::state::ExecutionState;
 /// * `state` - The execution state for checkpointing
 /// * `op_id` - The operation identifier for the child context
 /// * `parent_ctx` - The parent DurableContext
-/// * `config` - Child context configuration
+/// * `config` - Child context configuration (includes replay_children option)
 /// * `logger` - Logger for structured logging
 ///
 /// # Returns
@@ -41,12 +42,14 @@ use crate::state::ExecutionState;
 /// - 10.2: Checkpoint the child context result when complete
 /// - 10.3: Support custom SerDes for result serialization
 /// - 10.4: Propagate errors to the parent
+/// - 10.5: Support ReplayChildren option for large parallel operations
+/// - 10.6: When ReplayChildren is true, include child operations in state loads for replay
 pub async fn child_handler<T, F, Fut>(
     func: F,
     state: &Arc<ExecutionState>,
     op_id: &OperationIdentifier,
     parent_ctx: &DurableContext,
-    _config: &ChildConfig,
+    config: &ChildConfig,
     logger: &Arc<dyn Logger>,
 ) -> Result<T, DurableError>
 where
@@ -82,6 +85,22 @@ where
         // Handle succeeded checkpoint
         if checkpoint_result.is_succeeded() {
             logger.debug(&format!("Replaying succeeded child context: {}", op_id), &log_info);
+            
+            // Check if we need to replay children to reconstruct the result
+            // Requirements: 10.5, 10.6
+            if config.replay_children && state.has_replay_children(&op_id.operation_id).await {
+                logger.debug(&format!("ReplayChildren enabled, replaying child operations for: {}", op_id), &log_info);
+                
+                // Create child context and re-execute to replay children
+                // The child operations should already be in the state
+                let child_ctx = parent_ctx.create_child_context(&op_id.operation_id);
+                
+                // Execute the function - child operations will be replayed from state
+                let result = func(child_ctx).await;
+                
+                state.track_replay(&op_id.operation_id).await;
+                return result;
+            }
             
             if let Some(result_str) = checkpoint_result.result() {
                 let serdes = JsonSerDes::<T>::new();
@@ -120,6 +139,14 @@ where
             let status = checkpoint_result.status().unwrap();
             return Err(DurableError::execution(format!("Child context was {}", status)));
         }
+        
+        // If we have a STARTED status, we can continue execution without re-checkpointing START
+        // This handles the case where the context was started but not completed
+    } else {
+        // No existing checkpoint - checkpoint START with ReplayChildren option if enabled
+        // Requirements: 10.5, 10.6
+        let start_update = create_start_update(op_id, config);
+        state.create_checkpoint(start_update, true).await?;
     }
 
     // Create child context (Requirement 10.1)
@@ -172,14 +199,18 @@ where
 }
 
 /// Creates a Start operation update for child context.
-#[allow(dead_code)]
-fn create_start_update(op_id: &OperationIdentifier) -> OperationUpdate {
+fn create_start_update(op_id: &OperationIdentifier, config: &ChildConfig) -> OperationUpdate {
     let mut update = OperationUpdate::start(&op_id.operation_id, OperationType::Context);
     if let Some(ref parent_id) = op_id.parent_id {
         update = update.with_parent_id(parent_id);
     }
     if let Some(ref name) = op_id.name {
         update = update.with_name(name);
+    }
+    // Pass ReplayChildren option to API when starting CONTEXT
+    // Requirements: 10.5, 10.6, 12.8
+    if config.replay_children {
+        update = update.with_context_options(Some(true));
     }
     update
 }
@@ -461,5 +492,57 @@ mod tests {
         assert_eq!(update.operation_type, OperationType::Context);
         assert!(update.error.is_some());
         assert_eq!(update.error.unwrap().error_type, "ChildError");
+    }
+
+    #[test]
+    fn test_create_start_update_without_replay_children() {
+        let op_id = OperationIdentifier::new("op-123", Some("parent-456".to_string()), Some("my-child".to_string()));
+        let config = ChildConfig::default();
+        let update = create_start_update(&op_id, &config);
+        
+        assert_eq!(update.operation_id, "op-123");
+        assert_eq!(update.operation_type, OperationType::Context);
+        assert_eq!(update.parent_id, Some("parent-456".to_string()));
+        assert_eq!(update.name, Some("my-child".to_string()));
+        // context_options should be None when replay_children is false
+        assert!(update.context_options.is_none());
+    }
+
+    #[test]
+    fn test_create_start_update_with_replay_children() {
+        let op_id = OperationIdentifier::new("op-123", Some("parent-456".to_string()), Some("my-child".to_string()));
+        let config = ChildConfig::with_replay_children();
+        let update = create_start_update(&op_id, &config);
+        
+        assert_eq!(update.operation_id, "op-123");
+        assert_eq!(update.operation_type, OperationType::Context);
+        assert_eq!(update.parent_id, Some("parent-456".to_string()));
+        assert_eq!(update.name, Some("my-child".to_string()));
+        // context_options should have replay_children = true
+        assert!(update.context_options.is_some());
+        assert_eq!(update.context_options.unwrap().replay_children, Some(true));
+    }
+
+    #[tokio::test]
+    async fn test_child_handler_with_replay_children_config() {
+        let client = create_mock_client();
+        let state = create_test_state(client);
+        let op_id = create_test_op_id();
+        let config = ChildConfig::with_replay_children();
+        let logger = create_test_logger();
+        let parent_ctx = create_test_parent_ctx(state.clone());
+
+        // Execute with replay_children enabled
+        let result: Result<i32, DurableError> = child_handler(
+            |_ctx| async { Ok(42) },
+            &state,
+            &op_id,
+            &parent_ctx,
+            &config,
+            &logger,
+        ).await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 42);
     }
 }

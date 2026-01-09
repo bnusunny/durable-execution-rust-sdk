@@ -41,6 +41,11 @@ pub struct Operation {
     #[serde(rename = "Name", skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 
+    /// SDK-level categorization of the operation (e.g., "map", "parallel", "wait_for_condition")
+    /// Requirements: 23.3, 23.4
+    #[serde(rename = "SubType", skip_serializing_if = "Option::is_none")]
+    pub sub_type: Option<String>,
+
     /// Start timestamp of the operation (milliseconds since epoch)
     #[serde(rename = "StartTimestamp", skip_serializing_if = "Option::is_none")]
     pub start_timestamp: Option<i64>,
@@ -97,6 +102,10 @@ pub struct StepDetails {
     /// Error details if the step failed
     #[serde(rename = "Error", skip_serializing_if = "Option::is_none")]
     pub error: Option<ErrorObject>,
+    /// Payload for RETRY action - stores state for wait-for-condition pattern
+    /// Requirements: 4.9
+    #[serde(rename = "Payload", skip_serializing_if = "Option::is_none")]
+    pub payload: Option<String>,
 }
 
 /// Details specific to WAIT type operations
@@ -157,6 +166,7 @@ impl Operation {
             error: None,
             parent_id: None,
             name: None,
+            sub_type: None,
             start_timestamp: None,
             end_timestamp: None,
             execution_details: None,
@@ -177,6 +187,13 @@ impl Operation {
     /// Sets the name for this operation.
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
+        self
+    }
+
+    /// Sets the sub-type for this operation.
+    /// Requirements: 23.3, 23.4
+    pub fn with_sub_type(mut self, sub_type: impl Into<String>) -> Self {
+        self.sub_type = Some(sub_type.into());
         self
     }
 
@@ -242,6 +259,45 @@ impl Operation {
         // Fall back to legacy result field
         self.result.as_deref()
     }
+
+    /// Gets the retry payload from StepDetails for STEP operations.
+    ///
+    /// This is used for the wait-for-condition pattern where state is passed
+    /// between retry attempts via the Payload field.
+    ///
+    /// # Returns
+    ///
+    /// The payload string if this is a STEP operation with a payload, None otherwise.
+    ///
+    /// # Requirements
+    ///
+    /// - 4.9: THE Step_Operation SHALL support RETRY action with Payload for wait-for-condition pattern
+    pub fn get_retry_payload(&self) -> Option<&str> {
+        if self.operation_type == OperationType::Step {
+            if let Some(ref details) = self.step_details {
+                return details.payload.as_deref();
+            }
+        }
+        None
+    }
+
+    /// Gets the current attempt number from StepDetails for STEP operations.
+    ///
+    /// # Returns
+    ///
+    /// The attempt number (0-indexed) if this is a STEP operation with attempt tracking, None otherwise.
+    ///
+    /// # Requirements
+    ///
+    /// - 4.8: THE Step_Operation SHALL track attempt numbers in StepDetails.Attempt
+    pub fn get_attempt(&self) -> Option<u32> {
+        if self.operation_type == OperationType::Step {
+            if let Some(ref details) = self.step_details {
+                return details.attempt;
+            }
+        }
+        None
+    }
 }
 
 
@@ -287,6 +343,14 @@ pub enum OperationStatus {
     /// Operation has started but not completed
     #[serde(rename = "STARTED")]
     Started,
+    /// Operation is pending (e.g., step waiting for retry)
+    /// Requirements: 3.7, 4.7
+    #[serde(rename = "PENDING")]
+    Pending,
+    /// Operation is ready to resume execution (e.g., after retry delay)
+    /// Requirements: 3.7, 4.7
+    #[serde(rename = "READY")]
+    Ready,
     /// Operation completed successfully
     #[serde(rename = "SUCCEEDED")]
     Succeeded,
@@ -307,7 +371,7 @@ pub enum OperationStatus {
 impl OperationStatus {
     /// Returns true if this status represents a terminal state.
     pub fn is_terminal(&self) -> bool {
-        !matches!(self, Self::Started)
+        !matches!(self, Self::Started | Self::Pending | Self::Ready)
     }
 
     /// Returns true if this status represents a successful completion.
@@ -319,12 +383,33 @@ impl OperationStatus {
     pub fn is_failure(&self) -> bool {
         matches!(self, Self::Failed | Self::Cancelled | Self::TimedOut | Self::Stopped)
     }
+
+    /// Returns true if this status indicates the operation is pending (waiting for retry).
+    /// Requirements: 3.7, 4.7
+    pub fn is_pending(&self) -> bool {
+        matches!(self, Self::Pending)
+    }
+
+    /// Returns true if this status indicates the operation is ready to resume.
+    /// Requirements: 3.7, 4.7
+    pub fn is_ready(&self) -> bool {
+        matches!(self, Self::Ready)
+    }
+
+    /// Returns true if this status indicates the operation can be resumed.
+    /// This includes both PENDING and READY statuses.
+    /// Requirements: 3.7
+    pub fn is_resumable(&self) -> bool {
+        matches!(self, Self::Started | Self::Pending | Self::Ready)
+    }
 }
 
 impl std::fmt::Display for OperationStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Started => write!(f, "Started"),
+            Self::Pending => write!(f, "Pending"),
+            Self::Ready => write!(f, "Ready"),
             Self::Succeeded => write!(f, "Succeeded"),
             Self::Failed => write!(f, "Failed"),
             Self::Cancelled => write!(f, "Cancelled"),
@@ -346,6 +431,14 @@ pub enum OperationAction {
     /// Mark operation as failed
     #[serde(rename = "FAIL")]
     Fail,
+    /// Cancel an operation (e.g., cancel a wait)
+    /// Requirements: 5.5
+    #[serde(rename = "CANCEL")]
+    Cancel,
+    /// Retry an operation with optional payload (state) for wait-for-condition pattern
+    /// Requirements: 4.7, 4.8, 4.9
+    #[serde(rename = "RETRY")]
+    Retry,
 }
 
 impl std::fmt::Display for OperationAction {
@@ -354,6 +447,8 @@ impl std::fmt::Display for OperationAction {
             Self::Start => write!(f, "Start"),
             Self::Succeed => write!(f, "Succeed"),
             Self::Fail => write!(f, "Fail"),
+            Self::Cancel => write!(f, "Cancel"),
+            Self::Retry => write!(f, "Retry"),
         }
     }
 }
@@ -438,6 +533,11 @@ pub struct OperationUpdate {
     #[serde(rename = "Name", skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 
+    /// SDK-level categorization of the operation (e.g., "map", "parallel", "wait_for_condition")
+    /// Requirements: 23.3, 23.4
+    #[serde(rename = "SubType", skip_serializing_if = "Option::is_none")]
+    pub sub_type: Option<String>,
+
     /// Options for WAIT operations
     #[serde(rename = "WaitOptions", skip_serializing_if = "Option::is_none")]
     pub wait_options: Option<WaitOptions>,
@@ -473,6 +573,7 @@ impl OperationUpdate {
             error: None,
             parent_id: None,
             name: None,
+            sub_type: None,
             wait_options: None,
             step_options: None,
             callback_options: None,
@@ -494,6 +595,7 @@ impl OperationUpdate {
             error: None,
             parent_id: None,
             name: None,
+            sub_type: None,
             wait_options: Some(WaitOptions { wait_seconds }),
             step_options: None,
             callback_options: None,
@@ -516,6 +618,7 @@ impl OperationUpdate {
             error: None,
             parent_id: None,
             name: None,
+            sub_type: None,
             wait_options: None,
             step_options: None,
             callback_options: None,
@@ -538,8 +641,121 @@ impl OperationUpdate {
             error: Some(error),
             parent_id: None,
             name: None,
+            sub_type: None,
             wait_options: None,
             step_options: None,
+            callback_options: None,
+            chained_invoke_options: None,
+            context_options: None,
+        }
+    }
+
+    /// Creates a new OperationUpdate to cancel an operation.
+    ///
+    /// This is primarily used for cancelling WAIT operations.
+    ///
+    /// # Arguments
+    ///
+    /// * `operation_id` - The ID of the operation to cancel
+    /// * `operation_type` - The type of operation being cancelled
+    ///
+    /// # Requirements
+    ///
+    /// - 5.5: THE Wait_Operation SHALL support cancellation of active waits via CANCEL action
+    pub fn cancel(
+        operation_id: impl Into<String>,
+        operation_type: OperationType,
+    ) -> Self {
+        Self {
+            operation_id: operation_id.into(),
+            action: OperationAction::Cancel,
+            operation_type,
+            result: None,
+            error: None,
+            parent_id: None,
+            name: None,
+            sub_type: None,
+            wait_options: None,
+            step_options: None,
+            callback_options: None,
+            chained_invoke_options: None,
+            context_options: None,
+        }
+    }
+
+    /// Creates a new OperationUpdate to retry an operation with optional payload.
+    ///
+    /// This is used for the wait-for-condition pattern where state needs to be
+    /// passed between retry attempts. The payload contains the state to preserve
+    /// across retries, not an error.
+    ///
+    /// # Arguments
+    ///
+    /// * `operation_id` - The ID of the operation to retry
+    /// * `operation_type` - The type of operation being retried
+    /// * `payload` - Optional state payload to preserve across retries
+    /// * `next_attempt_delay_seconds` - Optional delay before the next retry attempt
+    ///
+    /// # Requirements
+    ///
+    /// - 4.7: THE Step_Operation SHALL support RETRY action with NextAttemptDelaySeconds for backoff
+    /// - 4.8: THE Step_Operation SHALL track attempt numbers in StepDetails.Attempt
+    /// - 4.9: THE Step_Operation SHALL support RETRY action with Payload (not just Error) for wait-for-condition pattern
+    pub fn retry(
+        operation_id: impl Into<String>,
+        operation_type: OperationType,
+        payload: Option<String>,
+        next_attempt_delay_seconds: Option<u64>,
+    ) -> Self {
+        Self {
+            operation_id: operation_id.into(),
+            action: OperationAction::Retry,
+            operation_type,
+            result: payload,
+            error: None,
+            parent_id: None,
+            name: None,
+            sub_type: None,
+            wait_options: None,
+            step_options: Some(StepOptions { next_attempt_delay_seconds }),
+            callback_options: None,
+            chained_invoke_options: None,
+            context_options: None,
+        }
+    }
+
+    /// Creates a new OperationUpdate to retry an operation with an error.
+    ///
+    /// This is used for traditional retry scenarios where the operation failed
+    /// and needs to be retried after a delay.
+    ///
+    /// # Arguments
+    ///
+    /// * `operation_id` - The ID of the operation to retry
+    /// * `operation_type` - The type of operation being retried
+    /// * `error` - The error that caused the retry
+    /// * `next_attempt_delay_seconds` - Optional delay before the next retry attempt
+    ///
+    /// # Requirements
+    ///
+    /// - 4.7: THE Step_Operation SHALL support RETRY action with NextAttemptDelaySeconds for backoff
+    pub fn retry_with_error(
+        operation_id: impl Into<String>,
+        operation_type: OperationType,
+        error: ErrorObject,
+        next_attempt_delay_seconds: Option<u64>,
+    ) -> Self {
+        Self {
+            operation_id: operation_id.into(),
+            action: OperationAction::Retry,
+            operation_type,
+            result: None,
+            error: Some(error),
+            parent_id: None,
+            name: None,
+            sub_type: None,
+            wait_options: None,
+            step_options: Some(StepOptions { next_attempt_delay_seconds }),
             callback_options: None,
             chained_invoke_options: None,
             context_options: None,
@@ -555,6 +771,13 @@ impl OperationUpdate {
     /// Sets the name for this operation update.
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
+        self
+    }
+
+    /// Sets the sub-type for this operation update.
+    /// Requirements: 23.3, 23.4
+    pub fn with_sub_type(mut self, sub_type: impl Into<String>) -> Self {
+        self.sub_type = Some(sub_type.into());
         self
     }
 
@@ -682,6 +905,8 @@ mod tests {
     #[test]
     fn test_operation_status_is_terminal() {
         assert!(!OperationStatus::Started.is_terminal());
+        assert!(!OperationStatus::Pending.is_terminal());
+        assert!(!OperationStatus::Ready.is_terminal());
         assert!(OperationStatus::Succeeded.is_terminal());
         assert!(OperationStatus::Failed.is_terminal());
         assert!(OperationStatus::Cancelled.is_terminal());
@@ -692,6 +917,8 @@ mod tests {
     #[test]
     fn test_operation_status_is_success() {
         assert!(!OperationStatus::Started.is_success());
+        assert!(!OperationStatus::Pending.is_success());
+        assert!(!OperationStatus::Ready.is_success());
         assert!(OperationStatus::Succeeded.is_success());
         assert!(!OperationStatus::Failed.is_success());
     }
@@ -699,11 +926,43 @@ mod tests {
     #[test]
     fn test_operation_status_is_failure() {
         assert!(!OperationStatus::Started.is_failure());
+        assert!(!OperationStatus::Pending.is_failure());
+        assert!(!OperationStatus::Ready.is_failure());
         assert!(!OperationStatus::Succeeded.is_failure());
         assert!(OperationStatus::Failed.is_failure());
         assert!(OperationStatus::Cancelled.is_failure());
         assert!(OperationStatus::TimedOut.is_failure());
         assert!(OperationStatus::Stopped.is_failure());
+    }
+
+    #[test]
+    fn test_operation_status_is_pending() {
+        assert!(!OperationStatus::Started.is_pending());
+        assert!(OperationStatus::Pending.is_pending());
+        assert!(!OperationStatus::Ready.is_pending());
+        assert!(!OperationStatus::Succeeded.is_pending());
+        assert!(!OperationStatus::Failed.is_pending());
+    }
+
+    #[test]
+    fn test_operation_status_is_ready() {
+        assert!(!OperationStatus::Started.is_ready());
+        assert!(!OperationStatus::Pending.is_ready());
+        assert!(OperationStatus::Ready.is_ready());
+        assert!(!OperationStatus::Succeeded.is_ready());
+        assert!(!OperationStatus::Failed.is_ready());
+    }
+
+    #[test]
+    fn test_operation_status_is_resumable() {
+        assert!(OperationStatus::Started.is_resumable());
+        assert!(OperationStatus::Pending.is_resumable());
+        assert!(OperationStatus::Ready.is_resumable());
+        assert!(!OperationStatus::Succeeded.is_resumable());
+        assert!(!OperationStatus::Failed.is_resumable());
+        assert!(!OperationStatus::Cancelled.is_resumable());
+        assert!(!OperationStatus::TimedOut.is_resumable());
+        assert!(!OperationStatus::Stopped.is_resumable());
     }
 
     #[test]
@@ -840,5 +1099,219 @@ mod tests {
         assert!(json.contains("\"Type\":\"STEP\""));
         assert!(json.contains("\"Payload\":\"{\\\"value\\\": 42}\""));
         assert!(json.contains("\"ParentId\":\"parent-456\""));
+    }
+
+    #[test]
+    fn test_operation_status_pending_serialization() {
+        // Test PENDING status serialization/deserialization
+        let json = r#"{
+            "Id": "op-123",
+            "Type": "STEP",
+            "Status": "PENDING"
+        }"#;
+        
+        let op: Operation = serde_json::from_str(json).unwrap();
+        assert_eq!(op.status, OperationStatus::Pending);
+        assert!(op.status.is_pending());
+        assert!(!op.status.is_terminal());
+        assert!(op.status.is_resumable());
+    }
+
+    #[test]
+    fn test_operation_status_ready_serialization() {
+        // Test READY status serialization/deserialization
+        let json = r#"{
+            "Id": "op-123",
+            "Type": "STEP",
+            "Status": "READY"
+        }"#;
+        
+        let op: Operation = serde_json::from_str(json).unwrap();
+        assert_eq!(op.status, OperationStatus::Ready);
+        assert!(op.status.is_ready());
+        assert!(!op.status.is_terminal());
+        assert!(op.status.is_resumable());
+    }
+
+    #[test]
+    fn test_operation_status_display() {
+        assert_eq!(OperationStatus::Started.to_string(), "Started");
+        assert_eq!(OperationStatus::Pending.to_string(), "Pending");
+        assert_eq!(OperationStatus::Ready.to_string(), "Ready");
+        assert_eq!(OperationStatus::Succeeded.to_string(), "Succeeded");
+        assert_eq!(OperationStatus::Failed.to_string(), "Failed");
+        assert_eq!(OperationStatus::Cancelled.to_string(), "Cancelled");
+        assert_eq!(OperationStatus::TimedOut.to_string(), "TimedOut");
+        assert_eq!(OperationStatus::Stopped.to_string(), "Stopped");
+    }
+
+    #[test]
+    fn test_operation_with_sub_type() {
+        let op = Operation::new("op-123", OperationType::Context)
+            .with_sub_type("map");
+        assert_eq!(op.sub_type, Some("map".to_string()));
+    }
+
+    #[test]
+    fn test_operation_update_with_sub_type() {
+        let update = OperationUpdate::start("op-123", OperationType::Context)
+            .with_sub_type("parallel");
+        assert_eq!(update.sub_type, Some("parallel".to_string()));
+    }
+
+    #[test]
+    fn test_operation_sub_type_serialization() {
+        let op = Operation::new("op-123", OperationType::Context)
+            .with_sub_type("wait_for_condition");
+        
+        let json = serde_json::to_string(&op).unwrap();
+        assert!(json.contains("\"SubType\":\"wait_for_condition\""));
+    }
+
+    #[test]
+    fn test_operation_sub_type_deserialization() {
+        let json = r#"{
+            "Id": "op-123",
+            "Type": "CONTEXT",
+            "Status": "STARTED",
+            "SubType": "map"
+        }"#;
+        
+        let op: Operation = serde_json::from_str(json).unwrap();
+        assert_eq!(op.sub_type, Some("map".to_string()));
+    }
+
+    #[test]
+    fn test_operation_metadata_fields() {
+        // Test that start_timestamp and end_timestamp are properly deserialized
+        let json = r#"{
+            "Id": "op-123",
+            "Type": "STEP",
+            "Status": "SUCCEEDED",
+            "StartTimestamp": 1704067200000,
+            "EndTimestamp": 1704067260000,
+            "Name": "my-step",
+            "SubType": "custom"
+        }"#;
+        
+        let op: Operation = serde_json::from_str(json).unwrap();
+        assert_eq!(op.start_timestamp, Some(1704067200000));
+        assert_eq!(op.end_timestamp, Some(1704067260000));
+        assert_eq!(op.name, Some("my-step".to_string()));
+        assert_eq!(op.sub_type, Some("custom".to_string()));
+    }
+
+    #[test]
+    fn test_operation_action_retry_display() {
+        assert_eq!(OperationAction::Retry.to_string(), "Retry");
+    }
+
+    #[test]
+    fn test_operation_update_retry_with_payload() {
+        let update = OperationUpdate::retry(
+            "op-123",
+            OperationType::Step,
+            Some(r#"{"state": "waiting"}"#.to_string()),
+            Some(5),
+        );
+        assert_eq!(update.operation_id, "op-123");
+        assert_eq!(update.action, OperationAction::Retry);
+        assert_eq!(update.operation_type, OperationType::Step);
+        assert_eq!(update.result, Some(r#"{"state": "waiting"}"#.to_string()));
+        assert!(update.error.is_none());
+        assert!(update.step_options.is_some());
+        assert_eq!(update.step_options.as_ref().unwrap().next_attempt_delay_seconds, Some(5));
+    }
+
+    #[test]
+    fn test_operation_update_retry_with_error() {
+        let error = ErrorObject::new("RetryableError", "Temporary failure");
+        let update = OperationUpdate::retry_with_error(
+            "op-123",
+            OperationType::Step,
+            error,
+            Some(10),
+        );
+        assert_eq!(update.operation_id, "op-123");
+        assert_eq!(update.action, OperationAction::Retry);
+        assert!(update.result.is_none());
+        assert!(update.error.is_some());
+        assert_eq!(update.error.as_ref().unwrap().error_type, "RetryableError");
+        assert_eq!(update.step_options.as_ref().unwrap().next_attempt_delay_seconds, Some(10));
+    }
+
+    #[test]
+    fn test_operation_update_retry_serialization() {
+        let update = OperationUpdate::retry(
+            "op-123",
+            OperationType::Step,
+            Some(r#"{"counter": 5}"#.to_string()),
+            Some(3),
+        );
+        
+        let json = serde_json::to_string(&update).unwrap();
+        assert!(json.contains("\"Action\":\"RETRY\""));
+        assert!(json.contains("\"Payload\":\"{\\\"counter\\\": 5}\""));
+        assert!(json.contains("\"NextAttemptDelaySeconds\":3"));
+    }
+
+    #[test]
+    fn test_step_details_with_payload() {
+        let json = r#"{
+            "Id": "op-123",
+            "Type": "STEP",
+            "Status": "PENDING",
+            "StepDetails": {
+                "Attempt": 2,
+                "Payload": "{\"state\": \"processing\"}"
+            }
+        }"#;
+        
+        let op: Operation = serde_json::from_str(json).unwrap();
+        assert_eq!(op.status, OperationStatus::Pending);
+        assert!(op.step_details.is_some());
+        let details = op.step_details.as_ref().unwrap();
+        assert_eq!(details.attempt, Some(2));
+        assert_eq!(details.payload, Some(r#"{"state": "processing"}"#.to_string()));
+    }
+
+    #[test]
+    fn test_operation_get_retry_payload() {
+        let mut op = Operation::new("op-123", OperationType::Step);
+        op.step_details = Some(StepDetails {
+            result: None,
+            attempt: Some(1),
+            next_attempt_timestamp: None,
+            error: None,
+            payload: Some(r#"{"counter": 3}"#.to_string()),
+        });
+        
+        assert_eq!(op.get_retry_payload(), Some(r#"{"counter": 3}"#));
+    }
+
+    #[test]
+    fn test_operation_get_attempt() {
+        let mut op = Operation::new("op-123", OperationType::Step);
+        op.step_details = Some(StepDetails {
+            result: None,
+            attempt: Some(5),
+            next_attempt_timestamp: None,
+            error: None,
+            payload: None,
+        });
+        
+        assert_eq!(op.get_attempt(), Some(5));
+    }
+
+    #[test]
+    fn test_operation_get_attempt_no_details() {
+        let op = Operation::new("op-123", OperationType::Step);
+        assert_eq!(op.get_attempt(), None);
+    }
+
+    #[test]
+    fn test_operation_get_retry_payload_wrong_type() {
+        let op = Operation::new("op-123", OperationType::Wait);
+        assert_eq!(op.get_retry_payload(), None);
     }
 }

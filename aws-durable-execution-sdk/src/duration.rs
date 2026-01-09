@@ -1,7 +1,7 @@
 //! Duration type for durable execution operations.
 //!
 //! Provides a Duration type with convenient constructors for specifying
-//! time intervals in seconds, minutes, hours, and days.
+//! time intervals in seconds, minutes, hours, days, weeks, months, and years.
 
 use serde::{Deserialize, Serialize};
 
@@ -20,11 +20,17 @@ use crate::error::DurableError;
 /// let two_minutes = Duration::from_minutes(2);
 /// let one_hour = Duration::from_hours(1);
 /// let one_day = Duration::from_days(1);
+/// let one_week = Duration::from_weeks(1);
+/// let one_month = Duration::from_months(1);
+/// let one_year = Duration::from_years(1);
 ///
 /// assert_eq!(five_seconds.to_seconds(), 5);
 /// assert_eq!(two_minutes.to_seconds(), 120);
 /// assert_eq!(one_hour.to_seconds(), 3600);
 /// assert_eq!(one_day.to_seconds(), 86400);
+/// assert_eq!(one_week.to_seconds(), 604800);
+/// assert_eq!(one_month.to_seconds(), 2592000);  // 30 days
+/// assert_eq!(one_year.to_seconds(), 31536000);  // 365 days
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
 pub struct Duration {
@@ -107,6 +113,70 @@ impl Duration {
     pub fn from_days(days: u64) -> Self {
         Self {
             seconds: days * 86400,
+        }
+    }
+
+    /// Creates a new Duration from the given number of weeks.
+    ///
+    /// # Arguments
+    ///
+    /// * `weeks` - The number of weeks for this duration
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use aws_durable_execution_sdk::Duration;
+    ///
+    /// let duration = Duration::from_weeks(1);
+    /// assert_eq!(duration.to_seconds(), 604800);
+    /// ```
+    pub fn from_weeks(weeks: u64) -> Self {
+        Self {
+            seconds: weeks * 604800, // 7 days * 86400 seconds/day
+        }
+    }
+
+    /// Creates a new Duration from the given number of months.
+    ///
+    /// A month is defined as 30 days for consistency.
+    ///
+    /// # Arguments
+    ///
+    /// * `months` - The number of months for this duration
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use aws_durable_execution_sdk::Duration;
+    ///
+    /// let duration = Duration::from_months(1);
+    /// assert_eq!(duration.to_seconds(), 2592000); // 30 days
+    /// ```
+    pub fn from_months(months: u64) -> Self {
+        Self {
+            seconds: months * 2592000, // 30 days * 86400 seconds/day
+        }
+    }
+
+    /// Creates a new Duration from the given number of years.
+    ///
+    /// A year is defined as 365 days for consistency.
+    ///
+    /// # Arguments
+    ///
+    /// * `years` - The number of years for this duration
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use aws_durable_execution_sdk::Duration;
+    ///
+    /// let duration = Duration::from_years(1);
+    /// assert_eq!(duration.to_seconds(), 31536000); // 365 days
+    /// ```
+    pub fn from_years(years: u64) -> Self {
+        Self {
+            seconds: years * 31536000, // 365 days * 86400 seconds/day
         }
     }
 
@@ -198,6 +268,42 @@ mod tests {
     }
 
     #[test]
+    fn test_from_weeks() {
+        let duration = Duration::from_weeks(1);
+        assert_eq!(duration.to_seconds(), 604800);
+    }
+
+    #[test]
+    fn test_from_weeks_multiple() {
+        let duration = Duration::from_weeks(2);
+        assert_eq!(duration.to_seconds(), 1209600);
+    }
+
+    #[test]
+    fn test_from_months() {
+        let duration = Duration::from_months(1);
+        assert_eq!(duration.to_seconds(), 2592000); // 30 days
+    }
+
+    #[test]
+    fn test_from_months_multiple() {
+        let duration = Duration::from_months(3);
+        assert_eq!(duration.to_seconds(), 7776000); // 90 days
+    }
+
+    #[test]
+    fn test_from_years() {
+        let duration = Duration::from_years(1);
+        assert_eq!(duration.to_seconds(), 31536000); // 365 days
+    }
+
+    #[test]
+    fn test_from_years_multiple() {
+        let duration = Duration::from_years(2);
+        assert_eq!(duration.to_seconds(), 63072000); // 730 days
+    }
+
+    #[test]
     fn test_validate_for_wait_valid() {
         let duration = Duration::from_seconds(1);
         assert!(duration.validate_for_wait().is_ok());
@@ -250,6 +356,24 @@ mod tests {
         fn prop_duration_from_days_produces_correct_total(days in 0u64..=u64::MAX / 86400 / 86400) {
             let duration = Duration::from_days(days);
             prop_assert_eq!(duration.to_seconds(), days * 86400);
+        }
+
+        #[test]
+        fn prop_duration_from_weeks_produces_correct_total(weeks in 0u64..=u64::MAX / 604800 / 604800) {
+            let duration = Duration::from_weeks(weeks);
+            prop_assert_eq!(duration.to_seconds(), weeks * 604800);
+        }
+
+        #[test]
+        fn prop_duration_from_months_produces_correct_total(months in 0u64..=u64::MAX / 2592000 / 2592000) {
+            let duration = Duration::from_months(months);
+            prop_assert_eq!(duration.to_seconds(), months * 2592000);
+        }
+
+        #[test]
+        fn prop_duration_from_years_produces_correct_total(years in 0u64..=u64::MAX / 31536000 / 31536000) {
+            let duration = Duration::from_years(years);
+            prop_assert_eq!(duration.to_seconds(), years * 31536000);
         }
 
         /// Property: Wait operations SHALL reject durations less than 1 second.

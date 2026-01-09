@@ -2,7 +2,7 @@
 
 ## Overview
 
-This implementation plan breaks down the Rust SDK into incremental tasks that build on each other. The approach starts with core types and error handling, then builds up through the checkpointing system, operation handlers, and finally the Lambda integration macro.
+This implementation plan breaks down the Rust SDK into incremental tasks that build on each other. The approach starts with core types and error handling, then builds up through the checkpointing system, operation handlers, and finally the Lambda integration macro. This update adds tasks to close gaps with the Language SDK Specification v1.2.
 
 ## Tasks
 
@@ -163,7 +163,7 @@ This implementation plan breaks down the Rust SDK into incremental tasks that bu
   - [x] 7.2 Write property test for step semantics
     - **Property 7: Step Semantics Checkpoint Ordering**
     - **Validates: Requirements 4.1, 4.2**
-    - **PBT Status: PASSED** - All 5 property tests passed (prop_at_most_once_checkpoints_before_execution, prop_at_least_once_checkpoints_after_execution, prop_at_most_once_checkpoints_error_on_failure, prop_at_least_once_checkpoints_error_on_failure, prop_replay_returns_checkpointed_result)
+    - **PBT Status: PASSED**
 
   - [x] 7.3 Implement wait handler
     - Implement wait_handler function
@@ -237,7 +237,7 @@ This implementation plan breaks down the Rust SDK into incremental tasks that bu
   - [x] 8.6 Write property test for completion criteria
     - **Property 6: Map/Parallel Completion Criteria**
     - **Validates: Requirements 8.6, 8.7, 9.3**
-    - **PBT Status: PASSED** - All 9 property tests passed (prop_min_successful_triggers_completion, prop_failure_tolerance_exceeded_triggers_completion, prop_all_completed_triggers_when_all_done, prop_suspended_triggers_when_tasks_suspend, prop_success_count_accurate, prop_failure_count_accurate, prop_completed_count_is_sum, prop_pending_count_accurate, prop_failure_percentage_calculation)
+    - **PBT Status: PASSED**
 
 - [x] 9. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
@@ -330,9 +330,9 @@ This implementation plan breaks down the Rust SDK into incremental tasks that bu
     - _Requirements: 15.5, 15.6, 15.7, 15.8_
 
   - [x] 12.3 Write property test for Lambda output
-    - **Property: Lambda output matches execution outcome**
+    - **Property 11: Lambda output matches execution outcome**
     - **Validates: Requirements 15.4, 15.5, 15.6, 15.7**
-    - **PBT Status: PASSED** - All 5 property tests passed (prop_lambda_output_success_status, prop_lambda_output_failure_status, prop_lambda_output_suspend_status, prop_lambda_output_serialization_preserves_status, prop_result_size_check_consistency)
+    - **PBT Status: PASSED**
 
 - [x] 13. Implement logging integration
   - [x] 13.1 Define Logger trait and default implementation
@@ -361,8 +361,249 @@ This implementation plan breaks down the Rust SDK into incremental tasks that bu
     - Parallel processing example
     - Callback/approval workflow example
 
+## New Tasks - Language SDK Specification v1.2 Gap Closure
+
+- [x] 16. Implement EXECUTION operation support
+  - [x] 16.1 Add EXECUTION operation recognition
+    - Recognize first operation in state as EXECUTION operation
+    - Store execution_operation in ExecutionState
+    - Extract original user input from ExecutionDetails.InputPayload
+    - _Requirements: 19.1, 19.2_
+
+  - [x] 16.2 Implement get_original_input method
+    - Add get_original_input<T>() method to DurableContext
+    - Deserialize input payload to requested type
+    - Handle missing or invalid input gracefully
+    - _Requirements: 1.11, 19.2_
+
+  - [x] 16.3 Implement execution completion via checkpointing
+    - Support SUCCEED action on EXECUTION operation
+    - Support FAIL action on EXECUTION operation
+    - Use for large results that exceed response size limits
+    - _Requirements: 19.3, 19.4, 19.5_
+
+- [x] 17. Implement enhanced operation types
+  - [x] 17.1 Add missing OperationStatus values
+    - Add PENDING status for step operations
+    - Add READY status for retry operations
+    - Ensure all status values match API specification
+    - _Requirements: 3.7, 4.7_
+
+  - [x] 17.2 Add operation metadata fields
+    - Add SubType field to Operation and OperationUpdate
+    - Add StartTimestamp field to Operation
+    - Add EndTimestamp field to Operation
+    - _Requirements: 23.1, 23.2, 23.3, 23.4_
+
+  - [x] 17.3 Implement READY status handling
+    - Detect READY status during replay
+    - Resume execution without re-checkpointing START
+    - _Requirements: 3.7_
+
+  - [x] 17.4 Write property test for READY status handling
+    - **Property 12: READY Status Resume Without Re-checkpoint**
+    - **Validates: Requirements 3.7**
+
+- [x] 18. Implement wait cancellation
+  - [x] 18.1 Add cancel_wait method to DurableContext
+    - Implement cancel_wait(operation_id) method
+    - Checkpoint CANCEL action for WAIT operation
+    - Handle already-completed waits gracefully
+    - _Requirements: 5.5_
+
+  - [x] 18.2 Update wait handler for cancellation
+    - Check for CANCELLED status during replay
+    - Return appropriate result for cancelled waits
+    - _Requirements: 5.5_
+
+- [x] 19. Implement extended duration support
+  - [x] 19.1 Add Duration constructors for weeks, months, years
+    - Implement from_weeks constructor
+    - Implement from_months constructor (30 days)
+    - Implement from_years constructor (365 days)
+    - _Requirements: 5.6, 12.7_
+
+- [x] 20. Implement RETRY action enhancements
+  - [x] 20.1 Add RETRY action with Payload support
+    - Support RETRY action with Payload (not just Error)
+    - Enable wait-for-condition pattern using RETRY with state
+    - Track attempt number in StepDetails.Attempt
+    - _Requirements: 4.7, 4.8, 4.9_
+
+  - [x] 20.2 Update wait_for_condition to use RETRY with Payload
+    - Implement as single STEP with RETRY mechanism
+    - Pass state as Payload on retry (not Error)
+    - Use NextAttemptDelaySeconds for wait intervals
+    - _Requirements: 1.8, 4.9_
+
+- [x] 21. Implement ReplayChildren support
+  - [x] 21.1 Add ContextConfig with replay_children option
+    - Create ContextConfig struct with replay_children field
+    - Pass ReplayChildren option to API when starting CONTEXT
+    - _Requirements: 10.5, 10.6, 12.8_
+
+  - [x] 21.2 Update child context handler for ReplayChildren
+    - Request children state when replay_children is true
+    - Replay each branch to combine output for large parallel operations
+    - _Requirements: 10.5, 10.6_
+
+- [-] 22. Implement promise combinators
+  - [x] 22.1 Implement all combinator
+    - Wait for all futures to complete successfully
+    - Return error on first failure
+    - Implement within a STEP operation for durability
+    - _Requirements: 20.1, 20.5_
+
+  - [x] 22.2 Implement all_settled combinator
+    - Wait for all futures to settle (success or failure)
+    - Return BatchResult with all outcomes
+    - Implement within a STEP operation for durability
+    - _Requirements: 20.2, 20.5_
+
+  - [x] 22.3 Implement race combinator
+    - Return result of first future to settle
+    - Implement within a STEP operation for durability
+    - _Requirements: 20.3, 20.5_
+
+  - [x] 22.4 Implement any combinator
+    - Return result of first future to succeed
+    - Return error only if all futures fail
+    - Implement within a STEP operation for durability
+    - _Requirements: 20.4, 20.5_
+
+  - [x] 22.5 Write property test for promise combinators
+    - **Property 13: Promise Combinator Correctness**
+    - **Validates: Requirements 20.1, 20.2, 20.3, 20.4**
+    - **PBT Status: PASSED**
+
+- [x] 23. Implement enhanced invoke support
+  - [x] 23.1 Add TenantId support to invoke
+    - Add tenant_id field to InvokeConfig
+    - Pass TenantId in ChainedInvokeOptions
+    - _Requirements: 7.6_
+
+  - [x] 23.2 Handle STOPPED status for invoke
+    - Detect STOPPED status during replay
+    - Return appropriate error for stopped invocations
+    - _Requirements: 7.7_
+
+- [x] 24. Implement checkpoint token handling
+  - [x] 24.1 Implement checkpoint token management
+    - Use CheckpointToken from invocation input for first checkpoint
+    - Use returned CheckpointToken for subsequent checkpoints
+    - Never reuse consumed checkpoint tokens
+    - _Requirements: 2.9, 2.10_
+
+  - [x] 24.2 Handle InvalidParameterValueException for tokens
+    - Detect "Invalid checkpoint token" error message
+    - Allow propagation for Lambda retry
+    - _Requirements: 2.11_
+
+- [x] 25. Implement batch checkpoint ordering
+  - [x] 25.1 Enforce checkpoint ordering rules
+    - Checkpoint operations in execution order
+    - Ensure EXECUTION completion is last in batch
+    - Ensure child operations after parent CONTEXT starts
+    - _Requirements: 2.12_
+
+  - [x] 25.2 Support START+completion in same batch
+    - Allow STEP START and SUCCEED/FAIL in same batch
+    - Allow CONTEXT START and SUCCEED/FAIL in same batch
+    - _Requirements: 2.13_
+
+- [x] 26. Implement replay-aware logging
+  - [x] 26.1 Add replay detection to logging
+    - Detect replay mode in ExecutionState
+    - Add is_replay flag to log context
+    - _Requirements: 16.6_
+
+  - [x] 26.2 Implement configurable replay log suppression
+    - Add replay_logging_enabled configuration
+    - Suppress logs during replay when disabled
+    - Allow users to configure behavior
+    - _Requirements: 16.6, 16.7_
+
+- [x] 27. Implement replay-safe helpers
+  - [x] 27.1 Implement deterministic UUID generator
+    - Create uuid_from_operation(operation_id, seed) function
+    - Use blake2b hash for deterministic generation
+    - Document usage for replay-safe UUIDs
+    - _Requirements: 22.1_
+
+  - [x] 27.2 Implement replay-safe timestamp helper
+    - Create timestamp_from_execution(state) function
+    - Return StartTimestamp from EXECUTION operation
+    - Document usage for replay-safe timestamps
+    - _Requirements: 22.2, 22.3_
+
+- [x] 28. Implement performance configuration
+  - [x] 28.1 Add CheckpointingMode configuration
+    - Create CheckpointingMode enum (Eager, Batched, Optimistic)
+    - Add checkpointing_mode to ExecutionState
+    - Document trade-offs for each mode
+    - _Requirements: 24.1, 24.2, 24.3, 24.4_
+
+  - [x] 28.2 Implement eager checkpointing mode
+    - Checkpoint after every operation
+    - Maximum durability, more API calls
+    - _Requirements: 24.1_
+
+  - [x] 28.3 Implement optimistic execution mode
+    - Execute multiple operations before checkpointing
+    - Best performance, replay may redo more work
+    - _Requirements: 24.3_
+
+- [x] 29. Implement enhanced error handling
+  - [x] 29.1 Add SizeLimit and Throttling error variants
+    - Add SizeLimit error for payload size exceeded
+    - Add Throttling error for rate limit exceeded
+    - Add ResourceNotFound error for missing executions
+    - _Requirements: 13.9, 18.5, 18.6_
+
+  - [x] 29.2 Handle size limit errors gracefully
+    - Catch size limit errors from API
+    - Return FAILED status with clear message
+    - Do not propagate for retry
+    - _Requirements: 25.6_
+
+  - [x] 29.3 Handle throttling with retry
+    - Detect ThrottlingException from API
+    - Retry with exponential backoff
+    - _Requirements: 18.5_
+
+- [x] 30. Checkpoint - Ensure all new tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 31. Documentation updates
+  - [x] 31.1 Add determinism documentation
+    - Document why determinism is required for replay
+    - List common sources of non-determinism in Rust
+    - Provide examples of correct and incorrect patterns
+    - Warn about HashMap iteration order
+    - _Requirements: 21.1, 21.2, 21.3, 21.4, 21.5_
+
+  - [x] 31.2 Add execution limits documentation
+    - Document maximum execution duration (1 year)
+    - Document maximum response payload (6MB)
+    - Document checkpoint and history size limits
+    - Document wait duration limits
+    - _Requirements: 25.1, 25.2, 25.3, 25.4, 25.5_
+
+  - [x] 31.3 Update API documentation
+    - Document all new methods and types
+    - Add examples for new features
+    - Update getting started guide
+    - _Requirements: 21.1, 21.2, 21.3, 21.4_
+
+- [x] 32. Final checkpoint - All specification gaps closed
+  - Ensure all tests pass
+  - Verify conformance to Language SDK Specification v1.2
+  - Ask the user if questions arise
+
 ## Notes
 
+- Tasks 1-15 are from the original implementation and are marked complete
+- Tasks 16-32 are new tasks to close gaps with Language SDK Specification v1.2
 - All tasks including property-based tests are required for comprehensive validation
 - Each task references specific requirements for traceability
 - Checkpoints ensure incremental validation

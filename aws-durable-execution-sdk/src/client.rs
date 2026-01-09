@@ -336,11 +336,62 @@ impl DurableServiceClient for LambdaDurableServiceClient {
 
         if !status.is_success() {
             let error_message = String::from_utf8_lossy(&response_body);
+            
+            // Check for specific error conditions
+            
+            // Size limit exceeded (413 Request Entity Too Large or specific error message)
+            // Requirements: 25.6 - Handle size limit errors gracefully, return FAILED without retry
+            if status.as_u16() == 413 || error_message.contains("RequestEntityTooLarge") 
+                || error_message.contains("Payload size exceeded") 
+                || error_message.contains("Request too large") {
+                return Err(DurableError::SizeLimit {
+                    message: format!("Checkpoint payload size exceeded: {}", error_message),
+                    actual_size: None,
+                    max_size: None,
+                });
+            }
+            
+            // Resource not found (404)
+            // Requirements: 18.6 - Handle ResourceNotFoundException appropriately
+            if status.as_u16() == 404 || error_message.contains("ResourceNotFoundException") 
+                || error_message.contains("not found") {
+                return Err(DurableError::ResourceNotFound {
+                    message: format!("Durable execution not found: {}", error_message),
+                    resource_id: Some(durable_execution_arn.to_string()),
+                });
+            }
+            
+            // Throttling (429 Too Many Requests)
+            // Requirements: 18.5 - Handle ThrottlingException with appropriate retry behavior
+            if status.as_u16() == 429 || error_message.contains("ThrottlingException") 
+                || error_message.contains("TooManyRequestsException")
+                || error_message.contains("Rate exceeded") {
+                return Err(DurableError::Throttling {
+                    message: format!("Rate limit exceeded: {}", error_message),
+                    retry_after_ms: None, // Could parse Retry-After header if available
+                });
+            }
+            
+            // Check for InvalidParameterValueException with "Invalid checkpoint token" message
+            // This indicates the token was already consumed or is invalid, and Lambda should retry
+            // Requirements: 2.11
+            let is_invalid_token = error_message.contains("Invalid checkpoint token");
+            
+            // Determine if the error is retriable:
+            // - Server errors (5xx) are retriable
+            // - Invalid checkpoint token errors are retriable (Lambda will provide a fresh token)
+            // Note: Throttling (429) is handled separately above
+            let is_retriable = status.is_server_error() || is_invalid_token;
+            
             return Err(DurableError::Checkpoint {
                 message: format!("Checkpoint API returned {}: {}", status, error_message),
-                is_retriable: status.is_server_error() || status.as_u16() == 429,
+                is_retriable,
                 aws_error: Some(AwsError {
-                    code: status.to_string(),
+                    code: if is_invalid_token { 
+                        "InvalidParameterValueException".to_string() 
+                    } else { 
+                        status.to_string() 
+                    },
                     message: error_message.to_string(),
                     request_id: None,
                 }),
@@ -403,6 +454,28 @@ impl DurableServiceClient for LambdaDurableServiceClient {
 
         if !status.is_success() {
             let error_message = String::from_utf8_lossy(&response_body);
+            
+            // Resource not found (404)
+            // Requirements: 18.6 - Handle ResourceNotFoundException appropriately
+            if status.as_u16() == 404 || error_message.contains("ResourceNotFoundException") 
+                || error_message.contains("not found") {
+                return Err(DurableError::ResourceNotFound {
+                    message: format!("Durable execution not found: {}", error_message),
+                    resource_id: Some(durable_execution_arn.to_string()),
+                });
+            }
+            
+            // Throttling (429 Too Many Requests)
+            // Requirements: 18.5 - Handle ThrottlingException with appropriate retry behavior
+            if status.as_u16() == 429 || error_message.contains("ThrottlingException") 
+                || error_message.contains("TooManyRequestsException")
+                || error_message.contains("Rate exceeded") {
+                return Err(DurableError::Throttling {
+                    message: format!("Rate limit exceeded: {}", error_message),
+                    retry_after_ms: None,
+                });
+            }
+            
             return Err(DurableError::Invocation {
                 message: format!("GetDurableExecutionState API returned {}: {}", status, error_message),
                 termination_reason: crate::error::TerminationReason::InvocationError,
@@ -671,5 +744,145 @@ mod tests {
         };
         let json = serde_json::to_string(&request).unwrap();
         assert!(json.contains(r#""NextMarker":"marker-123""#));
+    }
+
+    #[tokio::test]
+    async fn test_mock_client_checkpoint_with_invalid_token_error() {
+        // Test that invalid checkpoint token errors are properly marked as retriable
+        let error = DurableError::Checkpoint {
+            message: "Checkpoint API returned 400: Invalid checkpoint token".to_string(),
+            is_retriable: true,
+            aws_error: Some(AwsError {
+                code: "InvalidParameterValueException".to_string(),
+                message: "Invalid checkpoint token: token has been consumed".to_string(),
+                request_id: None,
+            }),
+        };
+        
+        let client = MockDurableServiceClient::new().with_checkpoint_response(Err(error));
+        let result = client
+            .checkpoint(
+                "arn:aws:lambda:us-east-1:123456789012:function:test",
+                "consumed-token",
+                vec![],
+            )
+            .await;
+        
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.is_retriable());
+        assert!(err.is_invalid_checkpoint_token());
+    }
+
+    #[tokio::test]
+    async fn test_mock_client_checkpoint_with_size_limit_error() {
+        // Test that size limit errors are properly returned as non-retriable
+        let error = DurableError::SizeLimit {
+            message: "Checkpoint payload size exceeded".to_string(),
+            actual_size: Some(7_000_000),
+            max_size: Some(6_000_000),
+        };
+        
+        let client = MockDurableServiceClient::new().with_checkpoint_response(Err(error));
+        let result = client
+            .checkpoint(
+                "arn:aws:lambda:us-east-1:123456789012:function:test",
+                "token-123",
+                vec![],
+            )
+            .await;
+        
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.is_size_limit());
+        assert!(!err.is_retriable());
+    }
+
+    #[tokio::test]
+    async fn test_mock_client_checkpoint_with_throttling_error() {
+        // Test that throttling errors are properly returned
+        let error = DurableError::Throttling {
+            message: "Rate limit exceeded".to_string(),
+            retry_after_ms: Some(5000),
+        };
+        
+        let client = MockDurableServiceClient::new().with_checkpoint_response(Err(error));
+        let result = client
+            .checkpoint(
+                "arn:aws:lambda:us-east-1:123456789012:function:test",
+                "token-123",
+                vec![],
+            )
+            .await;
+        
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.is_throttling());
+        assert_eq!(err.get_retry_after_ms(), Some(5000));
+    }
+
+    #[tokio::test]
+    async fn test_mock_client_checkpoint_with_resource_not_found_error() {
+        // Test that resource not found errors are properly returned
+        let error = DurableError::ResourceNotFound {
+            message: "Durable execution not found".to_string(),
+            resource_id: Some("arn:aws:lambda:us-east-1:123456789012:function:test".to_string()),
+        };
+        
+        let client = MockDurableServiceClient::new().with_checkpoint_response(Err(error));
+        let result = client
+            .checkpoint(
+                "arn:aws:lambda:us-east-1:123456789012:function:test",
+                "token-123",
+                vec![],
+            )
+            .await;
+        
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.is_resource_not_found());
+        assert!(!err.is_retriable());
+    }
+
+    #[tokio::test]
+    async fn test_mock_client_get_operations_with_throttling_error() {
+        // Test that throttling errors are properly returned for get_operations
+        let error = DurableError::Throttling {
+            message: "Rate limit exceeded".to_string(),
+            retry_after_ms: None,
+        };
+        
+        let client = MockDurableServiceClient::new().with_get_operations_response(Err(error));
+        let result = client
+            .get_operations(
+                "arn:aws:lambda:us-east-1:123456789012:function:test",
+                "marker-123",
+            )
+            .await;
+        
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.is_throttling());
+    }
+
+    #[tokio::test]
+    async fn test_mock_client_get_operations_with_resource_not_found_error() {
+        // Test that resource not found errors are properly returned for get_operations
+        let error = DurableError::ResourceNotFound {
+            message: "Durable execution not found".to_string(),
+            resource_id: Some("arn:aws:lambda:us-east-1:123456789012:function:test".to_string()),
+        };
+        
+        let client = MockDurableServiceClient::new().with_get_operations_response(Err(error));
+        let result = client
+            .get_operations(
+                "arn:aws:lambda:us-east-1:123456789012:function:test",
+                "marker-123",
+            )
+            .await;
+        
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.is_resource_not_found());
     }
 }

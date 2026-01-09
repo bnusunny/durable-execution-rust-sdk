@@ -21,6 +21,16 @@
 //! - **External Integration**: Wait for callbacks from external systems with configurable
 //!   timeouts.
 //! - **Type Safety**: Full Rust type safety with generics and trait-based abstractions.
+//! - **Promise Combinators**: Coordinate multiple durable promises with `all`, `any`, `race`, and `all_settled`.
+//! - **Replay-Safe Helpers**: Generate deterministic UUIDs and timestamps that are safe for replay.
+//! - **Configurable Checkpointing**: Choose between eager, batched, or optimistic checkpointing modes.
+//!
+//! ## Important Documentation
+//!
+//! Before writing durable workflows, please read:
+//!
+//! - [`docs::determinism`]: **Critical** - Understanding determinism requirements for replay-safe workflows
+//! - [`docs::limits`]: Execution limits and constraints you need to know
 //!
 //! ## Getting Started
 //!
@@ -207,6 +217,161 @@
 //! ).await?;
 //! ```
 //!
+//! ### Promise Combinators
+//!
+//! The SDK provides promise combinators for coordinating multiple durable operations:
+//!
+//! ```rust,ignore
+//! use aws_durable_execution_sdk::DurableContext;
+//!
+//! async fn coordinate_operations(ctx: &DurableContext) -> Result<(), DurableError> {
+//!     // Wait for ALL operations to complete successfully
+//!     let results = ctx.all(vec![
+//!         ctx.step(|_| Ok(1), None),
+//!         ctx.step(|_| Ok(2), None),
+//!         ctx.step(|_| Ok(3), None),
+//!     ]).await?;
+//!     // results = [1, 2, 3]
+//!
+//!     // Wait for ALL operations to settle (success or failure)
+//!     let batch_result = ctx.all_settled(vec![
+//!         ctx.step(|_| Ok("success"), None),
+//!         ctx.step(|_| Err("failure".into()), None),
+//!     ]).await;
+//!     // batch_result contains both success and failure outcomes
+//!
+//!     // Return the FIRST operation to settle (success or failure)
+//!     let first = ctx.race(vec![
+//!         ctx.step(|_| Ok("fast"), None),
+//!         ctx.step(|_| Ok("slow"), None),
+//!     ]).await?;
+//!
+//!     // Return the FIRST operation to succeed
+//!     let first_success = ctx.any(vec![
+//!         ctx.step(|_| Err("fail".into()), None),
+//!         ctx.step(|_| Ok("success"), None),
+//!     ]).await?;
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ### Accessing Original Input
+//!
+//! Access the original input that started the execution:
+//!
+//! ```rust,ignore
+//! use serde::Deserialize;
+//!
+//! #[derive(Deserialize)]
+//! struct OrderEvent {
+//!     order_id: String,
+//!     amount: f64,
+//! }
+//!
+//! async fn my_workflow(ctx: DurableContext) -> Result<(), DurableError> {
+//!     // Get the original input that started this execution
+//!     let event: OrderEvent = ctx.get_original_input()?;
+//!     println!("Processing order: {}", event.order_id);
+//!     
+//!     // Or get the raw JSON string
+//!     if let Some(raw_input) = ctx.get_original_input_raw() {
+//!         println!("Raw input: {}", raw_input);
+//!     }
+//!     
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ### Replay-Safe Helpers
+//!
+//! Generate deterministic values that are safe for replay:
+//!
+//! ```rust
+//! use aws_durable_execution_sdk::replay_safe::{
+//!     uuid_from_operation, uuid_to_string, uuid_string_from_operation,
+//! };
+//!
+//! // Generate a deterministic UUID from an operation ID
+//! let operation_id = "my-operation-123";
+//! let uuid_bytes = uuid_from_operation(operation_id, 0);
+//! let uuid_string = uuid_to_string(&uuid_bytes);
+//!
+//! // Or use the convenience function
+//! let uuid = uuid_string_from_operation(operation_id, 0);
+//!
+//! // Same inputs always produce the same UUID
+//! let uuid2 = uuid_string_from_operation(operation_id, 0);
+//! assert_eq!(uuid, uuid2);
+//!
+//! // Different seeds produce different UUIDs
+//! let uuid3 = uuid_string_from_operation(operation_id, 1);
+//! assert_ne!(uuid, uuid3);
+//! ```
+//!
+//! For timestamps, use the execution start time instead of current time:
+//!
+//! ```rust,ignore
+//! use aws_durable_execution_sdk::replay_safe::{
+//!     timestamp_from_execution, timestamp_seconds_from_execution,
+//! };
+//!
+//! async fn my_workflow(ctx: DurableContext) -> Result<(), DurableError> {
+//!     // Get replay-safe timestamp (milliseconds since epoch)
+//!     if let Some(timestamp_ms) = timestamp_from_execution(ctx.state()) {
+//!         println!("Execution started at: {} ms", timestamp_ms);
+//!     }
+//!     
+//!     // Or get seconds since epoch
+//!     if let Some(timestamp_secs) = timestamp_seconds_from_execution(ctx.state()) {
+//!         println!("Execution started at: {} seconds", timestamp_secs);
+//!     }
+//!     
+//!     Ok(())
+//! }
+//! ```
+//!
+//! **Important**: See [`docs::determinism`] for detailed guidance on writing replay-safe code.
+//!
+//! ### Wait Cancellation
+//!
+//! Cancel an active wait operation:
+//!
+//! ```rust,ignore
+//! async fn cancellable_workflow(ctx: DurableContext) -> Result<(), DurableError> {
+//!     // Start a long wait in a child context
+//!     let wait_op_id = ctx.next_operation_id();
+//!     
+//!     // In another branch, you can cancel the wait
+//!     ctx.cancel_wait(&wait_op_id).await?;
+//!     
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ### Extended Duration Support
+//!
+//! The Duration type supports extended time periods:
+//!
+//! ```rust
+//! use aws_durable_execution_sdk::Duration;
+//!
+//! // Standard durations
+//! let seconds = Duration::from_seconds(30);
+//! let minutes = Duration::from_minutes(5);
+//! let hours = Duration::from_hours(2);
+//! let days = Duration::from_days(7);
+//!
+//! // Extended durations
+//! let weeks = Duration::from_weeks(2);      // 14 days
+//! let months = Duration::from_months(3);    // 90 days (30 days per month)
+//! let years = Duration::from_years(1);      // 365 days
+//!
+//! assert_eq!(weeks.to_seconds(), 14 * 24 * 60 * 60);
+//! assert_eq!(months.to_seconds(), 90 * 24 * 60 * 60);
+//! assert_eq!(years.to_seconds(), 365 * 24 * 60 * 60);
+//! ```
+//!
 //! ## Configuration Types
 //!
 //! The SDK provides type-safe configuration for all operations:
@@ -292,6 +457,30 @@
 //! The SDK integrates with the `tracing` crate for structured logging. All operations
 //! automatically include execution context (ARN, operation ID, parent ID) in log messages.
 //!
+//! ### Replay-Aware Logging
+//!
+//! The SDK supports replay-aware logging that can suppress or filter logs during replay.
+//! This is useful to reduce noise when replaying previously executed operations.
+//!
+//! ```rust
+//! use aws_durable_execution_sdk::{TracingLogger, ReplayAwareLogger, ReplayLoggingConfig};
+//! use std::sync::Arc;
+//!
+//! // Suppress all logs during replay (default)
+//! let logger = ReplayAwareLogger::suppress_replay(Arc::new(TracingLogger));
+//!
+//! // Allow only errors during replay
+//! let logger_errors = ReplayAwareLogger::new(
+//!     Arc::new(TracingLogger),
+//!     ReplayLoggingConfig::ErrorsOnly,
+//! );
+//!
+//! // Allow all logs during replay
+//! let logger_all = ReplayAwareLogger::allow_all(Arc::new(TracingLogger));
+//! ```
+//!
+//! ### Custom Logger
+//!
 //! You can also provide a custom logger by implementing the [`Logger`] trait:
 //!
 //! ```rust,ignore
@@ -301,6 +490,7 @@
 //!
 //! impl Logger for MyLogger {
 //!     fn debug(&self, message: &str, info: &LogInfo) {
+//!         // info.is_replay indicates if this is during replay
 //!         println!("[DEBUG] {}: {:?}", message, info);
 //!     }
 //!     fn info(&self, message: &str, info: &LogInfo) {
@@ -363,17 +553,28 @@
 //! 6. **Set reasonable timeouts**: Always configure timeouts for callbacks and
 //!    invocations to prevent workflows from hanging indefinitely.
 //!
+//! 7. **Ensure determinism**: Your workflow must execute the same sequence of
+//!    operations on every run. Avoid using `HashMap` iteration, random numbers,
+//!    or current time outside of steps. See [`docs::determinism`] for details.
+//!
+//! 8. **Use replay-safe helpers**: When you need UUIDs or timestamps, use the
+//!    helpers in [`replay_safe`] to ensure consistent values across replays.
+//!
 //! ## Module Organization
 //!
 //! - [`client`]: Lambda service client for checkpoint operations
 //! - [`concurrency`]: Concurrent execution types (BatchResult, ConcurrentExecutor)
 //! - [`config`]: Configuration types for all operations
 //! - [`context`]: DurableContext and operation identifier types
+//! - [`docs`]: **Documentation modules** - determinism requirements and execution limits
+//!   - [`docs::determinism`]: Understanding determinism for replay-safe workflows
+//!   - [`docs::limits`]: Execution limits and constraints
 //! - [`duration`]: Duration type with convenient constructors
 //! - [`error`]: Error types and error handling
 //! - [`handlers`]: Operation handlers (step, wait, callback, etc.)
 //! - [`lambda`]: Lambda integration types (input/output)
 //! - [`operation`]: Operation types and status enums
+//! - [`replay_safe`]: Replay-safe helpers for deterministic UUIDs and timestamps
 //! - [`serdes`]: Serialization/deserialization system
 //! - [`state`]: Execution state and checkpointing system
 
@@ -381,11 +582,13 @@ pub mod client;
 pub mod concurrency;
 pub mod config;
 pub mod context;
+pub mod docs;
 pub mod duration;
 pub mod error;
 pub mod handlers;
 pub mod lambda;
 pub mod operation;
+pub mod replay_safe;
 pub mod serdes;
 pub mod state;
 
@@ -397,6 +600,7 @@ pub use client::{
 pub use config::*;
 pub use context::{
     DurableContext, LogInfo, Logger, OperationIdGenerator, OperationIdentifier, TracingLogger,
+    ReplayAwareLogger, ReplayLoggingConfig,
     generate_operation_id, WaitForConditionConfig, WaitForConditionContext,
 };
 pub use duration::Duration;
@@ -425,12 +629,19 @@ pub use concurrency::{
 // Re-export handlers
 pub use handlers::{
     StepContext, step_handler,
-    wait_handler,
+    wait_handler, wait_cancel_handler,
     Callback, callback_handler,
     invoke_handler,
     child_handler,
     map_handler,
     parallel_handler,
+    all_handler, all_settled_handler, race_handler, any_handler,
+};
+
+// Re-export replay-safe helpers
+pub use replay_safe::{
+    uuid_from_operation, uuid_to_string, uuid_string_from_operation,
+    timestamp_from_execution, timestamp_seconds_from_execution,
 };
 
 // Re-export macro if enabled

@@ -88,6 +88,14 @@ pub async fn wait_handler(
             return Ok(());
         }
 
+        // If the wait was cancelled, return Ok(()) - the wait is considered complete
+        // Requirements: 5.5
+        if checkpoint_result.is_cancelled() {
+            logger.debug(&format!("Wait was cancelled: {}", op_id), &log_info);
+            state.track_replay(&op_id.operation_id).await;
+            return Ok(());
+        }
+
         // If the wait was started but not yet succeeded, suspend and let the service handle timing
         if checkpoint_result.is_existent() && !checkpoint_result.is_terminal() {
             logger.debug(&format!("Wait still in progress: {}", op_id), &log_info);
@@ -108,6 +116,79 @@ pub async fn wait_handler(
     Err(DurableError::Suspend {
         scheduled_timestamp: None,
     })
+}
+
+/// Cancels an active wait operation.
+///
+/// This handler implements wait cancellation:
+/// - Checks if the wait operation exists
+/// - Validates that the operation is a WAIT type
+/// - Handles already-completed waits gracefully
+/// - Checkpoints the CANCEL action for active waits
+///
+/// # Arguments
+///
+/// * `state` - The execution state for checkpointing
+/// * `operation_id` - The operation ID of the wait to cancel
+/// * `logger` - Logger for structured logging
+///
+/// # Returns
+///
+/// Ok(()) if the wait was cancelled or was already completed, or an error if:
+/// - The operation doesn't exist
+/// - The operation is not a WAIT operation
+/// - The checkpoint fails
+///
+/// # Requirements
+///
+/// - 5.5: THE Wait_Operation SHALL support cancellation of active waits via CANCEL action
+pub async fn wait_cancel_handler(
+    state: &Arc<ExecutionState>,
+    operation_id: &str,
+    logger: &Arc<dyn Logger>,
+) -> Result<(), DurableError> {
+    let log_info = LogInfo::new(state.durable_execution_arn())
+        .with_operation_id(operation_id);
+
+    logger.debug(&format!("Attempting to cancel wait operation: {}", operation_id), &log_info);
+
+    // Check if the operation exists
+    let checkpoint_result = state.get_checkpoint_result(operation_id).await;
+
+    if !checkpoint_result.is_existent() {
+        // Operation doesn't exist - this could be a race condition or invalid ID
+        // We'll treat this as a no-op since there's nothing to cancel
+        logger.debug(&format!("Wait operation not found, nothing to cancel: {}", operation_id), &log_info);
+        return Ok(());
+    }
+
+    // Validate that this is a WAIT operation
+    if let Some(op_type) = checkpoint_result.operation_type() {
+        if op_type != OperationType::Wait {
+            return Err(DurableError::Validation {
+                message: format!(
+                    "Cannot cancel operation {}: expected WAIT operation but found {:?}",
+                    operation_id, op_type
+                ),
+            });
+        }
+    }
+
+    // Check if the wait is already in a terminal state
+    if checkpoint_result.is_terminal() {
+        // Already completed (succeeded, failed, cancelled, timed out, etc.)
+        // Nothing to do - return success
+        logger.debug(&format!("Wait already completed, nothing to cancel: {}", operation_id), &log_info);
+        return Ok(());
+    }
+
+    // The wait is still active - checkpoint the CANCEL action
+    let cancel_update = OperationUpdate::cancel(operation_id, OperationType::Wait);
+    state.create_checkpoint(cancel_update, true).await?;
+
+    logger.info(&format!("Wait operation cancelled: {}", operation_id), &log_info);
+
+    Ok(())
 }
 
 /// Creates a Start operation update for wait with the wait duration.
@@ -320,5 +401,150 @@ mod tests {
         assert_eq!(update.wait_options.unwrap().wait_seconds, 60);
         assert_eq!(update.parent_id, Some("parent-456".to_string()));
         assert_eq!(update.name, Some("my-wait".to_string()));
+    }
+
+    // Tests for wait cancellation (Requirements: 5.5)
+
+    #[tokio::test]
+    async fn test_wait_cancel_handler_cancels_active_wait() {
+        let client = Arc::new(
+            MockDurableServiceClient::new()
+                .with_checkpoint_response(Ok(CheckpointResponse {
+                    checkpoint_token: "token-1".to_string(),
+                }))
+        );
+        
+        // Create state with a started wait operation (active wait)
+        let mut op = Operation::new("test-wait-123", OperationType::Wait);
+        op.status = OperationStatus::Started;
+        
+        let initial_state = InitialExecutionState::with_operations(vec![op]);
+        let state = Arc::new(ExecutionState::new(
+            "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+            "initial-token",
+            initial_state,
+            client,
+        ));
+        
+        let logger = create_test_logger();
+
+        // Cancel the wait
+        let result = wait_cancel_handler(&state, "test-wait-123", &logger).await;
+
+        // Should succeed
+        assert!(result.is_ok());
+        
+        // Verify the operation is now cancelled in local cache
+        let checkpoint_result = state.get_checkpoint_result("test-wait-123").await;
+        assert!(checkpoint_result.is_cancelled());
+    }
+
+    #[tokio::test]
+    async fn test_wait_cancel_handler_handles_already_completed_wait() {
+        let client = Arc::new(MockDurableServiceClient::new());
+        
+        // Create state with a succeeded wait operation (already completed)
+        let mut op = Operation::new("test-wait-123", OperationType::Wait);
+        op.status = OperationStatus::Succeeded;
+        
+        let initial_state = InitialExecutionState::with_operations(vec![op]);
+        let state = Arc::new(ExecutionState::new(
+            "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+            "initial-token",
+            initial_state,
+            client,
+        ));
+        
+        let logger = create_test_logger();
+
+        // Try to cancel the already completed wait
+        let result = wait_cancel_handler(&state, "test-wait-123", &logger).await;
+
+        // Should succeed (no-op for already completed waits)
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_wait_cancel_handler_handles_nonexistent_wait() {
+        let client = Arc::new(MockDurableServiceClient::new());
+        
+        // Create empty state (no operations)
+        let initial_state = InitialExecutionState::new();
+        let state = Arc::new(ExecutionState::new(
+            "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+            "initial-token",
+            initial_state,
+            client,
+        ));
+        
+        let logger = create_test_logger();
+
+        // Try to cancel a non-existent wait
+        let result = wait_cancel_handler(&state, "nonexistent-wait", &logger).await;
+
+        // Should succeed (no-op for non-existent waits)
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_wait_cancel_handler_rejects_non_wait_operation() {
+        let client = Arc::new(MockDurableServiceClient::new());
+        
+        // Create state with a Step operation (not a Wait)
+        let mut op = Operation::new("test-step-123", OperationType::Step);
+        op.status = OperationStatus::Started;
+        
+        let initial_state = InitialExecutionState::with_operations(vec![op]);
+        let state = Arc::new(ExecutionState::new(
+            "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+            "initial-token",
+            initial_state,
+            client,
+        ));
+        
+        let logger = create_test_logger();
+
+        // Try to cancel a Step operation (should fail)
+        let result = wait_cancel_handler(&state, "test-step-123", &logger).await;
+
+        // Should fail with validation error
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DurableError::Validation { message } => {
+                assert!(message.contains("expected WAIT operation"));
+            }
+            _ => panic!("Expected Validation error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_wait_handler_replay_cancelled_wait() {
+        let client = Arc::new(MockDurableServiceClient::new());
+        
+        // Create state with a cancelled wait operation
+        let mut op = Operation::new("test-wait-123", OperationType::Wait);
+        op.status = OperationStatus::Cancelled;
+        
+        let initial_state = InitialExecutionState::with_operations(vec![op]);
+        let state = Arc::new(ExecutionState::new(
+            "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+            "initial-token",
+            initial_state,
+            client,
+        ));
+        
+        let op_id = create_test_op_id();
+        let logger = create_test_logger();
+
+        // Replay the cancelled wait
+        let result = wait_handler(
+            Duration::from_seconds(60),
+            &state,
+            &op_id,
+            &logger,
+        ).await;
+
+        // Should succeed immediately since wait was cancelled
+        assert!(result.is_ok());
     }
 }

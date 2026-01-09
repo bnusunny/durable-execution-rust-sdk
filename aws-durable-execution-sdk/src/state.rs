@@ -2,9 +2,33 @@
 //!
 //! This module provides the core state management types for durable executions,
 //! including checkpoint tracking, replay logic, and operation state management.
+//!
+//! ## Checkpoint Token Management
+//!
+//! The SDK uses checkpoint tokens to ensure exactly-once checkpoint semantics:
+//!
+//! 1. **Initial Token**: The first checkpoint uses the `CheckpointToken` from the
+//!    `DurableExecutionInvocationInput` provided by Lambda.
+//!
+//! 2. **Token Updates**: Each successful checkpoint returns a new token that MUST
+//!    be used for the next checkpoint. The SDK automatically updates the token
+//!    after each successful checkpoint.
+//!
+//! 3. **Token Consumption**: Once a token is used for a checkpoint, it is consumed
+//!    and cannot be reused. Attempting to reuse a consumed token results in an
+//!    `InvalidParameterValueException` error.
+//!
+//! 4. **Error Handling**: If a checkpoint fails with "Invalid checkpoint token",
+//!    the error is marked as retriable so Lambda can retry with a fresh token.
+//!
+//! ## Requirements
+//!
+//! - 2.9: THE Checkpointing_System SHALL use the CheckpointToken from invocation input for the first checkpoint
+//! - 2.10: THE Checkpointing_System SHALL use the returned CheckpointToken from each checkpoint response for subsequent checkpoints
+//! - 2.11: THE Checkpointing_System SHALL handle InvalidParameterValueException for invalid tokens by allowing propagation for retry
 
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU8, AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
 
@@ -81,6 +105,24 @@ impl CheckpointedResult {
             .unwrap_or(false)
     }
 
+    /// Returns true if the operation is pending (waiting for retry).
+    /// Requirements: 3.7, 4.7
+    pub fn is_pending(&self) -> bool {
+        self.operation
+            .as_ref()
+            .map(|op| op.status == OperationStatus::Pending)
+            .unwrap_or(false)
+    }
+
+    /// Returns true if the operation is ready to resume execution.
+    /// Requirements: 3.7
+    pub fn is_ready(&self) -> bool {
+        self.operation
+            .as_ref()
+            .map(|op| op.status == OperationStatus::Ready)
+            .unwrap_or(false)
+    }
+
     /// Returns true if the operation is in a terminal state (completed).
     pub fn is_terminal(&self) -> bool {
         self.operation
@@ -120,6 +162,39 @@ impl CheckpointedResult {
     /// Consumes self and returns the underlying operation.
     pub fn into_operation(self) -> Option<Operation> {
         self.operation
+    }
+
+    /// Returns the retry payload if this is a STEP operation with a payload.
+    ///
+    /// This is used for the wait-for-condition pattern where state is passed
+    /// between retry attempts via the Payload field.
+    ///
+    /// # Returns
+    ///
+    /// The payload string if available, None otherwise.
+    ///
+    /// # Requirements
+    ///
+    /// - 4.9: THE Step_Operation SHALL support RETRY action with Payload for wait-for-condition pattern
+    pub fn retry_payload(&self) -> Option<&str> {
+        self.operation
+            .as_ref()
+            .and_then(|op| op.get_retry_payload())
+    }
+
+    /// Returns the current attempt number for STEP operations.
+    ///
+    /// # Returns
+    ///
+    /// The attempt number (0-indexed) if available, None otherwise.
+    ///
+    /// # Requirements
+    ///
+    /// - 4.8: THE Step_Operation SHALL track attempt numbers in StepDetails.Attempt
+    pub fn attempt(&self) -> Option<u32> {
+        self.operation
+            .as_ref()
+            .and_then(|op| op.get_attempt())
     }
 }
 
@@ -255,6 +330,25 @@ pub struct BatchResult {
 /// - The batch reaches the maximum size in bytes
 /// - The batch reaches the maximum number of operations
 /// - The maximum batch time has elapsed
+///
+/// ## Checkpoint Token Management
+///
+/// The batcher manages checkpoint tokens according to the following rules:
+///
+/// 1. **First Checkpoint**: Uses the initial `CheckpointToken` from the Lambda invocation input
+/// 2. **Subsequent Checkpoints**: Uses the token returned from the previous checkpoint response
+/// 3. **Token Consumption**: Each token can only be used once; the batcher automatically
+///    updates to the new token after each successful checkpoint
+/// 4. **Error Handling**: If a checkpoint fails with "Invalid checkpoint token", the error
+///    is marked as retriable so Lambda can retry with a fresh token
+///
+/// ## Requirements
+///
+/// - 2.9: THE Checkpointing_System SHALL use the CheckpointToken from invocation input for the first checkpoint
+/// - 2.10: THE Checkpointing_System SHALL use the returned CheckpointToken from each checkpoint response for subsequent checkpoints
+/// - 2.11: THE Checkpointing_System SHALL handle InvalidParameterValueException for invalid tokens by allowing propagation for retry
+/// - 2.12: WHEN batching operations, THE Checkpointing_System SHALL checkpoint in execution order with EXECUTION completion last
+/// - 2.13: THE Checkpointing_System SHALL support including both START and completion actions for STEP/CONTEXT in the same batch
 pub struct CheckpointBatcher {
     /// Configuration for batching behavior
     config: CheckpointBatcherConfig,
@@ -264,12 +358,29 @@ pub struct CheckpointBatcher {
     service_client: SharedDurableServiceClient,
     /// Reference to the execution state for updating tokens
     durable_execution_arn: String,
-    /// Current checkpoint token
+    /// Current checkpoint token (shared with ExecutionState)
+    /// This is updated after each successful checkpoint to ensure
+    /// we never reuse a consumed token.
     checkpoint_token: Arc<RwLock<String>>,
+    /// Tracks whether the initial token has been consumed
+    /// This helps with debugging and ensures we follow the token lifecycle correctly
+    initial_token_consumed: AtomicBool,
 }
 
 impl CheckpointBatcher {
     /// Creates a new CheckpointBatcher.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Configuration for batching behavior
+    /// * `queue_rx` - Receiver for checkpoint requests
+    /// * `service_client` - Service client for sending checkpoints
+    /// * `durable_execution_arn` - The ARN of the durable execution
+    /// * `checkpoint_token` - The initial checkpoint token from Lambda invocation input
+    ///
+    /// # Requirements
+    ///
+    /// - 2.9: THE Checkpointing_System SHALL use the CheckpointToken from invocation input for the first checkpoint
     pub fn new(
         config: CheckpointBatcherConfig,
         queue_rx: mpsc::Receiver<CheckpointRequest>,
@@ -283,6 +394,7 @@ impl CheckpointBatcher {
             service_client,
             durable_execution_arn,
             checkpoint_token,
+            initial_token_consumed: AtomicBool::new(false),
         }
     }
 
@@ -354,31 +466,196 @@ impl CheckpointBatcher {
         batch
     }
 
+    /// Sorts checkpoint requests according to the ordering rules.
+    ///
+    /// The ordering rules are:
+    /// 1. Operations are checkpointed in execution order (preserving original order)
+    /// 2. EXECUTION completion (SUCCEED/FAIL on EXECUTION type) must be last in the batch
+    /// 3. Child operations must come after their parent CONTEXT starts
+    /// 4. START and completion (SUCCEED/FAIL) for the same operation can be in the same batch
+    ///
+    /// # Algorithm
+    ///
+    /// The sorting algorithm works as follows:
+    /// 1. Identify all CONTEXT START operations and their IDs
+    /// 2. Group operations by their parent_id
+    /// 3. Sort so that:
+    ///    - CONTEXT START comes before any child operations with that parent_id
+    ///    - EXECUTION completion is always last
+    ///    - Operations with the same ID (START + completion) maintain START before completion
+    ///
+    /// # Requirements
+    ///
+    /// - 2.12: WHEN batching operations, THE Checkpointing_System SHALL checkpoint in execution order with EXECUTION completion last
+    /// - 2.13: THE Checkpointing_System SHALL support including both START and completion actions for STEP/CONTEXT in the same batch
+    fn sort_checkpoint_batch(batch: Vec<CheckpointRequest>) -> Vec<CheckpointRequest> {
+        use crate::operation::{OperationAction, OperationType};
+        use std::collections::{HashMap, HashSet};
+
+        if batch.len() <= 1 {
+            return batch;
+        }
+
+        // Step 1: Identify CONTEXT START operations and build parent-child relationships
+        let context_starts: HashSet<String> = batch
+            .iter()
+            .filter(|req| {
+                req.operation.operation_type == OperationType::Context
+                    && req.operation.action == OperationAction::Start
+            })
+            .map(|req| req.operation.operation_id.clone())
+            .collect();
+
+        // Build a map of operation_id -> parent_id for operations in this batch
+        let parent_map: HashMap<String, Option<String>> = batch
+            .iter()
+            .map(|req| (req.operation.operation_id.clone(), req.operation.parent_id.clone()))
+            .collect();
+
+        // Helper function to check if an operation is an ancestor of another
+        // Returns true if ancestor_id is in the parent chain of operation_id
+        let is_ancestor = |operation_id: &str, ancestor_id: &str| -> bool {
+            let mut current = parent_map.get(operation_id).and_then(|p| p.as_ref());
+            while let Some(parent_id) = current {
+                if parent_id == ancestor_id {
+                    return true;
+                }
+                current = parent_map.get(parent_id).and_then(|p| p.as_ref());
+            }
+            false
+        };
+
+        // Step 2: Sort with custom comparator
+        // We use a stable sort to preserve original order when priorities are equal
+        let mut indexed_batch: Vec<(usize, CheckpointRequest)> = batch
+            .into_iter()
+            .enumerate()
+            .collect();
+
+        indexed_batch.sort_by(|(idx_a, a), (idx_b, b)| {
+            // Priority 1: EXECUTION completion must be last
+            let a_is_exec_completion = a.operation.operation_type == OperationType::Execution
+                && matches!(a.operation.action, OperationAction::Succeed | OperationAction::Fail);
+            let b_is_exec_completion = b.operation.operation_type == OperationType::Execution
+                && matches!(b.operation.action, OperationAction::Succeed | OperationAction::Fail);
+
+            if a_is_exec_completion && !b_is_exec_completion {
+                return std::cmp::Ordering::Greater;
+            }
+            if !a_is_exec_completion && b_is_exec_completion {
+                return std::cmp::Ordering::Less;
+            }
+
+            // Priority 2: Parent CONTEXT START must come before child operations
+            // Check if 'a' is a descendant of 'b' (b should come first)
+            if b.operation.action == OperationAction::Start 
+                && context_starts.contains(&b.operation.operation_id)
+            {
+                if let Some(ref parent_id) = a.operation.parent_id {
+                    if *parent_id == b.operation.operation_id 
+                        || is_ancestor(&a.operation.operation_id, &b.operation.operation_id)
+                    {
+                        return std::cmp::Ordering::Greater;
+                    }
+                }
+            }
+            // Check if 'b' is a descendant of 'a' (a should come first)
+            if a.operation.action == OperationAction::Start 
+                && context_starts.contains(&a.operation.operation_id)
+            {
+                if let Some(ref parent_id) = b.operation.parent_id {
+                    if *parent_id == a.operation.operation_id 
+                        || is_ancestor(&b.operation.operation_id, &a.operation.operation_id)
+                    {
+                        return std::cmp::Ordering::Less;
+                    }
+                }
+            }
+
+            // Priority 3: For same operation_id, START comes before completion
+            // This supports START+completion in the same batch (Requirements: 2.13)
+            if a.operation.operation_id == b.operation.operation_id {
+                let a_is_start = a.operation.action == OperationAction::Start;
+                let b_is_start = b.operation.action == OperationAction::Start;
+                if a_is_start && !b_is_start {
+                    return std::cmp::Ordering::Less;
+                }
+                if !a_is_start && b_is_start {
+                    return std::cmp::Ordering::Greater;
+                }
+            }
+
+            // Priority 4: Preserve original order (stable sort)
+            idx_a.cmp(idx_b)
+        });
+
+        // Extract the sorted requests
+        indexed_batch.into_iter().map(|(_, req)| req).collect()
+    }
+
     /// Processes a batch of checkpoint requests.
+    ///
+    /// This method:
+    /// 1. Gets the current checkpoint token
+    /// 2. Sends the batch to the Lambda service (with retry for throttling)
+    /// 3. Updates the checkpoint token with the new token from the response
+    /// 4. Signals completion to all waiting callers
+    ///
+    /// # Token Management
+    ///
+    /// - The first batch uses the initial token from Lambda invocation input
+    /// - Each successful checkpoint returns a new token that is used for the next batch
+    /// - Tokens are never reused - each token can only be consumed once
+    ///
+    /// # Error Handling
+    ///
+    /// - If the checkpoint fails with "Invalid checkpoint token", the error is marked
+    ///   as retriable so Lambda can retry with a fresh token.
+    /// - If the checkpoint fails with throttling, the SDK retries with exponential backoff.
+    ///
+    /// # Requirements
+    ///
+    /// - 2.9: THE Checkpointing_System SHALL use the CheckpointToken from invocation input for the first checkpoint
+    /// - 2.10: THE Checkpointing_System SHALL use the returned CheckpointToken from each checkpoint response for subsequent checkpoints
+    /// - 2.11: THE Checkpointing_System SHALL handle InvalidParameterValueException for invalid tokens by allowing propagation for retry
+    /// - 2.12: WHEN batching operations, THE Checkpointing_System SHALL checkpoint in execution order with EXECUTION completion last
+    /// - 2.13: THE Checkpointing_System SHALL support including both START and completion actions for STEP/CONTEXT in the same batch
+    /// - 18.5: THE AWS_Integration SHALL handle ThrottlingException with appropriate retry behavior
     async fn process_batch(&self, batch: Vec<CheckpointRequest>) {
         if batch.is_empty() {
             return;
         }
 
+        // Sort the batch according to checkpoint ordering rules
+        // Requirements: 2.12, 2.13
+        let sorted_batch = Self::sort_checkpoint_batch(batch);
+
         // Extract operations and completion channels
-        let (operations, completions): (Vec<_>, Vec<_>) = batch
+        let (operations, completions): (Vec<_>, Vec<_>) = sorted_batch
             .into_iter()
             .map(|req| (req.operation, req.completion))
             .unzip();
 
         // Get current checkpoint token
+        // Requirements: 2.9, 2.10 - Use the initial token for first checkpoint,
+        // then use the returned token for subsequent checkpoints
         let token = self.checkpoint_token.read().await.clone();
 
-        // Send the batch to the service
+        // Send the batch to the service with retry for throttling
+        // Requirements: 18.5 - Handle ThrottlingException with appropriate retry behavior
         let result = self
-            .service_client
-            .checkpoint(&self.durable_execution_arn, &token, operations)
+            .checkpoint_with_retry(&token, operations)
             .await;
 
         // Handle the result
         match result {
             Ok(response) => {
-                // Update the checkpoint token
+                // Mark that we've consumed the initial token (if this was the first checkpoint)
+                self.initial_token_consumed.store(true, Ordering::SeqCst);
+                
+                // Update the checkpoint token with the new token from the response
+                // Requirements: 2.10 - Use the returned CheckpointToken for subsequent checkpoints
+                // This ensures we never reuse a consumed token
                 {
                     let mut token_guard = self.checkpoint_token.write().await;
                     *token_guard = response.checkpoint_token;
@@ -390,14 +667,92 @@ impl CheckpointBatcher {
                 }
             }
             Err(error) => {
+                // Check if this is an invalid checkpoint token error
+                // Requirements: 2.11 - Handle InvalidParameterValueException for invalid tokens
+                let is_invalid_token = error.is_invalid_checkpoint_token();
+                
                 // Signal failure to all waiting callers
+                // If it's an invalid token error, it's already marked as retriable
+                // so Lambda will retry with a fresh token
                 for completion in completions.into_iter().flatten() {
+                    let error_msg = if is_invalid_token {
+                        format!(
+                            "Invalid checkpoint token - token may have been consumed. \
+                             Lambda will retry with a fresh token. Original error: {}",
+                            error
+                        )
+                    } else {
+                        error.to_string()
+                    };
+                    
                     let _ = completion.send(Err(DurableError::Checkpoint {
-                        message: error.to_string(),
+                        message: error_msg,
                         is_retriable: error.is_retriable(),
                         aws_error: None,
                     }));
                 }
+            }
+        }
+    }
+
+    /// Sends a checkpoint request with retry for throttling errors.
+    ///
+    /// This method implements exponential backoff for throttling errors:
+    /// - Initial delay: 100ms (or retry_after_ms if provided)
+    /// - Maximum delay: 10 seconds
+    /// - Maximum retries: 5
+    /// - Backoff multiplier: 2x
+    ///
+    /// # Requirements
+    ///
+    /// - 18.5: THE AWS_Integration SHALL handle ThrottlingException with appropriate retry behavior
+    async fn checkpoint_with_retry(
+        &self,
+        token: &str,
+        operations: Vec<OperationUpdate>,
+    ) -> Result<crate::client::CheckpointResponse, DurableError> {
+        const MAX_RETRIES: u32 = 5;
+        const INITIAL_DELAY_MS: u64 = 100;
+        const MAX_DELAY_MS: u64 = 10_000;
+        const BACKOFF_MULTIPLIER: u64 = 2;
+
+        let mut attempt = 0;
+        let mut delay_ms = INITIAL_DELAY_MS;
+
+        loop {
+            let result = self
+                .service_client
+                .checkpoint(&self.durable_execution_arn, token, operations.clone())
+                .await;
+
+            match result {
+                Ok(response) => return Ok(response),
+                Err(error) if error.is_throttling() => {
+                    attempt += 1;
+                    if attempt > MAX_RETRIES {
+                        tracing::warn!(
+                            attempt = attempt,
+                            "Checkpoint throttling: max retries exceeded"
+                        );
+                        return Err(error);
+                    }
+
+                    // Use retry_after_ms from the error if available, otherwise use calculated delay
+                    let actual_delay = error.get_retry_after_ms().unwrap_or(delay_ms);
+                    
+                    tracing::debug!(
+                        attempt = attempt,
+                        delay_ms = actual_delay,
+                        "Checkpoint throttled, retrying with exponential backoff"
+                    );
+
+                    // Sleep before retrying
+                    tokio::time::sleep(StdDuration::from_millis(actual_delay)).await;
+
+                    // Calculate next delay with exponential backoff
+                    delay_ms = (delay_ms * BACKOFF_MULTIPLIER).min(MAX_DELAY_MS);
+                }
+                Err(error) => return Err(error),
             }
         }
     }
@@ -504,6 +859,25 @@ pub struct ExecutionState {
     
     /// Optional checkpoint sender for batched checkpointing
     checkpoint_sender: Option<CheckpointSender>,
+    
+    /// The EXECUTION operation (first operation in state) - provides access to original input
+    /// Requirements: 19.1, 19.2
+    execution_operation: Option<Operation>,
+    
+    /// The checkpointing mode that controls the trade-off between durability and performance.
+    ///
+    /// This field determines when and how often the SDK persists operation state:
+    /// - `Eager`: Checkpoint after every operation (maximum durability)
+    /// - `Batched`: Group operations into batches (balanced, default)
+    /// - `Optimistic`: Execute multiple operations before checkpointing (best performance)
+    ///
+    /// # Requirements
+    ///
+    /// - 24.1: THE Performance_Configuration SHALL support eager checkpointing mode
+    /// - 24.2: THE Performance_Configuration SHALL support batched checkpointing mode
+    /// - 24.3: THE Performance_Configuration SHALL support optimistic execution mode
+    /// - 24.4: THE Performance_Configuration SHALL document the default behavior and trade-offs
+    checkpointing_mode: crate::config::CheckpointingMode,
 }
 
 impl ExecutionState {
@@ -515,12 +889,58 @@ impl ExecutionState {
     /// * `checkpoint_token` - The initial checkpoint token
     /// * `initial_state` - The initial execution state with operations
     /// * `service_client` - The service client for Lambda communication
+    ///
+    /// # Requirements
+    ///
+    /// - 19.1: THE EXECUTION_Operation SHALL be recognized as the first operation in state
+    /// - 19.2: THE EXECUTION_Operation SHALL provide access to original user input from ExecutionDetails.InputPayload
     pub fn new(
         durable_execution_arn: impl Into<String>,
         checkpoint_token: impl Into<String>,
         initial_state: crate::lambda::InitialExecutionState,
         service_client: SharedDurableServiceClient,
     ) -> Self {
+        Self::with_checkpointing_mode(
+            durable_execution_arn,
+            checkpoint_token,
+            initial_state,
+            service_client,
+            crate::config::CheckpointingMode::default(),
+        )
+    }
+    
+    /// Creates a new ExecutionState with a specific checkpointing mode.
+    ///
+    /// # Arguments
+    ///
+    /// * `durable_execution_arn` - The ARN of the durable execution
+    /// * `checkpoint_token` - The initial checkpoint token
+    /// * `initial_state` - The initial execution state with operations
+    /// * `service_client` - The service client for Lambda communication
+    /// * `checkpointing_mode` - The checkpointing mode to use
+    ///
+    /// # Requirements
+    ///
+    /// - 19.1: THE EXECUTION_Operation SHALL be recognized as the first operation in state
+    /// - 19.2: THE EXECUTION_Operation SHALL provide access to original user input from ExecutionDetails.InputPayload
+    /// - 24.1: THE Performance_Configuration SHALL support eager checkpointing mode
+    /// - 24.2: THE Performance_Configuration SHALL support batched checkpointing mode
+    /// - 24.3: THE Performance_Configuration SHALL support optimistic execution mode
+    pub fn with_checkpointing_mode(
+        durable_execution_arn: impl Into<String>,
+        checkpoint_token: impl Into<String>,
+        initial_state: crate::lambda::InitialExecutionState,
+        service_client: SharedDurableServiceClient,
+        checkpointing_mode: crate::config::CheckpointingMode,
+    ) -> Self {
+        // Find and extract the EXECUTION operation (first operation of type EXECUTION)
+        // Requirements: 19.1, 19.2
+        let execution_operation = initial_state
+            .operations
+            .iter()
+            .find(|op| op.operation_type == OperationType::Execution)
+            .cloned();
+        
         // Build the operations map from the initial state
         let operations: HashMap<String, Operation> = initial_state
             .operations
@@ -545,6 +965,8 @@ impl ExecutionState {
             next_marker: RwLock::new(initial_state.next_marker),
             parent_done_lock: Mutex::new(HashSet::new()),
             checkpoint_sender: None,
+            execution_operation,
+            checkpointing_mode,
         }
     }
     
@@ -562,6 +984,11 @@ impl ExecutionState {
     /// * `service_client` - The service client for Lambda communication
     /// * `batcher_config` - Configuration for the checkpoint batcher
     /// * `queue_buffer_size` - Size of the checkpoint queue buffer
+    ///
+    /// # Requirements
+    ///
+    /// - 19.1: THE EXECUTION_Operation SHALL be recognized as the first operation in state
+    /// - 19.2: THE EXECUTION_Operation SHALL provide access to original user input from ExecutionDetails.InputPayload
     pub fn with_batcher(
         durable_execution_arn: impl Into<String>,
         checkpoint_token: impl Into<String>,
@@ -570,8 +997,59 @@ impl ExecutionState {
         batcher_config: CheckpointBatcherConfig,
         queue_buffer_size: usize,
     ) -> (Self, CheckpointBatcher) {
+        Self::with_batcher_and_mode(
+            durable_execution_arn,
+            checkpoint_token,
+            initial_state,
+            service_client,
+            batcher_config,
+            queue_buffer_size,
+            crate::config::CheckpointingMode::default(),
+        )
+    }
+    
+    /// Creates a new ExecutionState with a checkpoint batcher and specific checkpointing mode.
+    ///
+    /// This method sets up the checkpoint queue and batcher for efficient
+    /// batched checkpointing. Returns the ExecutionState and a handle to
+    /// the batcher that should be run in a background task.
+    ///
+    /// # Arguments
+    ///
+    /// * `durable_execution_arn` - The ARN of the durable execution
+    /// * `checkpoint_token` - The initial checkpoint token
+    /// * `initial_state` - The initial execution state with operations
+    /// * `service_client` - The service client for Lambda communication
+    /// * `batcher_config` - Configuration for the checkpoint batcher
+    /// * `queue_buffer_size` - Size of the checkpoint queue buffer
+    /// * `checkpointing_mode` - The checkpointing mode to use
+    ///
+    /// # Requirements
+    ///
+    /// - 19.1: THE EXECUTION_Operation SHALL be recognized as the first operation in state
+    /// - 19.2: THE EXECUTION_Operation SHALL provide access to original user input from ExecutionDetails.InputPayload
+    /// - 24.1: THE Performance_Configuration SHALL support eager checkpointing mode
+    /// - 24.2: THE Performance_Configuration SHALL support batched checkpointing mode
+    /// - 24.3: THE Performance_Configuration SHALL support optimistic execution mode
+    pub fn with_batcher_and_mode(
+        durable_execution_arn: impl Into<String>,
+        checkpoint_token: impl Into<String>,
+        initial_state: crate::lambda::InitialExecutionState,
+        service_client: SharedDurableServiceClient,
+        batcher_config: CheckpointBatcherConfig,
+        queue_buffer_size: usize,
+        checkpointing_mode: crate::config::CheckpointingMode,
+    ) -> (Self, CheckpointBatcher) {
         let arn: String = durable_execution_arn.into();
         let token: String = checkpoint_token.into();
+        
+        // Find and extract the EXECUTION operation (first operation of type EXECUTION)
+        // Requirements: 19.1, 19.2
+        let execution_operation = initial_state
+            .operations
+            .iter()
+            .find(|op| op.operation_type == OperationType::Execution)
+            .cloned();
         
         // Build the operations map from the initial state
         let operations: HashMap<String, Operation> = initial_state
@@ -610,6 +1088,8 @@ impl ExecutionState {
             next_marker: RwLock::new(initial_state.next_marker),
             parent_done_lock: Mutex::new(HashSet::new()),
             checkpoint_sender: Some(sender),
+            execution_operation,
+            checkpointing_mode,
         };
         
         (state, batcher)
@@ -644,6 +1124,160 @@ impl ExecutionState {
     /// Returns true if executing new operations.
     pub fn is_new(&self) -> bool {
         self.replay_status().is_new()
+    }
+    
+    /// Returns the current checkpointing mode.
+    ///
+    /// The checkpointing mode determines when and how often the SDK persists
+    /// operation state to the durable execution service.
+    ///
+    /// # Returns
+    ///
+    /// The [`CheckpointingMode`] configured for this execution state.
+    ///
+    /// # Requirements
+    ///
+    /// - 24.1: THE Performance_Configuration SHALL support eager checkpointing mode
+    /// - 24.2: THE Performance_Configuration SHALL support batched checkpointing mode
+    /// - 24.3: THE Performance_Configuration SHALL support optimistic execution mode
+    /// - 24.4: THE Performance_Configuration SHALL document the default behavior and trade-offs
+    pub fn checkpointing_mode(&self) -> crate::config::CheckpointingMode {
+        self.checkpointing_mode
+    }
+    
+    /// Returns true if eager checkpointing mode is enabled.
+    ///
+    /// In eager mode, every operation is immediately checkpointed for maximum durability.
+    pub fn is_eager_checkpointing(&self) -> bool {
+        self.checkpointing_mode.is_eager()
+    }
+    
+    /// Returns true if batched checkpointing mode is enabled.
+    ///
+    /// In batched mode, operations are grouped into batches before checkpointing.
+    pub fn is_batched_checkpointing(&self) -> bool {
+        self.checkpointing_mode.is_batched()
+    }
+    
+    /// Returns true if optimistic checkpointing mode is enabled.
+    ///
+    /// In optimistic mode, multiple operations execute before checkpointing.
+    pub fn is_optimistic_checkpointing(&self) -> bool {
+        self.checkpointing_mode.is_optimistic()
+    }
+    
+    /// Returns a reference to the EXECUTION operation if it exists.
+    ///
+    /// The EXECUTION operation is the first operation in the state and represents
+    /// the overall execution. It provides access to the original user input.
+    ///
+    /// # Returns
+    ///
+    /// An `Option<&Operation>` containing the EXECUTION operation if it exists.
+    ///
+    /// # Requirements
+    ///
+    /// - 19.1: THE EXECUTION_Operation SHALL be recognized as the first operation in state
+    pub fn execution_operation(&self) -> Option<&Operation> {
+        self.execution_operation.as_ref()
+    }
+    
+    /// Returns the original user input from the EXECUTION operation.
+    ///
+    /// This method extracts the input payload from the EXECUTION operation's
+    /// ExecutionDetails.InputPayload field.
+    ///
+    /// # Returns
+    ///
+    /// An `Option<&str>` containing the original input payload if available.
+    ///
+    /// # Requirements
+    ///
+    /// - 19.2: THE EXECUTION_Operation SHALL provide access to original user input from ExecutionDetails.InputPayload
+    pub fn get_original_input_raw(&self) -> Option<&str> {
+        self.execution_operation
+            .as_ref()
+            .and_then(|op| op.execution_details.as_ref())
+            .and_then(|details| details.input_payload.as_deref())
+    }
+    
+    /// Returns the EXECUTION operation's ID if it exists.
+    ///
+    /// # Returns
+    ///
+    /// An `Option<&str>` containing the EXECUTION operation ID.
+    pub fn execution_operation_id(&self) -> Option<&str> {
+        self.execution_operation
+            .as_ref()
+            .map(|op| op.operation_id.as_str())
+    }
+    
+    /// Completes the execution with a successful result via checkpointing.
+    ///
+    /// This method checkpoints a SUCCEED action on the EXECUTION operation,
+    /// which is useful for large results that exceed the Lambda response size limit.
+    ///
+    /// # Arguments
+    ///
+    /// * `result` - The serialized result to checkpoint
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success, or a `DurableError` if:
+    /// - No EXECUTION operation exists
+    /// - The checkpoint fails
+    ///
+    /// # Requirements
+    ///
+    /// - 19.3: THE EXECUTION_Operation SHALL support completing execution via SUCCEED action with result
+    /// - 19.5: WHEN execution result exceeds response size limits, THE EXECUTION_Operation SHALL checkpoint the result and return empty Result field
+    pub async fn complete_execution_success(&self, result: Option<String>) -> Result<(), DurableError> {
+        let execution_id = self.execution_operation_id().ok_or_else(|| {
+            DurableError::Validation {
+                message: "Cannot complete execution: no EXECUTION operation exists".to_string(),
+            }
+        })?;
+        
+        let update = OperationUpdate::succeed(
+            execution_id,
+            OperationType::Execution,
+            result,
+        );
+        
+        self.create_checkpoint(update, true).await
+    }
+    
+    /// Completes the execution with a failure via checkpointing.
+    ///
+    /// This method checkpoints a FAIL action on the EXECUTION operation.
+    ///
+    /// # Arguments
+    ///
+    /// * `error` - The error details to checkpoint
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success, or a `DurableError` if:
+    /// - No EXECUTION operation exists
+    /// - The checkpoint fails
+    ///
+    /// # Requirements
+    ///
+    /// - 19.4: THE EXECUTION_Operation SHALL support completing execution via FAIL action with error
+    pub async fn complete_execution_failure(&self, error: ErrorObject) -> Result<(), DurableError> {
+        let execution_id = self.execution_operation_id().ok_or_else(|| {
+            DurableError::Validation {
+                message: "Cannot complete execution: no EXECUTION operation exists".to_string(),
+            }
+        })?;
+        
+        let update = OperationUpdate::fail(
+            execution_id,
+            OperationType::Execution,
+            error,
+        );
+        
+        self.create_checkpoint(update, true).await
     }
     
     /// Gets the checkpoint result for an operation.
@@ -705,6 +1339,10 @@ impl ExecutionState {
     ///
     /// Ok(true) if more operations were loaded, Ok(false) if no more to load,
     /// or an error if the load failed.
+    ///
+    /// # Requirements
+    ///
+    /// - 18.5: THE AWS_Integration SHALL handle ThrottlingException with appropriate retry behavior
     pub async fn load_more_operations(&self) -> Result<bool, DurableError> {
         // Get the current marker
         let marker = {
@@ -715,10 +1353,9 @@ impl ExecutionState {
             }
         };
         
-        // Fetch more operations from the service
+        // Fetch more operations from the service with retry for throttling
         let response = self
-            .service_client
-            .get_operations(&self.durable_execution_arn, &marker)
+            .get_operations_with_retry(&marker)
             .await?;
         
         // Add the new operations to our map
@@ -736,6 +1373,67 @@ impl ExecutionState {
         }
         
         Ok(true)
+    }
+    
+    /// Fetches operations from the service with retry for throttling errors.
+    ///
+    /// This method implements exponential backoff for throttling errors:
+    /// - Initial delay: 100ms (or retry_after_ms if provided)
+    /// - Maximum delay: 10 seconds
+    /// - Maximum retries: 5
+    /// - Backoff multiplier: 2x
+    ///
+    /// # Requirements
+    ///
+    /// - 18.5: THE AWS_Integration SHALL handle ThrottlingException with appropriate retry behavior
+    async fn get_operations_with_retry(
+        &self,
+        marker: &str,
+    ) -> Result<crate::client::GetOperationsResponse, DurableError> {
+        const MAX_RETRIES: u32 = 5;
+        const INITIAL_DELAY_MS: u64 = 100;
+        const MAX_DELAY_MS: u64 = 10_000;
+        const BACKOFF_MULTIPLIER: u64 = 2;
+
+        let mut attempt = 0;
+        let mut delay_ms = INITIAL_DELAY_MS;
+
+        loop {
+            let result = self
+                .service_client
+                .get_operations(&self.durable_execution_arn, marker)
+                .await;
+
+            match result {
+                Ok(response) => return Ok(response),
+                Err(error) if error.is_throttling() => {
+                    attempt += 1;
+                    if attempt > MAX_RETRIES {
+                        tracing::warn!(
+                            attempt = attempt,
+                            "GetOperations throttling: max retries exceeded"
+                        );
+                        return Err(error);
+                    }
+
+                    // Use retry_after_ms from the error if available, otherwise use calculated delay
+                    let actual_delay = error.get_retry_after_ms().unwrap_or(delay_ms);
+                    
+                    tracing::debug!(
+                        attempt = attempt,
+                        delay_ms = actual_delay,
+                        "GetOperations throttled, retrying with exponential backoff"
+                    );
+
+                    // Sleep before retrying
+                    tokio::time::sleep(StdDuration::from_millis(actual_delay)).await;
+
+                    // Calculate next delay with exponential backoff
+                    delay_ms = (delay_ms * BACKOFF_MULTIPLIER).min(MAX_DELAY_MS);
+                }
+                Err(error) => return Err(error),
+            }
+        }
     }
     
     /// Loads all remaining operations from the service.
@@ -837,6 +1535,23 @@ impl ExecutionState {
     ///
     /// - `DurableError::Checkpoint` - If the checkpoint fails
     /// - `DurableError::OrphanedChild` - If the operation's parent has completed
+    ///
+    /// # Checkpointing Mode Behavior
+    ///
+    /// The behavior of this method depends on the configured checkpointing mode:
+    ///
+    /// - **Eager**: Always sends checkpoints synchronously and immediately, bypassing
+    ///   the batcher even if one is configured. This provides maximum durability.
+    /// - **Batched**: Uses the checkpoint batcher if available, grouping operations
+    ///   for efficiency. Falls back to direct checkpointing if no batcher is configured.
+    /// - **Optimistic**: Uses the checkpoint batcher with async checkpoints when possible,
+    ///   allowing multiple operations to execute before waiting for confirmation.
+    ///
+    /// # Requirements
+    ///
+    /// - 24.1: THE Performance_Configuration SHALL support eager checkpointing mode
+    /// - 24.2: THE Performance_Configuration SHALL support batched checkpointing mode
+    /// - 24.3: THE Performance_Configuration SHALL support optimistic execution mode
     pub async fn create_checkpoint(
         &self,
         operation: OperationUpdate,
@@ -855,9 +1570,26 @@ impl ExecutionState {
             }
         }
         
+        // Determine effective sync behavior based on checkpointing mode
+        // Requirements: 24.1, 24.2, 24.3
+        let effective_is_sync = match self.checkpointing_mode {
+            // Eager mode: always synchronous for maximum durability
+            crate::config::CheckpointingMode::Eager => true,
+            // Batched mode: use the requested sync behavior
+            crate::config::CheckpointingMode::Batched => is_sync,
+            // Optimistic mode: prefer async unless explicitly requested sync
+            crate::config::CheckpointingMode::Optimistic => is_sync,
+        };
+        
+        // In Eager mode, bypass the batcher and send directly for immediate durability
+        // Requirements: 24.1 - Checkpoint after every operation
+        if self.checkpointing_mode.is_eager() {
+            return self.checkpoint_direct(operation, effective_is_sync).await;
+        }
+        
         // Use the checkpoint sender if available (batched mode)
         if let Some(ref sender) = self.checkpoint_sender {
-            let result = sender.checkpoint(operation.clone(), is_sync).await;
+            let result = sender.checkpoint(operation.clone(), effective_is_sync).await;
             
             // On success, update local cache
             if result.is_ok() {
@@ -868,6 +1600,28 @@ impl ExecutionState {
         }
         
         // Direct checkpoint (non-batched mode)
+        self.checkpoint_direct(operation, effective_is_sync).await
+    }
+    
+    /// Sends a checkpoint directly to the service, bypassing the batcher.
+    ///
+    /// This method is used for:
+    /// - Eager checkpointing mode (always direct for maximum durability)
+    /// - When no batcher is configured
+    ///
+    /// # Arguments
+    ///
+    /// * `operation` - The operation update to checkpoint
+    /// * `is_sync` - If true, waits for checkpoint confirmation; if false, fire-and-forget
+    ///
+    /// # Requirements
+    ///
+    /// - 24.1: THE Performance_Configuration SHALL support eager checkpointing mode
+    async fn checkpoint_direct(
+        &self,
+        operation: OperationUpdate,
+        _is_sync: bool,
+    ) -> Result<(), DurableError> {
         let token = self.checkpoint_token.read().await.clone();
         let response = self
             .service_client
@@ -898,6 +1652,89 @@ impl ExecutionState {
     /// This is a convenience method that calls `create_checkpoint` with `is_sync = false`.
     pub async fn checkpoint_async(&self, operation: OperationUpdate) -> Result<(), DurableError> {
         self.create_checkpoint(operation, false).await
+    }
+    
+    /// Creates a checkpoint using the optimal sync behavior for the current mode.
+    ///
+    /// This method automatically determines whether to use sync or async checkpointing
+    /// based on the configured checkpointing mode:
+    ///
+    /// - **Eager**: Always synchronous (maximum durability)
+    /// - **Batched**: Uses the provided `prefer_sync` hint
+    /// - **Optimistic**: Prefers async unless `prefer_sync` is true
+    ///
+    /// # Arguments
+    ///
+    /// * `operation` - The operation update to checkpoint
+    /// * `prefer_sync` - Hint for whether sync is preferred (ignored in Eager mode)
+    ///
+    /// # Requirements
+    ///
+    /// - 24.1: THE Performance_Configuration SHALL support eager checkpointing mode
+    /// - 24.2: THE Performance_Configuration SHALL support batched checkpointing mode
+    /// - 24.3: THE Performance_Configuration SHALL support optimistic execution mode
+    pub async fn checkpoint_optimal(
+        &self,
+        operation: OperationUpdate,
+        prefer_sync: bool,
+    ) -> Result<(), DurableError> {
+        let is_sync = match self.checkpointing_mode {
+            crate::config::CheckpointingMode::Eager => true,
+            crate::config::CheckpointingMode::Batched => prefer_sync,
+            crate::config::CheckpointingMode::Optimistic => prefer_sync,
+        };
+        self.create_checkpoint(operation, is_sync).await
+    }
+    
+    /// Returns whether async checkpointing is recommended for the current mode.
+    ///
+    /// This method helps callers decide whether to use async checkpointing:
+    ///
+    /// - **Eager**: Returns `false` (always use sync)
+    /// - **Batched**: Returns `true` (async is acceptable)
+    /// - **Optimistic**: Returns `true` (async is preferred)
+    ///
+    /// # Requirements
+    ///
+    /// - 24.3: THE Performance_Configuration SHALL support optimistic execution mode
+    pub fn should_use_async_checkpoint(&self) -> bool {
+        match self.checkpointing_mode {
+            crate::config::CheckpointingMode::Eager => false,
+            crate::config::CheckpointingMode::Batched => true,
+            crate::config::CheckpointingMode::Optimistic => true,
+        }
+    }
+    
+    /// Returns whether the current mode prioritizes performance over durability.
+    ///
+    /// This is useful for callers that want to adjust their behavior based on
+    /// the configured trade-off:
+    ///
+    /// - **Eager**: Returns `false` (prioritizes durability)
+    /// - **Batched**: Returns `false` (balanced)
+    /// - **Optimistic**: Returns `true` (prioritizes performance)
+    ///
+    /// # Requirements
+    ///
+    /// - 24.3: THE Performance_Configuration SHALL support optimistic execution mode
+    pub fn prioritizes_performance(&self) -> bool {
+        self.checkpointing_mode.is_optimistic()
+    }
+    
+    /// Returns whether the current mode prioritizes durability over performance.
+    ///
+    /// This is useful for callers that want to adjust their behavior based on
+    /// the configured trade-off:
+    ///
+    /// - **Eager**: Returns `true` (prioritizes durability)
+    /// - **Batched**: Returns `false` (balanced)
+    /// - **Optimistic**: Returns `false` (prioritizes performance)
+    ///
+    /// # Requirements
+    ///
+    /// - 24.1: THE Performance_Configuration SHALL support eager checkpointing mode
+    pub fn prioritizes_durability(&self) -> bool {
+        self.checkpointing_mode.is_eager()
     }
     
     /// Updates the local operation cache based on an operation update.
@@ -942,6 +1779,65 @@ impl ExecutionState {
                     operations.insert(update.operation_id.clone(), op);
                 }
             }
+            crate::operation::OperationAction::Cancel => {
+                // Update existing operation to Cancelled
+                // Requirements: 5.5
+                if let Some(op) = operations.get_mut(&update.operation_id) {
+                    op.status = OperationStatus::Cancelled;
+                } else {
+                    // Create new operation if it doesn't exist
+                    let mut op = Operation::new(&update.operation_id, update.operation_type);
+                    op.status = OperationStatus::Cancelled;
+                    op.parent_id = update.parent_id.clone();
+                    op.name = update.name.clone();
+                    operations.insert(update.operation_id.clone(), op);
+                }
+            }
+            crate::operation::OperationAction::Retry => {
+                // Update existing operation to Pending (waiting for retry)
+                // Requirements: 4.7, 4.8, 4.9
+                if let Some(op) = operations.get_mut(&update.operation_id) {
+                    op.status = OperationStatus::Pending;
+                    // Store the payload in step_details for wait-for-condition pattern
+                    if update.result.is_some() || update.step_options.is_some() {
+                        let step_details = op.step_details.get_or_insert_with(|| crate::operation::StepDetails {
+                            result: None,
+                            attempt: None,
+                            next_attempt_timestamp: None,
+                            error: None,
+                            payload: None,
+                        });
+                        // Store payload for wait-for-condition pattern
+                        if update.result.is_some() {
+                            step_details.payload = update.result.clone();
+                        }
+                        // Increment attempt counter
+                        step_details.attempt = Some(step_details.attempt.unwrap_or(0) + 1);
+                    }
+                    // Store error if provided
+                    if update.error.is_some() {
+                        op.error = update.error.clone();
+                    }
+                } else {
+                    // Create new operation if it doesn't exist
+                    let mut op = Operation::new(&update.operation_id, update.operation_type);
+                    op.status = OperationStatus::Pending;
+                    op.parent_id = update.parent_id.clone();
+                    op.name = update.name.clone();
+                    op.error = update.error.clone();
+                    // Initialize step_details with payload and attempt
+                    if update.result.is_some() || update.step_options.is_some() {
+                        op.step_details = Some(crate::operation::StepDetails {
+                            result: None,
+                            attempt: Some(1),
+                            next_attempt_timestamp: None,
+                            error: None,
+                            payload: update.result.clone(),
+                        });
+                    }
+                    operations.insert(update.operation_id.clone(), op);
+                }
+            }
         }
     }
     
@@ -955,6 +1851,84 @@ impl ExecutionState {
     /// Returns true if this ExecutionState has a checkpoint sender configured.
     pub fn has_checkpoint_sender(&self) -> bool {
         self.checkpoint_sender.is_some()
+    }
+
+    /// Loads child operations for a specific parent operation.
+    ///
+    /// This method is used when ReplayChildren is enabled for a CONTEXT operation.
+    /// It retrieves all child operations that have the specified parent_id and
+    /// adds them to the local operations cache.
+    ///
+    /// # Arguments
+    ///
+    /// * `parent_id` - The operation ID of the parent CONTEXT operation
+    ///
+    /// # Returns
+    ///
+    /// A vector of child operations that were loaded.
+    ///
+    /// # Requirements
+    ///
+    /// - 10.5: THE Child_Context_Operation SHALL support ReplayChildren option for large parallel operations
+    /// - 10.6: WHEN ReplayChildren is true, THE Child_Context_Operation SHALL include child operations in state loads for replay
+    pub async fn load_child_operations(&self, parent_id: &str) -> Result<Vec<Operation>, DurableError> {
+        // Get all operations from the current cache that have this parent_id
+        let operations = self.operations.read().await;
+        let children: Vec<Operation> = operations
+            .values()
+            .filter(|op| op.parent_id.as_deref() == Some(parent_id))
+            .cloned()
+            .collect();
+        
+        Ok(children)
+    }
+
+    /// Gets all child operations for a specific parent from the local cache.
+    ///
+    /// This method returns child operations that are already loaded in the cache.
+    /// Unlike `load_child_operations`, this does not make any API calls.
+    ///
+    /// # Arguments
+    ///
+    /// * `parent_id` - The operation ID of the parent operation
+    ///
+    /// # Returns
+    ///
+    /// A vector of child operations with the specified parent_id.
+    pub async fn get_child_operations(&self, parent_id: &str) -> Vec<Operation> {
+        let operations = self.operations.read().await;
+        operations
+            .values()
+            .filter(|op| op.parent_id.as_deref() == Some(parent_id))
+            .cloned()
+            .collect()
+    }
+
+    /// Checks if a CONTEXT operation has ReplayChildren enabled.
+    ///
+    /// This method checks the ContextDetails of a CONTEXT operation to see
+    /// if replay_children was set to true when the operation was started.
+    ///
+    /// # Arguments
+    ///
+    /// * `operation_id` - The operation ID of the CONTEXT operation
+    ///
+    /// # Returns
+    ///
+    /// `true` if the operation exists, is a CONTEXT type, and has replay_children enabled.
+    /// `false` otherwise.
+    ///
+    /// # Requirements
+    ///
+    /// - 10.5: THE Child_Context_Operation SHALL support ReplayChildren option for large parallel operations
+    pub async fn has_replay_children(&self, operation_id: &str) -> bool {
+        let operations = self.operations.read().await;
+        operations
+            .get(operation_id)
+            .filter(|op| op.operation_type == OperationType::Context)
+            .and_then(|op| op.context_details.as_ref())
+            .and_then(|details| details.replay_children)
+            .unwrap_or(false)
     }
 }
 
@@ -1067,6 +2041,28 @@ mod checkpoint_result_tests {
         assert!(result.is_existent());
         assert!(result.is_stopped());
         assert!(result.is_terminal());
+    }
+
+    #[test]
+    fn test_pending_checkpoint_result() {
+        let op = create_operation(OperationStatus::Pending);
+        let result = CheckpointedResult::new(Some(op));
+        
+        assert!(result.is_existent());
+        assert!(result.is_pending());
+        assert!(!result.is_ready());
+        assert!(!result.is_terminal());
+    }
+
+    #[test]
+    fn test_ready_checkpoint_result() {
+        let op = create_operation(OperationStatus::Ready);
+        let result = CheckpointedResult::new(Some(op));
+        
+        assert!(result.is_existent());
+        assert!(result.is_ready());
+        assert!(!result.is_pending());
+        assert!(!result.is_terminal());
     }
 
     #[test]
@@ -1660,6 +2656,389 @@ mod execution_state_tests {
         
         // Verify the state sees the change
         assert_eq!(state.checkpoint_token().await, "modified-token");
+    }
+
+    // Tests for ReplayChildren support (Requirements 10.5, 10.6)
+
+    #[tokio::test]
+    async fn test_load_child_operations_returns_children() {
+        let client = create_mock_client();
+        
+        // Create a parent CONTEXT operation and some child operations
+        let mut parent_op = Operation::new("parent-ctx", OperationType::Context);
+        parent_op.status = OperationStatus::Succeeded;
+        
+        let mut child1 = create_test_operation("child-1", OperationStatus::Succeeded);
+        child1.parent_id = Some("parent-ctx".to_string());
+        
+        let mut child2 = create_test_operation("child-2", OperationStatus::Succeeded);
+        child2.parent_id = Some("parent-ctx".to_string());
+        
+        // Another operation with different parent
+        let mut other_child = create_test_operation("other-child", OperationStatus::Succeeded);
+        other_child.parent_id = Some("other-parent".to_string());
+        
+        let initial_state = InitialExecutionState::with_operations(vec![
+            parent_op, child1, child2, other_child
+        ]);
+        
+        let state = ExecutionState::new("arn:test", "token-123", initial_state, client);
+        
+        // Load children for parent-ctx
+        let children = state.load_child_operations("parent-ctx").await.unwrap();
+        
+        assert_eq!(children.len(), 2);
+        let child_ids: Vec<&str> = children.iter().map(|c| c.operation_id.as_str()).collect();
+        assert!(child_ids.contains(&"child-1"));
+        assert!(child_ids.contains(&"child-2"));
+    }
+
+    #[tokio::test]
+    async fn test_load_child_operations_no_children() {
+        let client = create_mock_client();
+        
+        let parent_op = Operation::new("parent-ctx", OperationType::Context);
+        let initial_state = InitialExecutionState::with_operations(vec![parent_op]);
+        
+        let state = ExecutionState::new("arn:test", "token-123", initial_state, client);
+        
+        // Load children for parent with no children
+        let children = state.load_child_operations("parent-ctx").await.unwrap();
+        
+        assert!(children.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_child_operations_returns_cached_children() {
+        let client = create_mock_client();
+        
+        let mut parent_op = Operation::new("parent-ctx", OperationType::Context);
+        parent_op.status = OperationStatus::Succeeded;
+        
+        let mut child1 = create_test_operation("child-1", OperationStatus::Succeeded);
+        child1.parent_id = Some("parent-ctx".to_string());
+        
+        let mut child2 = create_test_operation("child-2", OperationStatus::Succeeded);
+        child2.parent_id = Some("parent-ctx".to_string());
+        
+        let initial_state = InitialExecutionState::with_operations(vec![
+            parent_op, child1, child2
+        ]);
+        
+        let state = ExecutionState::new("arn:test", "token-123", initial_state, client);
+        
+        // Get children from cache
+        let children = state.get_child_operations("parent-ctx").await;
+        
+        assert_eq!(children.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_get_child_operations_empty_for_nonexistent_parent() {
+        let client = create_mock_client();
+        let state = ExecutionState::new(
+            "arn:test",
+            "token-123",
+            InitialExecutionState::new(),
+            client,
+        );
+        
+        let children = state.get_child_operations("nonexistent-parent").await;
+        assert!(children.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_has_replay_children_true() {
+        use crate::operation::ContextDetails;
+        
+        let client = create_mock_client();
+        
+        let mut ctx_op = Operation::new("ctx-with-replay", OperationType::Context);
+        ctx_op.status = OperationStatus::Succeeded;
+        ctx_op.context_details = Some(ContextDetails {
+            result: None,
+            replay_children: Some(true),
+            error: None,
+        });
+        
+        let initial_state = InitialExecutionState::with_operations(vec![ctx_op]);
+        let state = ExecutionState::new("arn:test", "token-123", initial_state, client);
+        
+        assert!(state.has_replay_children("ctx-with-replay").await);
+    }
+
+    #[tokio::test]
+    async fn test_has_replay_children_false_when_not_set() {
+        use crate::operation::ContextDetails;
+        
+        let client = create_mock_client();
+        
+        let mut ctx_op = Operation::new("ctx-no-replay", OperationType::Context);
+        ctx_op.status = OperationStatus::Succeeded;
+        ctx_op.context_details = Some(ContextDetails {
+            result: None,
+            replay_children: None,
+            error: None,
+        });
+        
+        let initial_state = InitialExecutionState::with_operations(vec![ctx_op]);
+        let state = ExecutionState::new("arn:test", "token-123", initial_state, client);
+        
+        assert!(!state.has_replay_children("ctx-no-replay").await);
+    }
+
+    #[tokio::test]
+    async fn test_has_replay_children_false_when_explicitly_false() {
+        use crate::operation::ContextDetails;
+        
+        let client = create_mock_client();
+        
+        let mut ctx_op = Operation::new("ctx-replay-false", OperationType::Context);
+        ctx_op.status = OperationStatus::Succeeded;
+        ctx_op.context_details = Some(ContextDetails {
+            result: None,
+            replay_children: Some(false),
+            error: None,
+        });
+        
+        let initial_state = InitialExecutionState::with_operations(vec![ctx_op]);
+        let state = ExecutionState::new("arn:test", "token-123", initial_state, client);
+        
+        assert!(!state.has_replay_children("ctx-replay-false").await);
+    }
+
+    #[tokio::test]
+    async fn test_has_replay_children_false_for_non_context_operation() {
+        let client = create_mock_client();
+        
+        let step_op = create_test_operation("step-op", OperationStatus::Succeeded);
+        
+        let initial_state = InitialExecutionState::with_operations(vec![step_op]);
+        let state = ExecutionState::new("arn:test", "token-123", initial_state, client);
+        
+        // STEP operations don't have replay_children
+        assert!(!state.has_replay_children("step-op").await);
+    }
+
+    #[tokio::test]
+    async fn test_has_replay_children_false_for_nonexistent_operation() {
+        let client = create_mock_client();
+        let state = ExecutionState::new(
+            "arn:test",
+            "token-123",
+            InitialExecutionState::new(),
+            client,
+        );
+        
+        assert!(!state.has_replay_children("nonexistent").await);
+    }
+
+    #[tokio::test]
+    async fn test_has_replay_children_false_when_no_context_details() {
+        let client = create_mock_client();
+        
+        // CONTEXT operation without context_details
+        let ctx_op = Operation::new("ctx-no-details", OperationType::Context);
+        
+        let initial_state = InitialExecutionState::with_operations(vec![ctx_op]);
+        let state = ExecutionState::new("arn:test", "token-123", initial_state, client);
+        
+        assert!(!state.has_replay_children("ctx-no-details").await);
+    }
+
+    // Tests for CheckpointingMode (Requirements 24.1, 24.2, 24.3, 24.4)
+
+    #[tokio::test]
+    async fn test_checkpointing_mode_default_is_batched() {
+        let client = create_mock_client();
+        let state = ExecutionState::new(
+            "arn:test",
+            "token-123",
+            InitialExecutionState::new(),
+            client,
+        );
+
+        assert_eq!(state.checkpointing_mode(), crate::config::CheckpointingMode::Batched);
+        assert!(state.is_batched_checkpointing());
+        assert!(!state.is_eager_checkpointing());
+        assert!(!state.is_optimistic_checkpointing());
+    }
+
+    #[tokio::test]
+    async fn test_checkpointing_mode_eager() {
+        let client = create_mock_client();
+        let state = ExecutionState::with_checkpointing_mode(
+            "arn:test",
+            "token-123",
+            InitialExecutionState::new(),
+            client,
+            crate::config::CheckpointingMode::Eager,
+        );
+
+        assert_eq!(state.checkpointing_mode(), crate::config::CheckpointingMode::Eager);
+        assert!(state.is_eager_checkpointing());
+        assert!(!state.is_batched_checkpointing());
+        assert!(!state.is_optimistic_checkpointing());
+        assert!(state.prioritizes_durability());
+        assert!(!state.prioritizes_performance());
+        assert!(!state.should_use_async_checkpoint());
+    }
+
+    #[tokio::test]
+    async fn test_checkpointing_mode_optimistic() {
+        let client = create_mock_client();
+        let state = ExecutionState::with_checkpointing_mode(
+            "arn:test",
+            "token-123",
+            InitialExecutionState::new(),
+            client,
+            crate::config::CheckpointingMode::Optimistic,
+        );
+
+        assert_eq!(state.checkpointing_mode(), crate::config::CheckpointingMode::Optimistic);
+        assert!(state.is_optimistic_checkpointing());
+        assert!(!state.is_eager_checkpointing());
+        assert!(!state.is_batched_checkpointing());
+        assert!(state.prioritizes_performance());
+        assert!(!state.prioritizes_durability());
+        assert!(state.should_use_async_checkpoint());
+    }
+
+    #[tokio::test]
+    async fn test_checkpointing_mode_batched_helpers() {
+        let client = create_mock_client();
+        let state = ExecutionState::with_checkpointing_mode(
+            "arn:test",
+            "token-123",
+            InitialExecutionState::new(),
+            client,
+            crate::config::CheckpointingMode::Batched,
+        );
+
+        assert!(!state.prioritizes_durability());
+        assert!(!state.prioritizes_performance());
+        assert!(state.should_use_async_checkpoint());
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_optimal_eager_mode() {
+        use crate::client::CheckpointResponse;
+        
+        let client = Arc::new(
+            MockDurableServiceClient::new()
+                .with_checkpoint_response(Ok(CheckpointResponse {
+                    checkpoint_token: "new-token".to_string(),
+                }))
+        );
+        
+        let state = ExecutionState::with_checkpointing_mode(
+            "arn:test",
+            "token-123",
+            InitialExecutionState::new(),
+            client,
+            crate::config::CheckpointingMode::Eager,
+        );
+
+        // In eager mode, checkpoint_optimal should always be sync
+        let update = OperationUpdate::start("op-1", OperationType::Step);
+        let result = state.checkpoint_optimal(update, false).await;
+        
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_optimal_batched_mode() {
+        use crate::client::CheckpointResponse;
+        
+        let client = Arc::new(
+            MockDurableServiceClient::new()
+                .with_checkpoint_response(Ok(CheckpointResponse {
+                    checkpoint_token: "new-token".to_string(),
+                }))
+        );
+        
+        let state = ExecutionState::with_checkpointing_mode(
+            "arn:test",
+            "token-123",
+            InitialExecutionState::new(),
+            client,
+            crate::config::CheckpointingMode::Batched,
+        );
+
+        // In batched mode, checkpoint_optimal respects the prefer_sync hint
+        let update = OperationUpdate::start("op-1", OperationType::Step);
+        let result = state.checkpoint_optimal(update, true).await;
+        
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_optimal_optimistic_mode() {
+        use crate::client::CheckpointResponse;
+        
+        let client = Arc::new(
+            MockDurableServiceClient::new()
+                .with_checkpoint_response(Ok(CheckpointResponse {
+                    checkpoint_token: "new-token".to_string(),
+                }))
+        );
+        
+        let state = ExecutionState::with_checkpointing_mode(
+            "arn:test",
+            "token-123",
+            InitialExecutionState::new(),
+            client,
+            crate::config::CheckpointingMode::Optimistic,
+        );
+
+        // In optimistic mode, checkpoint_optimal respects the prefer_sync hint
+        let update = OperationUpdate::start("op-1", OperationType::Step);
+        let result = state.checkpoint_optimal(update, false).await;
+        
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_eager_mode_bypasses_batcher() {
+        use crate::client::CheckpointResponse;
+        
+        let client = Arc::new(
+            MockDurableServiceClient::new()
+                .with_checkpoint_response(Ok(CheckpointResponse {
+                    checkpoint_token: "new-token".to_string(),
+                }))
+        );
+        
+        // Create state with batcher but in eager mode
+        let (state, mut batcher) = ExecutionState::with_batcher_and_mode(
+            "arn:test",
+            "token-123",
+            InitialExecutionState::new(),
+            client,
+            CheckpointBatcherConfig {
+                max_batch_time_ms: 10,
+                ..Default::default()
+            },
+            100,
+            crate::config::CheckpointingMode::Eager,
+        );
+
+        // Run batcher in background
+        let batcher_handle = tokio::spawn(async move {
+            batcher.run().await;
+        });
+
+        // In eager mode, checkpoint should bypass the batcher and go directly
+        let update = OperationUpdate::start("op-1", OperationType::Step);
+        let result = state.create_checkpoint(update, false).await;
+        
+        // Drop the state to close the checkpoint sender
+        drop(state);
+        
+        // Wait for batcher to finish
+        batcher_handle.await.unwrap();
+        
+        assert!(result.is_ok());
     }
 }
 
@@ -2374,5 +3753,516 @@ mod orphan_prevention_property_tests {
             });
             result?;
         }
+    }
+}
+
+#[cfg(test)]
+mod execution_operation_tests {
+    use super::*;
+    use crate::client::{CheckpointResponse, MockDurableServiceClient};
+    use crate::error::ErrorObject;
+    use crate::lambda::InitialExecutionState;
+    use crate::operation::{ExecutionDetails, Operation, OperationStatus, OperationType};
+
+    fn create_execution_operation(input_payload: Option<&str>) -> Operation {
+        let mut op = Operation::new("exec-123", OperationType::Execution);
+        op.status = OperationStatus::Started;
+        op.execution_details = Some(ExecutionDetails {
+            input_payload: input_payload.map(|s| s.to_string()),
+        });
+        op
+    }
+
+    fn create_mock_client() -> SharedDurableServiceClient {
+        Arc::new(MockDurableServiceClient::new())
+    }
+
+    #[tokio::test]
+    async fn test_execution_operation_recognized() {
+        let client = create_mock_client();
+        let exec_op = create_execution_operation(Some(r#"{"order_id": "123"}"#));
+        let step_op = Operation::new("step-1", OperationType::Step);
+        
+        let initial_state = InitialExecutionState::with_operations(vec![exec_op, step_op]);
+        let state = ExecutionState::new("arn:test", "token-123", initial_state, client);
+        
+        // EXECUTION operation should be recognized
+        assert!(state.execution_operation().is_some());
+        let exec = state.execution_operation().unwrap();
+        assert_eq!(exec.operation_type, OperationType::Execution);
+        assert_eq!(exec.operation_id, "exec-123");
+    }
+
+    #[tokio::test]
+    async fn test_execution_operation_not_present() {
+        let client = create_mock_client();
+        let step_op = Operation::new("step-1", OperationType::Step);
+        
+        let initial_state = InitialExecutionState::with_operations(vec![step_op]);
+        let state = ExecutionState::new("arn:test", "token-123", initial_state, client);
+        
+        // No EXECUTION operation
+        assert!(state.execution_operation().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_original_input_raw() {
+        let client = create_mock_client();
+        let exec_op = create_execution_operation(Some(r#"{"order_id": "123"}"#));
+        
+        let initial_state = InitialExecutionState::with_operations(vec![exec_op]);
+        let state = ExecutionState::new("arn:test", "token-123", initial_state, client);
+        
+        let input = state.get_original_input_raw();
+        assert!(input.is_some());
+        assert_eq!(input.unwrap(), r#"{"order_id": "123"}"#);
+    }
+
+    #[tokio::test]
+    async fn test_get_original_input_raw_no_payload() {
+        let client = create_mock_client();
+        let exec_op = create_execution_operation(None);
+        
+        let initial_state = InitialExecutionState::with_operations(vec![exec_op]);
+        let state = ExecutionState::new("arn:test", "token-123", initial_state, client);
+        
+        let input = state.get_original_input_raw();
+        assert!(input.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_original_input_raw_no_execution_operation() {
+        let client = create_mock_client();
+        let step_op = Operation::new("step-1", OperationType::Step);
+        
+        let initial_state = InitialExecutionState::with_operations(vec![step_op]);
+        let state = ExecutionState::new("arn:test", "token-123", initial_state, client);
+        
+        let input = state.get_original_input_raw();
+        assert!(input.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_execution_operation_id() {
+        let client = create_mock_client();
+        let exec_op = create_execution_operation(Some(r#"{"order_id": "123"}"#));
+        
+        let initial_state = InitialExecutionState::with_operations(vec![exec_op]);
+        let state = ExecutionState::new("arn:test", "token-123", initial_state, client);
+        
+        let id = state.execution_operation_id();
+        assert!(id.is_some());
+        assert_eq!(id.unwrap(), "exec-123");
+    }
+
+    #[tokio::test]
+    async fn test_complete_execution_success() {
+        let client = Arc::new(
+            MockDurableServiceClient::new()
+                .with_checkpoint_response(Ok(CheckpointResponse {
+                    checkpoint_token: "new-token".to_string(),
+                }))
+        );
+        
+        let exec_op = create_execution_operation(Some(r#"{"order_id": "123"}"#));
+        let initial_state = InitialExecutionState::with_operations(vec![exec_op]);
+        let state = ExecutionState::new("arn:test", "token-123", initial_state, client);
+        
+        let result = state.complete_execution_success(Some(r#"{"status": "completed"}"#.to_string())).await;
+        assert!(result.is_ok());
+        
+        // Verify the operation was updated
+        let op = state.get_operation("exec-123").await.unwrap();
+        assert_eq!(op.status, OperationStatus::Succeeded);
+        assert_eq!(op.result, Some(r#"{"status": "completed"}"#.to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_complete_execution_success_no_execution_operation() {
+        let client = create_mock_client();
+        let step_op = Operation::new("step-1", OperationType::Step);
+        
+        let initial_state = InitialExecutionState::with_operations(vec![step_op]);
+        let state = ExecutionState::new("arn:test", "token-123", initial_state, client);
+        
+        let result = state.complete_execution_success(Some("result".to_string())).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DurableError::Validation { message } => {
+                assert!(message.contains("no EXECUTION operation"));
+            }
+            _ => panic!("Expected Validation error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_complete_execution_failure() {
+        let client = Arc::new(
+            MockDurableServiceClient::new()
+                .with_checkpoint_response(Ok(CheckpointResponse {
+                    checkpoint_token: "new-token".to_string(),
+                }))
+        );
+        
+        let exec_op = create_execution_operation(Some(r#"{"order_id": "123"}"#));
+        let initial_state = InitialExecutionState::with_operations(vec![exec_op]);
+        let state = ExecutionState::new("arn:test", "token-123", initial_state, client);
+        
+        let error = ErrorObject::new("ProcessingError", "Order processing failed");
+        let result = state.complete_execution_failure(error).await;
+        assert!(result.is_ok());
+        
+        // Verify the operation was updated
+        let op = state.get_operation("exec-123").await.unwrap();
+        assert_eq!(op.status, OperationStatus::Failed);
+        assert!(op.error.is_some());
+        assert_eq!(op.error.as_ref().unwrap().error_type, "ProcessingError");
+    }
+
+    #[tokio::test]
+    async fn test_complete_execution_failure_no_execution_operation() {
+        let client = create_mock_client();
+        let step_op = Operation::new("step-1", OperationType::Step);
+        
+        let initial_state = InitialExecutionState::with_operations(vec![step_op]);
+        let state = ExecutionState::new("arn:test", "token-123", initial_state, client);
+        
+        let error = ErrorObject::new("TestError", "Test message");
+        let result = state.complete_execution_failure(error).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DurableError::Validation { message } => {
+                assert!(message.contains("no EXECUTION operation"));
+            }
+            _ => panic!("Expected Validation error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_with_batcher_recognizes_execution_operation() {
+        let client = Arc::new(MockDurableServiceClient::new());
+        let exec_op = create_execution_operation(Some(r#"{"order_id": "123"}"#));
+        
+        let initial_state = InitialExecutionState::with_operations(vec![exec_op]);
+        let (state, _batcher) = ExecutionState::with_batcher(
+            "arn:test",
+            "token-123",
+            initial_state,
+            client,
+            CheckpointBatcherConfig::default(),
+            100,
+        );
+        
+        // EXECUTION operation should be recognized
+        assert!(state.execution_operation().is_some());
+        let exec = state.execution_operation().unwrap();
+        assert_eq!(exec.operation_type, OperationType::Execution);
+        assert_eq!(state.get_original_input_raw(), Some(r#"{"order_id": "123"}"#));
+    }
+}
+
+#[cfg(test)]
+mod batch_ordering_tests {
+    use super::*;
+    use crate::operation::{OperationAction, OperationType, OperationUpdate};
+
+    fn create_start_update(id: &str, op_type: OperationType) -> OperationUpdate {
+        OperationUpdate::start(id, op_type)
+    }
+
+    fn create_succeed_update(id: &str, op_type: OperationType) -> OperationUpdate {
+        OperationUpdate::succeed(id, op_type, Some("result".to_string()))
+    }
+
+    fn create_fail_update(id: &str, op_type: OperationType) -> OperationUpdate {
+        OperationUpdate::fail(id, op_type, crate::error::ErrorObject::new("Error", "message"))
+    }
+
+    fn create_request(update: OperationUpdate) -> CheckpointRequest {
+        CheckpointRequest::async_request(update)
+    }
+
+    // Test: EXECUTION completion must be last in batch
+    // Requirements: 2.12
+    #[test]
+    fn test_execution_completion_is_last() {
+        let batch = vec![
+            create_request(create_succeed_update("exec-1", OperationType::Execution)),
+            create_request(create_start_update("step-1", OperationType::Step)),
+            create_request(create_succeed_update("step-2", OperationType::Step)),
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        // EXECUTION completion should be last
+        assert_eq!(sorted.len(), 3);
+        assert_eq!(sorted[2].operation.operation_id, "exec-1");
+        assert_eq!(sorted[2].operation.action, OperationAction::Succeed);
+        assert_eq!(sorted[2].operation.operation_type, OperationType::Execution);
+    }
+
+    // Test: EXECUTION FAIL is also last
+    // Requirements: 2.12
+    #[test]
+    fn test_execution_fail_is_last() {
+        let batch = vec![
+            create_request(create_fail_update("exec-1", OperationType::Execution)),
+            create_request(create_start_update("step-1", OperationType::Step)),
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        assert_eq!(sorted.len(), 2);
+        assert_eq!(sorted[1].operation.operation_id, "exec-1");
+        assert_eq!(sorted[1].operation.action, OperationAction::Fail);
+    }
+
+    // Test: Child operations come after parent CONTEXT starts
+    // Requirements: 2.12
+    #[test]
+    fn test_child_after_parent_context_start() {
+        let mut child_update = create_start_update("child-1", OperationType::Step);
+        child_update.parent_id = Some("parent-ctx".to_string());
+
+        let batch = vec![
+            create_request(child_update),
+            create_request(create_start_update("parent-ctx", OperationType::Context)),
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        // Parent CONTEXT START should come before child
+        assert_eq!(sorted.len(), 2);
+        assert_eq!(sorted[0].operation.operation_id, "parent-ctx");
+        assert_eq!(sorted[0].operation.action, OperationAction::Start);
+        assert_eq!(sorted[1].operation.operation_id, "child-1");
+    }
+
+    // Test: START and completion for same operation in same batch
+    // Requirements: 2.13
+    #[test]
+    fn test_start_and_completion_same_operation() {
+        let batch = vec![
+            create_request(create_succeed_update("step-1", OperationType::Step)),
+            create_request(create_start_update("step-1", OperationType::Step)),
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        // START should come before SUCCEED for same operation
+        assert_eq!(sorted.len(), 2);
+        assert_eq!(sorted[0].operation.operation_id, "step-1");
+        assert_eq!(sorted[0].operation.action, OperationAction::Start);
+        assert_eq!(sorted[1].operation.operation_id, "step-1");
+        assert_eq!(sorted[1].operation.action, OperationAction::Succeed);
+    }
+
+    // Test: CONTEXT START and completion in same batch
+    // Requirements: 2.13
+    #[test]
+    fn test_context_start_and_completion_same_batch() {
+        let batch = vec![
+            create_request(create_succeed_update("ctx-1", OperationType::Context)),
+            create_request(create_start_update("ctx-1", OperationType::Context)),
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        // START should come before SUCCEED
+        assert_eq!(sorted.len(), 2);
+        assert_eq!(sorted[0].operation.operation_id, "ctx-1");
+        assert_eq!(sorted[0].operation.action, OperationAction::Start);
+        assert_eq!(sorted[1].operation.operation_id, "ctx-1");
+        assert_eq!(sorted[1].operation.action, OperationAction::Succeed);
+    }
+
+    // Test: STEP START and FAIL in same batch
+    // Requirements: 2.13
+    #[test]
+    fn test_step_start_and_fail_same_batch() {
+        let batch = vec![
+            create_request(create_fail_update("step-1", OperationType::Step)),
+            create_request(create_start_update("step-1", OperationType::Step)),
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        // START should come before FAIL for same operation
+        assert_eq!(sorted.len(), 2);
+        assert_eq!(sorted[0].operation.operation_id, "step-1");
+        assert_eq!(sorted[0].operation.action, OperationAction::Start);
+        assert_eq!(sorted[1].operation.operation_id, "step-1");
+        assert_eq!(sorted[1].operation.action, OperationAction::Fail);
+    }
+
+    // Test: CONTEXT START and FAIL in same batch
+    // Requirements: 2.13
+    #[test]
+    fn test_context_start_and_fail_same_batch() {
+        let batch = vec![
+            create_request(create_fail_update("ctx-1", OperationType::Context)),
+            create_request(create_start_update("ctx-1", OperationType::Context)),
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        // START should come before FAIL
+        assert_eq!(sorted.len(), 2);
+        assert_eq!(sorted[0].operation.operation_id, "ctx-1");
+        assert_eq!(sorted[0].operation.action, OperationAction::Start);
+        assert_eq!(sorted[1].operation.operation_id, "ctx-1");
+        assert_eq!(sorted[1].operation.action, OperationAction::Fail);
+    }
+
+    // Test: Complex scenario with multiple ordering rules
+    // Requirements: 2.12, 2.13
+    #[test]
+    fn test_complex_ordering_scenario() {
+        let mut child1 = create_start_update("child-1", OperationType::Step);
+        child1.parent_id = Some("parent-ctx".to_string());
+
+        let mut child2 = create_succeed_update("child-2", OperationType::Step);
+        child2.parent_id = Some("parent-ctx".to_string());
+
+        let batch = vec![
+            create_request(create_succeed_update("exec-1", OperationType::Execution)), // Should be last
+            create_request(child1),                                                      // Should be after parent-ctx START
+            create_request(create_succeed_update("parent-ctx", OperationType::Context)), // Should be after parent-ctx START
+            create_request(create_start_update("parent-ctx", OperationType::Context)),   // Should be early
+            create_request(child2),                                                      // Should be after parent-ctx START
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        assert_eq!(sorted.len(), 5);
+
+        // Find positions
+        let parent_start_pos = sorted.iter().position(|r| 
+            r.operation.operation_id == "parent-ctx" && r.operation.action == OperationAction::Start
+        ).unwrap();
+        let parent_succeed_pos = sorted.iter().position(|r| 
+            r.operation.operation_id == "parent-ctx" && r.operation.action == OperationAction::Succeed
+        ).unwrap();
+        let child1_pos = sorted.iter().position(|r| r.operation.operation_id == "child-1").unwrap();
+        let child2_pos = sorted.iter().position(|r| r.operation.operation_id == "child-2").unwrap();
+        let exec_pos = sorted.iter().position(|r| r.operation.operation_id == "exec-1").unwrap();
+
+        // Verify ordering constraints
+        assert!(parent_start_pos < parent_succeed_pos, "Parent START should be before parent SUCCEED");
+        assert!(parent_start_pos < child1_pos, "Parent START should be before child-1");
+        assert!(parent_start_pos < child2_pos, "Parent START should be before child-2");
+        assert_eq!(exec_pos, 4, "EXECUTION completion should be last");
+    }
+
+    // Test: Empty batch returns empty
+    #[test]
+    fn test_empty_batch() {
+        let batch: Vec<CheckpointRequest> = vec![];
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+        assert!(sorted.is_empty());
+    }
+
+    // Test: Single item batch returns same item
+    #[test]
+    fn test_single_item_batch() {
+        let batch = vec![create_request(create_start_update("step-1", OperationType::Step))];
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+        assert_eq!(sorted.len(), 1);
+        assert_eq!(sorted[0].operation.operation_id, "step-1");
+    }
+
+    // Test: Preserves original order when no ordering constraints apply
+    #[test]
+    fn test_preserves_original_order() {
+        let batch = vec![
+            create_request(create_start_update("step-1", OperationType::Step)),
+            create_request(create_start_update("step-2", OperationType::Step)),
+            create_request(create_start_update("step-3", OperationType::Step)),
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        // Order should be preserved
+        assert_eq!(sorted.len(), 3);
+        assert_eq!(sorted[0].operation.operation_id, "step-1");
+        assert_eq!(sorted[1].operation.operation_id, "step-2");
+        assert_eq!(sorted[2].operation.operation_id, "step-3");
+    }
+
+    // Test: Multiple children of same parent
+    #[test]
+    fn test_multiple_children_same_parent() {
+        let mut child1 = create_start_update("child-1", OperationType::Step);
+        child1.parent_id = Some("parent-ctx".to_string());
+
+        let mut child2 = create_start_update("child-2", OperationType::Step);
+        child2.parent_id = Some("parent-ctx".to_string());
+
+        let mut child3 = create_start_update("child-3", OperationType::Step);
+        child3.parent_id = Some("parent-ctx".to_string());
+
+        let batch = vec![
+            create_request(child1),
+            create_request(child2),
+            create_request(create_start_update("parent-ctx", OperationType::Context)),
+            create_request(child3),
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        // Parent should be first
+        assert_eq!(sorted[0].operation.operation_id, "parent-ctx");
+        
+        // All children should come after parent
+        for i in 1..4 {
+            assert!(sorted[i].operation.parent_id.as_deref() == Some("parent-ctx"));
+        }
+    }
+
+    // Test: Nested contexts (grandparent -> parent -> child)
+    #[test]
+    fn test_nested_contexts() {
+        let mut parent_ctx = create_start_update("parent-ctx", OperationType::Context);
+        parent_ctx.parent_id = Some("grandparent-ctx".to_string());
+
+        let mut child = create_start_update("child-1", OperationType::Step);
+        child.parent_id = Some("parent-ctx".to_string());
+
+        let batch = vec![
+            create_request(child),
+            create_request(parent_ctx),
+            create_request(create_start_update("grandparent-ctx", OperationType::Context)),
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        // Find positions
+        let grandparent_pos = sorted.iter().position(|r| r.operation.operation_id == "grandparent-ctx").unwrap();
+        let parent_pos = sorted.iter().position(|r| r.operation.operation_id == "parent-ctx").unwrap();
+        let child_pos = sorted.iter().position(|r| r.operation.operation_id == "child-1").unwrap();
+
+        // Grandparent should be before parent (parent is child of grandparent)
+        assert!(grandparent_pos < parent_pos, "Grandparent should be before parent");
+        // Parent should be before child
+        assert!(parent_pos < child_pos, "Parent should be before child");
+    }
+
+    // Test: EXECUTION START is not affected (only completion is last)
+    #[test]
+    fn test_execution_start_not_affected() {
+        let batch = vec![
+            create_request(create_start_update("step-1", OperationType::Step)),
+            create_request(create_start_update("exec-1", OperationType::Execution)),
+            create_request(create_start_update("step-2", OperationType::Step)),
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        // EXECUTION START should stay in original position (not moved to end)
+        assert_eq!(sorted.len(), 3);
+        // Original order should be preserved since no ordering constraints apply
+        assert_eq!(sorted[0].operation.operation_id, "step-1");
+        assert_eq!(sorted[1].operation.operation_id, "exec-1");
+        assert_eq!(sorted[2].operation.operation_id, "step-2");
     }
 }

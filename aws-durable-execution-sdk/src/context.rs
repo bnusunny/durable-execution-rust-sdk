@@ -212,6 +212,14 @@ pub trait Logger: Send + Sync {
 }
 
 /// Context information for log messages.
+///
+/// This struct provides context for log messages including execution ARN,
+/// operation IDs, and replay status. The `is_replay` flag indicates whether
+/// the current operation is being replayed from a checkpoint.
+///
+/// # Requirements
+///
+/// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
 #[derive(Debug, Clone, Default)]
 pub struct LogInfo {
     /// The durable execution ARN
@@ -220,6 +228,16 @@ pub struct LogInfo {
     pub operation_id: Option<String>,
     /// The parent operation ID
     pub parent_id: Option<String>,
+    /// Whether the current operation is being replayed from a checkpoint
+    ///
+    /// When `true`, the operation is returning a previously checkpointed result
+    /// without re-executing the operation's logic. Loggers can use this flag
+    /// to suppress or annotate logs during replay.
+    ///
+    /// # Requirements
+    ///
+    /// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
+    pub is_replay: bool,
     /// Additional key-value pairs
     pub extra: Vec<(String, String)>,
 }
@@ -245,6 +263,23 @@ impl LogInfo {
         self
     }
 
+    /// Sets the replay flag.
+    ///
+    /// When set to `true`, indicates that the current operation is being
+    /// replayed from a checkpoint rather than executing fresh.
+    ///
+    /// # Arguments
+    ///
+    /// * `is_replay` - Whether the operation is being replayed
+    ///
+    /// # Requirements
+    ///
+    /// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
+    pub fn with_replay(mut self, is_replay: bool) -> Self {
+        self.is_replay = is_replay;
+        self
+    }
+
     /// Adds an extra key-value pair.
     pub fn with_extra(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         self.extra.push((key.into(), value.into()));
@@ -253,6 +288,13 @@ impl LogInfo {
 }
 
 /// Default logger implementation using the `tracing` crate.
+///
+/// This logger includes the `is_replay` flag in all log messages to help
+/// distinguish between fresh executions and replayed operations.
+///
+/// # Requirements
+///
+/// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
 #[derive(Debug, Clone, Default)]
 pub struct TracingLogger;
 
@@ -262,6 +304,7 @@ impl Logger for TracingLogger {
             durable_execution_arn = ?info.durable_execution_arn,
             operation_id = ?info.operation_id,
             parent_id = ?info.parent_id,
+            is_replay = info.is_replay,
             "{}",
             message
         );
@@ -272,6 +315,7 @@ impl Logger for TracingLogger {
             durable_execution_arn = ?info.durable_execution_arn,
             operation_id = ?info.operation_id,
             parent_id = ?info.parent_id,
+            is_replay = info.is_replay,
             "{}",
             message
         );
@@ -282,6 +326,7 @@ impl Logger for TracingLogger {
             durable_execution_arn = ?info.durable_execution_arn,
             operation_id = ?info.operation_id,
             parent_id = ?info.parent_id,
+            is_replay = info.is_replay,
             "{}",
             message
         );
@@ -292,9 +337,202 @@ impl Logger for TracingLogger {
             durable_execution_arn = ?info.durable_execution_arn,
             operation_id = ?info.operation_id,
             parent_id = ?info.parent_id,
+            is_replay = info.is_replay,
             "{}",
             message
         );
+    }
+}
+
+/// Configuration for replay-aware logging behavior.
+///
+/// This configuration controls how the `ReplayAwareLogger` handles log messages
+/// during replay. Users can choose to suppress all logs during replay, allow
+/// only certain log levels, or log all messages regardless of replay status.
+///
+/// # Requirements
+///
+/// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
+/// - 16.7: THE Logging_System SHALL allow users to configure replay logging behavior
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReplayLoggingConfig {
+    /// Suppress all logs during replay (default).
+    ///
+    /// When in replay mode, no log messages will be emitted. This is useful
+    /// to reduce noise in logs when replaying previously executed operations.
+    SuppressAll,
+    
+    /// Allow all logs during replay.
+    ///
+    /// Log messages will be emitted regardless of replay status. The `is_replay`
+    /// flag in `LogInfo` can still be used to distinguish replay logs.
+    AllowAll,
+    
+    /// Allow only error logs during replay.
+    ///
+    /// Only error-level messages will be emitted during replay. This is useful
+    /// when you want to see errors but suppress informational messages.
+    ErrorsOnly,
+    
+    /// Allow error and warning logs during replay.
+    ///
+    /// Error and warning-level messages will be emitted during replay.
+    /// Debug and info messages will be suppressed.
+    WarningsAndErrors,
+}
+
+impl Default for ReplayLoggingConfig {
+    fn default() -> Self {
+        Self::SuppressAll
+    }
+}
+
+/// A logger wrapper that can suppress logs during replay based on configuration.
+///
+/// `ReplayAwareLogger` wraps any `Logger` implementation and adds replay-aware
+/// behavior. When the `is_replay` flag in `LogInfo` is `true`, the logger will
+/// suppress or allow logs based on the configured `ReplayLoggingConfig`.
+///
+/// # Example
+///
+/// ```rust
+/// use aws_durable_execution_sdk::{TracingLogger, ReplayAwareLogger, ReplayLoggingConfig};
+/// use std::sync::Arc;
+///
+/// // Create a replay-aware logger that suppresses all logs during replay
+/// let logger = ReplayAwareLogger::new(
+///     Arc::new(TracingLogger),
+///     ReplayLoggingConfig::SuppressAll,
+/// );
+///
+/// // Create a replay-aware logger that allows errors during replay
+/// let logger_with_errors = ReplayAwareLogger::new(
+///     Arc::new(TracingLogger),
+///     ReplayLoggingConfig::ErrorsOnly,
+/// );
+/// ```
+///
+/// # Requirements
+///
+/// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
+/// - 16.7: THE Logging_System SHALL allow users to configure replay logging behavior
+pub struct ReplayAwareLogger {
+    /// The underlying logger to delegate to
+    inner: Arc<dyn Logger>,
+    /// Configuration for replay logging behavior
+    config: ReplayLoggingConfig,
+}
+
+impl ReplayAwareLogger {
+    /// Creates a new `ReplayAwareLogger` with the specified configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `inner` - The underlying logger to delegate to
+    /// * `config` - Configuration for replay logging behavior
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use aws_durable_execution_sdk::{TracingLogger, ReplayAwareLogger, ReplayLoggingConfig};
+    /// use std::sync::Arc;
+    ///
+    /// let logger = ReplayAwareLogger::new(
+    ///     Arc::new(TracingLogger),
+    ///     ReplayLoggingConfig::SuppressAll,
+    /// );
+    /// ```
+    pub fn new(inner: Arc<dyn Logger>, config: ReplayLoggingConfig) -> Self {
+        Self { inner, config }
+    }
+
+    /// Creates a new `ReplayAwareLogger` that suppresses all logs during replay.
+    ///
+    /// This is a convenience constructor for the most common use case.
+    ///
+    /// # Arguments
+    ///
+    /// * `inner` - The underlying logger to delegate to
+    pub fn suppress_replay(inner: Arc<dyn Logger>) -> Self {
+        Self::new(inner, ReplayLoggingConfig::SuppressAll)
+    }
+
+    /// Creates a new `ReplayAwareLogger` that allows all logs during replay.
+    ///
+    /// # Arguments
+    ///
+    /// * `inner` - The underlying logger to delegate to
+    pub fn allow_all(inner: Arc<dyn Logger>) -> Self {
+        Self::new(inner, ReplayLoggingConfig::AllowAll)
+    }
+
+    /// Returns the current replay logging configuration.
+    pub fn config(&self) -> ReplayLoggingConfig {
+        self.config
+    }
+
+    /// Returns a reference to the underlying logger.
+    pub fn inner(&self) -> &Arc<dyn Logger> {
+        &self.inner
+    }
+
+    /// Checks if a log at the given level should be suppressed during replay.
+    fn should_suppress(&self, info: &LogInfo, level: LogLevel) -> bool {
+        if !info.is_replay {
+            return false;
+        }
+
+        match self.config {
+            ReplayLoggingConfig::SuppressAll => true,
+            ReplayLoggingConfig::AllowAll => false,
+            ReplayLoggingConfig::ErrorsOnly => level != LogLevel::Error,
+            ReplayLoggingConfig::WarningsAndErrors => {
+                level != LogLevel::Error && level != LogLevel::Warn
+            }
+        }
+    }
+}
+
+/// Internal enum for log levels used by ReplayAwareLogger.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LogLevel {
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+impl std::fmt::Debug for ReplayAwareLogger {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ReplayAwareLogger")
+            .field("config", &self.config)
+            .finish()
+    }
+}
+
+impl Logger for ReplayAwareLogger {
+    fn debug(&self, message: &str, info: &LogInfo) {
+        if !self.should_suppress(info, LogLevel::Debug) {
+            self.inner.debug(message, info);
+        }
+    }
+
+    fn info(&self, message: &str, info: &LogInfo) {
+        if !self.should_suppress(info, LogLevel::Info) {
+            self.inner.info(message, info);
+        }
+    }
+
+    fn warn(&self, message: &str, info: &LogInfo) {
+        if !self.should_suppress(info, LogLevel::Warn) {
+            self.inner.warn(message, info);
+        }
+    }
+
+    fn error(&self, message: &str, info: &LogInfo) {
+        if !self.should_suppress(info, LogLevel::Error) {
+            self.inner.error(message, info);
+        }
     }
 }
 
@@ -469,17 +707,266 @@ impl DurableContext {
     }
 
     /// Creates log info for the current context.
+    ///
+    /// The returned `LogInfo` includes the current replay status from the
+    /// execution state, allowing loggers to distinguish between fresh
+    /// executions and replayed operations.
+    ///
+    /// # Requirements
+    ///
+    /// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
     pub fn log_info(&self) -> LogInfo {
         let mut info = LogInfo::new(self.durable_execution_arn());
         if let Some(ref parent_id) = self.parent_id {
             info = info.with_parent_id(parent_id);
         }
+        // Include replay status from execution state
+        info = info.with_replay(self.state.is_replay());
         info
     }
 
     /// Creates log info with an operation ID.
+    ///
+    /// The returned `LogInfo` includes the current replay status from the
+    /// execution state, allowing loggers to distinguish between fresh
+    /// executions and replayed operations.
+    ///
+    /// # Requirements
+    ///
+    /// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
     pub fn log_info_with_operation(&self, operation_id: &str) -> LogInfo {
         self.log_info().with_operation_id(operation_id)
+    }
+
+    /// Creates log info with explicit replay status.
+    ///
+    /// This method allows callers to explicitly set the replay status,
+    /// which is useful when the operation-specific replay status differs
+    /// from the global execution state replay status.
+    ///
+    /// # Arguments
+    ///
+    /// * `operation_id` - The operation ID to include in the log info
+    /// * `is_replay` - Whether this specific operation is being replayed
+    ///
+    /// # Requirements
+    ///
+    /// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
+    pub fn log_info_with_replay(&self, operation_id: &str, is_replay: bool) -> LogInfo {
+        let mut info = LogInfo::new(self.durable_execution_arn());
+        if let Some(ref parent_id) = self.parent_id {
+            info = info.with_parent_id(parent_id);
+        }
+        info.with_operation_id(operation_id).with_replay(is_replay)
+    }
+
+    /// Returns the original user input from the EXECUTION operation.
+    ///
+    /// This method deserializes the input payload from the EXECUTION operation's
+    /// ExecutionDetails.InputPayload field into the requested type.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` - The type to deserialize the input into. Must implement `DeserializeOwned`.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(T)` if the input exists and can be deserialized, or a `DurableError` if:
+    /// - No EXECUTION operation exists
+    /// - No input payload is available
+    /// - Deserialization fails
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// #[derive(Deserialize)]
+    /// struct OrderEvent {
+    ///     order_id: String,
+    ///     amount: f64,
+    /// }
+    ///
+    /// async fn my_workflow(ctx: DurableContext) -> Result<(), DurableError> {
+    ///     // Get the original input that started this execution
+    ///     let event: OrderEvent = ctx.get_original_input()?;
+    ///     println!("Processing order: {}", event.order_id);
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// - 1.11: THE DurableContext SHALL provide access to the original user input from the EXECUTION operation
+    /// - 19.2: THE EXECUTION_Operation SHALL provide access to original user input from ExecutionDetails.InputPayload
+    pub fn get_original_input<T>(&self) -> Result<T, crate::error::DurableError>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        // Get the raw input payload from the execution state
+        let input_payload = self.state.get_original_input_raw().ok_or_else(|| {
+            crate::error::DurableError::Validation {
+                message: "No original input available. The EXECUTION operation may not exist or has no input payload.".to_string(),
+            }
+        })?;
+        
+        // Deserialize the input payload to the requested type
+        serde_json::from_str(input_payload).map_err(|e| {
+            crate::error::DurableError::SerDes {
+                message: format!("Failed to deserialize original input: {}", e),
+            }
+        })
+    }
+
+    /// Returns the raw original user input as a string, if available.
+    ///
+    /// This method returns the raw JSON string from the EXECUTION operation's
+    /// ExecutionDetails.InputPayload field without deserializing it.
+    ///
+    /// # Returns
+    ///
+    /// `Some(&str)` if the input exists, `None` otherwise.
+    ///
+    /// # Requirements
+    ///
+    /// - 19.2: THE EXECUTION_Operation SHALL provide access to original user input from ExecutionDetails.InputPayload
+    pub fn get_original_input_raw(&self) -> Option<&str> {
+        self.state.get_original_input_raw()
+    }
+    
+    /// Completes the execution with a successful result via checkpointing.
+    ///
+    /// This method checkpoints a SUCCEED action on the EXECUTION operation,
+    /// which is useful for large results that exceed the Lambda response size limit (6MB).
+    /// After calling this method, the Lambda function should return an empty result.
+    ///
+    /// # Arguments
+    ///
+    /// * `result` - The result to checkpoint. Must implement `Serialize`.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success, or a `DurableError` if:
+    /// - No EXECUTION operation exists
+    /// - Serialization fails
+    /// - The checkpoint fails
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// async fn my_workflow(ctx: DurableContext) -> Result<(), DurableError> {
+    ///     let large_result = compute_large_result().await?;
+    ///     
+    ///     // Check if result would exceed Lambda response limit
+    ///     if DurableExecutionInvocationOutput::would_exceed_max_size(&large_result) {
+    ///         // Checkpoint the result instead of returning it
+    ///         ctx.complete_execution_success(&large_result).await?;
+    ///         // Return empty result - the actual result is checkpointed
+    ///         return Ok(());
+    ///     }
+    ///     
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// - 19.3: THE EXECUTION_Operation SHALL support completing execution via SUCCEED action with result
+    /// - 19.5: WHEN execution result exceeds response size limits, THE EXECUTION_Operation SHALL checkpoint the result and return empty Result field
+    pub async fn complete_execution_success<T>(&self, result: &T) -> Result<(), crate::error::DurableError>
+    where
+        T: serde::Serialize,
+    {
+        let serialized = serde_json::to_string(result).map_err(|e| {
+            crate::error::DurableError::SerDes {
+                message: format!("Failed to serialize execution result: {}", e),
+            }
+        })?;
+        
+        self.state.complete_execution_success(Some(serialized)).await
+    }
+    
+    /// Completes the execution with a failure via checkpointing.
+    ///
+    /// This method checkpoints a FAIL action on the EXECUTION operation.
+    /// After calling this method, the Lambda function should return a FAILED status.
+    ///
+    /// # Arguments
+    ///
+    /// * `error` - The error details to checkpoint
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success, or a `DurableError` if:
+    /// - No EXECUTION operation exists
+    /// - The checkpoint fails
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// async fn my_workflow(ctx: DurableContext) -> Result<(), DurableError> {
+    ///     if let Err(e) = process_order().await {
+    ///         // Checkpoint the failure
+    ///         ctx.complete_execution_failure(ErrorObject::new("ProcessingError", &e.to_string())).await?;
+    ///         return Err(DurableError::execution(&e.to_string()));
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// - 19.4: THE EXECUTION_Operation SHALL support completing execution via FAIL action with error
+    pub async fn complete_execution_failure(&self, error: crate::error::ErrorObject) -> Result<(), crate::error::DurableError> {
+        self.state.complete_execution_failure(error).await
+    }
+    
+    /// Completes the execution with a successful result, automatically handling large results.
+    ///
+    /// This method checks if the result would exceed the Lambda response size limit (6MB).
+    /// If so, it checkpoints the result via the EXECUTION operation and returns `true`.
+    /// If the result fits within the limit, it returns `false` and the caller should
+    /// return the result normally.
+    ///
+    /// # Arguments
+    ///
+    /// * `result` - The result to potentially checkpoint. Must implement `Serialize`.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(true)` if the result was checkpointed (caller should return empty result),
+    /// `Ok(false)` if the result fits within limits (caller should return it normally),
+    /// or a `DurableError` if checkpointing fails.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// async fn my_workflow(ctx: DurableContext) -> Result<LargeResult, DurableError> {
+    ///     let result = compute_result().await?;
+    ///     
+    ///     // Automatically handle large results
+    ///     if ctx.complete_execution_if_large(&result).await? {
+    ///         // Result was checkpointed, return a placeholder
+    ///         // The actual result is stored in the EXECUTION operation
+    ///         return Ok(LargeResult::default());
+    ///     }
+    ///     
+    ///     // Result fits within limits, return normally
+    ///     Ok(result)
+    /// }
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// - 19.5: WHEN execution result exceeds response size limits, THE EXECUTION_Operation SHALL checkpoint the result and return empty Result field
+    pub async fn complete_execution_if_large<T>(&self, result: &T) -> Result<bool, crate::error::DurableError>
+    where
+        T: serde::Serialize,
+    {
+        if crate::lambda::DurableExecutionInvocationOutput::would_exceed_max_size(result) {
+            self.complete_execution_success(result).await?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     // ========================================================================
@@ -634,6 +1121,47 @@ impl DurableContext {
         }
         
         result
+    }
+
+    /// Cancels an active wait operation.
+    ///
+    /// This method allows cancelling a wait operation that was previously started.
+    /// If the wait has already completed (succeeded, failed, or timed out), this
+    /// method will return Ok(()) without making any changes.
+    ///
+    /// # Arguments
+    ///
+    /// * `operation_id` - The operation ID of the wait to cancel
+    ///
+    /// # Returns
+    ///
+    /// Ok(()) if the wait was cancelled or was already completed, or an error if:
+    /// - The operation doesn't exist
+    /// - The operation is not a WAIT operation
+    /// - The checkpoint fails
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// // Start a wait in a parallel branch
+    /// let wait_op_id = ctx.next_operation_id();
+    /// 
+    /// // Later, cancel the wait from another branch
+    /// ctx.cancel_wait(&wait_op_id).await?;
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// - 5.5: THE Wait_Operation SHALL support cancellation of active waits via CANCEL action
+    pub async fn cancel_wait(
+        &self,
+        operation_id: &str,
+    ) -> Result<(), crate::error::DurableError> {
+        crate::handlers::wait_cancel_handler(
+            &self.state,
+            operation_id,
+            &self.logger,
+        ).await
     }
 
     /// Creates a callback and returns a handle to wait for the result.
@@ -998,7 +1526,15 @@ impl DurableContext {
     /// Polls until a condition is met.
     ///
     /// This method repeatedly checks a condition until it returns a successful
-    /// result. Between checks, it waits for a configurable duration.
+    /// result. Between checks, it waits for a configurable duration using the
+    /// RETRY mechanism with NextAttemptDelaySeconds.
+    ///
+    /// # Implementation
+    ///
+    /// This method is implemented as a single STEP operation with RETRY mechanism,
+    /// which is more efficient than using multiple steps and waits. The state is
+    /// passed as Payload on retry (not Error), and the attempt number is tracked
+    /// in StepDetails.Attempt.
     ///
     /// # Arguments
     ///
@@ -1034,6 +1570,7 @@ impl DurableContext {
     /// # Requirements
     ///
     /// - 1.8: THE DurableContext SHALL provide a `wait_for_condition` method that polls until a condition is met
+    /// - 4.9: THE Step_Operation SHALL support RETRY action with Payload for wait-for-condition pattern
     pub async fn wait_for_condition<T, S, F>(
         &self,
         check: F,
@@ -1042,58 +1579,26 @@ impl DurableContext {
     where
         T: serde::Serialize + serde::de::DeserializeOwned + Send,
         S: serde::Serialize + serde::de::DeserializeOwned + Clone + Send + Sync,
-        F: Fn(&S, &WaitForConditionContext) -> Result<T, Box<dyn std::error::Error + Send + Sync>> + Send + Sync + Clone,
+        F: Fn(&S, &WaitForConditionContext) -> Result<T, Box<dyn std::error::Error + Send + Sync>> + Send + Sync,
     {
-        let _op_id = self.next_operation_identifier(Some("wait_for_condition".to_string()));
+        let op_id = self.next_operation_identifier(Some("wait_for_condition".to_string()));
         
-        // Execute in a child context to track all iterations
-        self.run_in_child_context(|child_ctx| async move {
-            let state = config.initial_state.clone();
-            let mut attempt = 0;
-            let max_attempts = config.max_attempts.unwrap_or(usize::MAX);
-            
-            loop {
-                attempt += 1;
-                
-                // Check if max attempts exceeded
-                if attempt > max_attempts {
-                    return Err(crate::error::DurableError::Execution {
-                        message: format!("Max attempts ({}) exceeded for wait_for_condition", max_attempts),
-                        termination_reason: crate::error::TerminationReason::ExecutionError,
-                    });
-                }
-                
-                // Create context for this check
-                let check_ctx = WaitForConditionContext {
-                    attempt,
-                    max_attempts: config.max_attempts,
-                };
-                
-                // Clone state and check for the closure
-                let state_clone = state.clone();
-                let check_clone = check.clone();
-                
-                // Try the condition check as a step
-                let check_result = child_ctx.step_named(
-                    &format!("condition_check_{}", attempt),
-                    move |_step_ctx| {
-                        check_clone(&state_clone, &check_ctx)
-                    },
-                    None,
-                ).await;
-                
-                match check_result {
-                    Ok(result) => return Ok(result),
-                    Err(crate::error::DurableError::UserCode { .. }) => {
-                        // Condition not met, wait and retry
-                        if attempt < max_attempts {
-                            child_ctx.wait(config.interval, Some(&format!("wait_attempt_{}", attempt))).await?;
-                        }
-                    }
-                    Err(e) => return Err(e),
-                }
-            }
-        }, None).await
+        // Use the new wait_for_condition_handler which implements the single STEP with RETRY pattern
+        // This is more efficient than the previous child context + multiple steps approach
+        let result = crate::handlers::wait_for_condition_handler(
+            check,
+            config,
+            &self.state,
+            &op_id,
+            &self.logger,
+        ).await;
+        
+        // Track replay after completion (only if not suspended)
+        if result.is_ok() {
+            self.state.track_replay(&op_id.operation_id).await;
+        }
+        
+        result
     }
 
     /// Creates a callback and waits for the result with a submitter function.
@@ -1162,6 +1667,223 @@ impl DurableContext {
         
         // Wait for the callback result
         callback.result().await
+    }
+
+    // ========================================================================
+    // Promise Combinators
+    // ========================================================================
+
+    /// Waits for all futures to complete successfully.
+    ///
+    /// Returns all results if all futures succeed, or returns the first error encountered.
+    /// This is implemented within a STEP operation for durability.
+    ///
+    /// # Arguments
+    ///
+    /// * `futures` - Vector of futures to execute
+    ///
+    /// # Returns
+    ///
+    /// `Ok(Vec<T>)` if all futures succeed, or `Err` with the first error.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let results = ctx.all(vec![
+    ///     ctx.step(|_| Ok(1), None),
+    ///     ctx.step(|_| Ok(2), None),
+    ///     ctx.step(|_| Ok(3), None),
+    /// ]).await?;
+    /// assert_eq!(results, vec![1, 2, 3]);
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// - 20.1: Wait for all promises to complete successfully, return error on first failure
+    /// - 20.5: Implement within a STEP operation for durability
+    pub async fn all<T, Fut>(
+        &self,
+        futures: Vec<Fut>,
+    ) -> Result<Vec<T>, crate::error::DurableError>
+    where
+        T: serde::Serialize + serde::de::DeserializeOwned + Send + Clone + 'static,
+        Fut: std::future::Future<Output = Result<T, crate::error::DurableError>> + Send + 'static,
+    {
+        let op_id = self.next_operation_identifier(Some("all".to_string()));
+        
+        let result = crate::handlers::all_handler(
+            futures,
+            &self.state,
+            &op_id,
+            &self.logger,
+        ).await;
+        
+        // Track replay after completion
+        if result.is_ok() {
+            self.state.track_replay(&op_id.operation_id).await;
+        }
+        
+        result
+    }
+
+    /// Waits for all futures to settle (success or failure).
+    ///
+    /// Returns a BatchResult containing outcomes for all futures, regardless of success or failure.
+    /// This is implemented within a STEP operation for durability.
+    ///
+    /// # Arguments
+    ///
+    /// * `futures` - Vector of futures to execute
+    ///
+    /// # Returns
+    ///
+    /// `BatchResult<T>` containing results for all futures.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let results = ctx.all_settled(vec![
+    ///     ctx.step(|_| Ok(1), None),
+    ///     ctx.step(|_| Err("error".into()), None),
+    ///     ctx.step(|_| Ok(3), None),
+    /// ]).await?;
+    /// assert_eq!(results.success_count(), 2);
+    /// assert_eq!(results.failure_count(), 1);
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// - 20.2: Wait for all promises to settle, return BatchResult with all outcomes
+    /// - 20.5: Implement within a STEP operation for durability
+    pub async fn all_settled<T, Fut>(
+        &self,
+        futures: Vec<Fut>,
+    ) -> Result<crate::concurrency::BatchResult<T>, crate::error::DurableError>
+    where
+        T: serde::Serialize + serde::de::DeserializeOwned + Send + Clone + 'static,
+        Fut: std::future::Future<Output = Result<T, crate::error::DurableError>> + Send + 'static,
+    {
+        let op_id = self.next_operation_identifier(Some("all_settled".to_string()));
+        
+        let result = crate::handlers::all_settled_handler(
+            futures,
+            &self.state,
+            &op_id,
+            &self.logger,
+        ).await;
+        
+        // Track replay after completion
+        if result.is_ok() {
+            self.state.track_replay(&op_id.operation_id).await;
+        }
+        
+        result
+    }
+
+    /// Returns the result of the first future to settle.
+    ///
+    /// Returns the result (success or failure) of whichever future completes first.
+    /// This is implemented within a STEP operation for durability.
+    ///
+    /// # Arguments
+    ///
+    /// * `futures` - Vector of futures to execute
+    ///
+    /// # Returns
+    ///
+    /// The result of the first future to settle.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let result = ctx.race(vec![
+    ///     ctx.step(|_| Ok(1), None),
+    ///     ctx.step(|_| Ok(2), None),
+    /// ]).await?;
+    /// // result is either 1 or 2, whichever completed first
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// - 20.3: Return result of first promise to settle
+    /// - 20.5: Implement within a STEP operation for durability
+    pub async fn race<T, Fut>(
+        &self,
+        futures: Vec<Fut>,
+    ) -> Result<T, crate::error::DurableError>
+    where
+        T: serde::Serialize + serde::de::DeserializeOwned + Send + Clone + 'static,
+        Fut: std::future::Future<Output = Result<T, crate::error::DurableError>> + Send + 'static,
+    {
+        let op_id = self.next_operation_identifier(Some("race".to_string()));
+        
+        let result = crate::handlers::race_handler(
+            futures,
+            &self.state,
+            &op_id,
+            &self.logger,
+        ).await;
+        
+        // Track replay after completion
+        if result.is_ok() {
+            self.state.track_replay(&op_id.operation_id).await;
+        }
+        
+        result
+    }
+
+    /// Returns the result of the first future to succeed.
+    ///
+    /// Returns the result of the first future to succeed. If all futures fail,
+    /// returns an error containing all the failures.
+    /// This is implemented within a STEP operation for durability.
+    ///
+    /// # Arguments
+    ///
+    /// * `futures` - Vector of futures to execute
+    ///
+    /// # Returns
+    ///
+    /// The result of the first future to succeed, or an error if all fail.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let result = ctx.any(vec![
+    ///     ctx.step(|_| Err("error".into()), None),
+    ///     ctx.step(|_| Ok(2), None),
+    ///     ctx.step(|_| Ok(3), None),
+    /// ]).await?;
+    /// // result is either 2 or 3, whichever succeeded first
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// - 20.4: Return result of first promise to succeed, return error only if all fail
+    /// - 20.5: Implement within a STEP operation for durability
+    pub async fn any<T, Fut>(
+        &self,
+        futures: Vec<Fut>,
+    ) -> Result<T, crate::error::DurableError>
+    where
+        T: serde::Serialize + serde::de::DeserializeOwned + Send + Clone + 'static,
+        Fut: std::future::Future<Output = Result<T, crate::error::DurableError>> + Send + 'static,
+    {
+        let op_id = self.next_operation_identifier(Some("any".to_string()));
+        
+        let result = crate::handlers::any_handler(
+            futures,
+            &self.state,
+            &op_id,
+            &self.logger,
+        ).await;
+        
+        // Track replay after completion
+        if result.is_ok() {
+            self.state.track_replay(&op_id.operation_id).await;
+        }
+        
+        result
     }
 }
 
@@ -1601,6 +2323,254 @@ mod durable_context_tests {
         let info = ctx.log_info_with_operation("op-123");
         
         assert_eq!(info.operation_id, Some("op-123".to_string()));
+    }
+
+    #[test]
+    fn test_log_info_with_replay() {
+        let info = LogInfo::new("arn:test")
+            .with_operation_id("op-123")
+            .with_replay(true);
+        
+        assert!(info.is_replay);
+        assert_eq!(info.operation_id, Some("op-123".to_string()));
+    }
+
+    #[test]
+    fn test_log_info_default_not_replay() {
+        let info = LogInfo::default();
+        assert!(!info.is_replay);
+    }
+
+    #[test]
+    fn test_replay_logging_config_default() {
+        let config = ReplayLoggingConfig::default();
+        assert_eq!(config, ReplayLoggingConfig::SuppressAll);
+    }
+
+    #[test]
+    fn test_replay_aware_logger_suppress_all() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        
+        // Create a test logger that counts calls
+        struct CountingLogger {
+            debug_count: AtomicUsize,
+            info_count: AtomicUsize,
+            warn_count: AtomicUsize,
+            error_count: AtomicUsize,
+        }
+        
+        impl Logger for CountingLogger {
+            fn debug(&self, _: &str, _: &LogInfo) {
+                self.debug_count.fetch_add(1, Ordering::SeqCst);
+            }
+            fn info(&self, _: &str, _: &LogInfo) {
+                self.info_count.fetch_add(1, Ordering::SeqCst);
+            }
+            fn warn(&self, _: &str, _: &LogInfo) {
+                self.warn_count.fetch_add(1, Ordering::SeqCst);
+            }
+            fn error(&self, _: &str, _: &LogInfo) {
+                self.error_count.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+        
+        let inner = Arc::new(CountingLogger {
+            debug_count: AtomicUsize::new(0),
+            info_count: AtomicUsize::new(0),
+            warn_count: AtomicUsize::new(0),
+            error_count: AtomicUsize::new(0),
+        });
+        
+        let logger = ReplayAwareLogger::new(inner.clone(), ReplayLoggingConfig::SuppressAll);
+        
+        // Non-replay logs should pass through
+        let non_replay_info = LogInfo::new("arn:test").with_replay(false);
+        logger.debug("test", &non_replay_info);
+        logger.info("test", &non_replay_info);
+        logger.warn("test", &non_replay_info);
+        logger.error("test", &non_replay_info);
+        
+        assert_eq!(inner.debug_count.load(Ordering::SeqCst), 1);
+        assert_eq!(inner.info_count.load(Ordering::SeqCst), 1);
+        assert_eq!(inner.warn_count.load(Ordering::SeqCst), 1);
+        assert_eq!(inner.error_count.load(Ordering::SeqCst), 1);
+        
+        // Replay logs should be suppressed
+        let replay_info = LogInfo::new("arn:test").with_replay(true);
+        logger.debug("test", &replay_info);
+        logger.info("test", &replay_info);
+        logger.warn("test", &replay_info);
+        logger.error("test", &replay_info);
+        
+        // Counts should not have increased
+        assert_eq!(inner.debug_count.load(Ordering::SeqCst), 1);
+        assert_eq!(inner.info_count.load(Ordering::SeqCst), 1);
+        assert_eq!(inner.warn_count.load(Ordering::SeqCst), 1);
+        assert_eq!(inner.error_count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn test_replay_aware_logger_allow_all() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        
+        struct CountingLogger {
+            call_count: AtomicUsize,
+        }
+        
+        impl Logger for CountingLogger {
+            fn debug(&self, _: &str, _: &LogInfo) {
+                self.call_count.fetch_add(1, Ordering::SeqCst);
+            }
+            fn info(&self, _: &str, _: &LogInfo) {
+                self.call_count.fetch_add(1, Ordering::SeqCst);
+            }
+            fn warn(&self, _: &str, _: &LogInfo) {
+                self.call_count.fetch_add(1, Ordering::SeqCst);
+            }
+            fn error(&self, _: &str, _: &LogInfo) {
+                self.call_count.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+        
+        let inner = Arc::new(CountingLogger {
+            call_count: AtomicUsize::new(0),
+        });
+        
+        let logger = ReplayAwareLogger::allow_all(inner.clone());
+        
+        // All logs should pass through even during replay
+        let replay_info = LogInfo::new("arn:test").with_replay(true);
+        logger.debug("test", &replay_info);
+        logger.info("test", &replay_info);
+        logger.warn("test", &replay_info);
+        logger.error("test", &replay_info);
+        
+        assert_eq!(inner.call_count.load(Ordering::SeqCst), 4);
+    }
+
+    #[test]
+    fn test_replay_aware_logger_errors_only() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        
+        struct CountingLogger {
+            debug_count: AtomicUsize,
+            info_count: AtomicUsize,
+            warn_count: AtomicUsize,
+            error_count: AtomicUsize,
+        }
+        
+        impl Logger for CountingLogger {
+            fn debug(&self, _: &str, _: &LogInfo) {
+                self.debug_count.fetch_add(1, Ordering::SeqCst);
+            }
+            fn info(&self, _: &str, _: &LogInfo) {
+                self.info_count.fetch_add(1, Ordering::SeqCst);
+            }
+            fn warn(&self, _: &str, _: &LogInfo) {
+                self.warn_count.fetch_add(1, Ordering::SeqCst);
+            }
+            fn error(&self, _: &str, _: &LogInfo) {
+                self.error_count.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+        
+        let inner = Arc::new(CountingLogger {
+            debug_count: AtomicUsize::new(0),
+            info_count: AtomicUsize::new(0),
+            warn_count: AtomicUsize::new(0),
+            error_count: AtomicUsize::new(0),
+        });
+        
+        let logger = ReplayAwareLogger::new(inner.clone(), ReplayLoggingConfig::ErrorsOnly);
+        
+        // During replay, only errors should pass through
+        let replay_info = LogInfo::new("arn:test").with_replay(true);
+        logger.debug("test", &replay_info);
+        logger.info("test", &replay_info);
+        logger.warn("test", &replay_info);
+        logger.error("test", &replay_info);
+        
+        assert_eq!(inner.debug_count.load(Ordering::SeqCst), 0);
+        assert_eq!(inner.info_count.load(Ordering::SeqCst), 0);
+        assert_eq!(inner.warn_count.load(Ordering::SeqCst), 0);
+        assert_eq!(inner.error_count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn test_replay_aware_logger_warnings_and_errors() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        
+        struct CountingLogger {
+            debug_count: AtomicUsize,
+            info_count: AtomicUsize,
+            warn_count: AtomicUsize,
+            error_count: AtomicUsize,
+        }
+        
+        impl Logger for CountingLogger {
+            fn debug(&self, _: &str, _: &LogInfo) {
+                self.debug_count.fetch_add(1, Ordering::SeqCst);
+            }
+            fn info(&self, _: &str, _: &LogInfo) {
+                self.info_count.fetch_add(1, Ordering::SeqCst);
+            }
+            fn warn(&self, _: &str, _: &LogInfo) {
+                self.warn_count.fetch_add(1, Ordering::SeqCst);
+            }
+            fn error(&self, _: &str, _: &LogInfo) {
+                self.error_count.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+        
+        let inner = Arc::new(CountingLogger {
+            debug_count: AtomicUsize::new(0),
+            info_count: AtomicUsize::new(0),
+            warn_count: AtomicUsize::new(0),
+            error_count: AtomicUsize::new(0),
+        });
+        
+        let logger = ReplayAwareLogger::new(inner.clone(), ReplayLoggingConfig::WarningsAndErrors);
+        
+        // During replay, only warnings and errors should pass through
+        let replay_info = LogInfo::new("arn:test").with_replay(true);
+        logger.debug("test", &replay_info);
+        logger.info("test", &replay_info);
+        logger.warn("test", &replay_info);
+        logger.error("test", &replay_info);
+        
+        assert_eq!(inner.debug_count.load(Ordering::SeqCst), 0);
+        assert_eq!(inner.info_count.load(Ordering::SeqCst), 0);
+        assert_eq!(inner.warn_count.load(Ordering::SeqCst), 1);
+        assert_eq!(inner.error_count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn test_replay_aware_logger_suppress_replay_constructor() {
+        let inner: Arc<dyn Logger> = Arc::new(TracingLogger);
+        let logger = ReplayAwareLogger::suppress_replay(inner);
+        
+        assert_eq!(logger.config(), ReplayLoggingConfig::SuppressAll);
+    }
+
+    #[test]
+    fn test_replay_aware_logger_debug() {
+        let inner: Arc<dyn Logger> = Arc::new(TracingLogger);
+        let logger = ReplayAwareLogger::new(inner, ReplayLoggingConfig::SuppressAll);
+        
+        let debug_str = format!("{:?}", logger);
+        assert!(debug_str.contains("ReplayAwareLogger"));
+        assert!(debug_str.contains("SuppressAll"));
+    }
+
+    #[test]
+    fn test_durable_context_log_info_with_replay_method() {
+        let state = create_test_state();
+        let ctx = DurableContext::new(state);
+        
+        let info = ctx.log_info_with_replay("op-123", true);
+        
+        assert_eq!(info.operation_id, Some("op-123".to_string()));
+        assert!(info.is_replay);
     }
 
     #[test]

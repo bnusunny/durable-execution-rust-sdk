@@ -50,6 +50,3 @@ pub use batcher::{
     create_checkpoint_queue,
 };
 pub use execution_state::ExecutionState;
-
-#[cfg(test)]
-mod tests;

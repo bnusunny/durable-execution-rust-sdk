@@ -549,3 +549,699 @@ pub fn create_checkpoint_queue(buffer_size: usize) -> (CheckpointSender, mpsc::R
     let (tx, rx) = mpsc::channel(buffer_size);
     (CheckpointSender::new(tx), rx)
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::client::{CheckpointResponse, MockDurableServiceClient};
+    use crate::error::ErrorObject;
+
+    fn create_test_update(id: &str) -> OperationUpdate {
+        OperationUpdate::start(id, OperationType::Step)
+    }
+
+    fn create_start_update(id: &str, op_type: OperationType) -> OperationUpdate {
+        OperationUpdate::start(id, op_type)
+    }
+
+    fn create_succeed_update(id: &str, op_type: OperationType) -> OperationUpdate {
+        OperationUpdate::succeed(id, op_type, Some("result".to_string()))
+    }
+
+    fn create_fail_update(id: &str, op_type: OperationType) -> OperationUpdate {
+        OperationUpdate::fail(id, op_type, ErrorObject::new("Error", "message"))
+    }
+
+    fn create_request(update: OperationUpdate) -> CheckpointRequest {
+        CheckpointRequest::async_request(update)
+    }
+
+    // Checkpoint request tests
+    #[test]
+    fn test_checkpoint_request_sync() {
+        let update = create_test_update("op-1");
+        let (request, _rx) = CheckpointRequest::sync(update);
+        
+        assert!(request.is_sync());
+        assert_eq!(request.operation.operation_id, "op-1");
+    }
+
+    #[test]
+    fn test_checkpoint_request_async() {
+        let update = create_test_update("op-1");
+        let request = CheckpointRequest::async_request(update);
+        
+        assert!(!request.is_sync());
+        assert_eq!(request.operation.operation_id, "op-1");
+    }
+
+    #[test]
+    fn test_checkpoint_request_estimated_size() {
+        let update = create_test_update("op-1");
+        let request = CheckpointRequest::async_request(update);
+        
+        let size = request.estimated_size();
+        assert!(size > 0);
+        assert!(size >= 100);
+    }
+
+    #[test]
+    fn test_checkpoint_request_estimated_size_with_result() {
+        let mut update = create_test_update("op-1");
+        update.result = Some("a".repeat(1000));
+        let request = CheckpointRequest::async_request(update);
+        
+        let size = request.estimated_size();
+        assert!(size >= 1100);
+    }
+
+    #[test]
+    fn test_create_checkpoint_queue() {
+        let (sender, _rx) = create_checkpoint_queue(100);
+        drop(sender);
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_sender_sync() {
+        let (sender, mut rx) = create_checkpoint_queue(10);
+        
+        let handle = tokio::spawn(async move {
+            if let Some(request) = rx.recv().await {
+                assert!(request.is_sync());
+                if let Some(completion) = request.completion {
+                    let _ = completion.send(Ok(()));
+                }
+            }
+        });
+
+        let update = create_test_update("op-1");
+        let result = sender.checkpoint_sync(update).await;
+        assert!(result.is_ok());
+        
+        handle.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_sender_async() {
+        let (sender, mut rx) = create_checkpoint_queue(10);
+        
+        let update = create_test_update("op-1");
+        let result = sender.checkpoint_async(update).await;
+        assert!(result.is_ok());
+        
+        let request = rx.recv().await.unwrap();
+        assert!(!request.is_sync());
+        assert_eq!(request.operation.operation_id, "op-1");
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_sender_queue_closed() {
+        let (sender, rx) = create_checkpoint_queue(10);
+        drop(rx);
+        
+        let update = create_test_update("op-1");
+        let result = sender.checkpoint_async(update).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_batcher_processes_batch() {
+        let client = Arc::new(
+            MockDurableServiceClient::new()
+                .with_checkpoint_response(Ok(CheckpointResponse {
+                    checkpoint_token: "new-token".to_string(),
+                }))
+        );
+        
+        let (sender, rx) = create_checkpoint_queue(10);
+        let checkpoint_token = Arc::new(RwLock::new("initial-token".to_string()));
+        
+        let config = CheckpointBatcherConfig {
+            max_batch_time_ms: 10,
+            ..Default::default()
+        };
+        
+        let mut batcher = CheckpointBatcher::new(
+            config,
+            rx,
+            client,
+            "arn:test".to_string(),
+            checkpoint_token.clone(),
+        );
+        
+        let update = create_test_update("op-1");
+        let (request, completion_rx) = CheckpointRequest::sync(update);
+        sender.tx.send(request).await.unwrap();
+        
+        drop(sender);
+        batcher.run().await;
+        
+        let result = completion_rx.await.unwrap();
+        assert!(result.is_ok());
+        
+        let token = checkpoint_token.read().await;
+        assert_eq!(*token, "new-token");
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_batcher_handles_error() {
+        let client = Arc::new(
+            MockDurableServiceClient::new()
+                .with_checkpoint_response(Err(DurableError::checkpoint_retriable("Test error")))
+        );
+        
+        let (sender, rx) = create_checkpoint_queue(10);
+        let checkpoint_token = Arc::new(RwLock::new("initial-token".to_string()));
+        
+        let config = CheckpointBatcherConfig {
+            max_batch_time_ms: 10,
+            ..Default::default()
+        };
+        
+        let mut batcher = CheckpointBatcher::new(
+            config,
+            rx,
+            client,
+            "arn:test".to_string(),
+            checkpoint_token.clone(),
+        );
+        
+        let update = create_test_update("op-1");
+        let (request, completion_rx) = CheckpointRequest::sync(update);
+        sender.tx.send(request).await.unwrap();
+        
+        drop(sender);
+        batcher.run().await;
+        
+        let result = completion_rx.await.unwrap();
+        assert!(result.is_err());
+        
+        let token = checkpoint_token.read().await;
+        assert_eq!(*token, "initial-token");
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_batcher_batches_multiple_requests() {
+        let client = Arc::new(
+            MockDurableServiceClient::new()
+                .with_checkpoint_response(Ok(CheckpointResponse {
+                    checkpoint_token: "new-token".to_string(),
+                }))
+        );
+        
+        let (sender, rx) = create_checkpoint_queue(10);
+        let checkpoint_token = Arc::new(RwLock::new("initial-token".to_string()));
+        
+        let config = CheckpointBatcherConfig {
+            max_batch_time_ms: 50,
+            max_batch_operations: 3,
+            ..Default::default()
+        };
+        
+        let mut batcher = CheckpointBatcher::new(
+            config,
+            rx,
+            client,
+            "arn:test".to_string(),
+            checkpoint_token.clone(),
+        );
+        
+        for i in 0..3 {
+            let update = create_test_update(&format!("op-{}", i));
+            sender.tx.send(CheckpointRequest::async_request(update)).await.unwrap();
+        }
+        
+        drop(sender);
+        batcher.run().await;
+        
+        let token = checkpoint_token.read().await;
+        assert_eq!(*token, "new-token");
+    }
+
+    // Batch ordering tests
+    #[test]
+    fn test_execution_completion_is_last() {
+        let batch = vec![
+            create_request(create_succeed_update("exec-1", OperationType::Execution)),
+            create_request(create_start_update("step-1", OperationType::Step)),
+            create_request(create_succeed_update("step-2", OperationType::Step)),
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        assert_eq!(sorted.len(), 3);
+        assert_eq!(sorted[2].operation.operation_id, "exec-1");
+        assert_eq!(sorted[2].operation.action, OperationAction::Succeed);
+        assert_eq!(sorted[2].operation.operation_type, OperationType::Execution);
+    }
+
+    #[test]
+    fn test_execution_fail_is_last() {
+        let batch = vec![
+            create_request(create_fail_update("exec-1", OperationType::Execution)),
+            create_request(create_start_update("step-1", OperationType::Step)),
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        assert_eq!(sorted.len(), 2);
+        assert_eq!(sorted[1].operation.operation_id, "exec-1");
+        assert_eq!(sorted[1].operation.action, OperationAction::Fail);
+    }
+
+    #[test]
+    fn test_child_after_parent_context_start() {
+        let mut child_update = create_start_update("child-1", OperationType::Step);
+        child_update.parent_id = Some("parent-ctx".to_string());
+
+        let batch = vec![
+            create_request(child_update),
+            create_request(create_start_update("parent-ctx", OperationType::Context)),
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        assert_eq!(sorted.len(), 2);
+        assert_eq!(sorted[0].operation.operation_id, "parent-ctx");
+        assert_eq!(sorted[0].operation.action, OperationAction::Start);
+        assert_eq!(sorted[1].operation.operation_id, "child-1");
+    }
+
+    #[test]
+    fn test_start_and_completion_same_operation() {
+        let batch = vec![
+            create_request(create_succeed_update("step-1", OperationType::Step)),
+            create_request(create_start_update("step-1", OperationType::Step)),
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        assert_eq!(sorted.len(), 2);
+        assert_eq!(sorted[0].operation.operation_id, "step-1");
+        assert_eq!(sorted[0].operation.action, OperationAction::Start);
+        assert_eq!(sorted[1].operation.operation_id, "step-1");
+        assert_eq!(sorted[1].operation.action, OperationAction::Succeed);
+    }
+
+    #[test]
+    fn test_context_start_and_completion_same_batch() {
+        let batch = vec![
+            create_request(create_succeed_update("ctx-1", OperationType::Context)),
+            create_request(create_start_update("ctx-1", OperationType::Context)),
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        assert_eq!(sorted.len(), 2);
+        assert_eq!(sorted[0].operation.operation_id, "ctx-1");
+        assert_eq!(sorted[0].operation.action, OperationAction::Start);
+        assert_eq!(sorted[1].operation.operation_id, "ctx-1");
+        assert_eq!(sorted[1].operation.action, OperationAction::Succeed);
+    }
+
+    #[test]
+    fn test_step_start_and_fail_same_batch() {
+        let batch = vec![
+            create_request(create_fail_update("step-1", OperationType::Step)),
+            create_request(create_start_update("step-1", OperationType::Step)),
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        assert_eq!(sorted.len(), 2);
+        assert_eq!(sorted[0].operation.operation_id, "step-1");
+        assert_eq!(sorted[0].operation.action, OperationAction::Start);
+        assert_eq!(sorted[1].operation.operation_id, "step-1");
+        assert_eq!(sorted[1].operation.action, OperationAction::Fail);
+    }
+
+    #[test]
+    fn test_complex_ordering_scenario() {
+        let mut child1 = create_start_update("child-1", OperationType::Step);
+        child1.parent_id = Some("parent-ctx".to_string());
+
+        let mut child2 = create_succeed_update("child-2", OperationType::Step);
+        child2.parent_id = Some("parent-ctx".to_string());
+
+        let batch = vec![
+            create_request(create_succeed_update("exec-1", OperationType::Execution)),
+            create_request(child1),
+            create_request(create_succeed_update("parent-ctx", OperationType::Context)),
+            create_request(create_start_update("parent-ctx", OperationType::Context)),
+            create_request(child2),
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        assert_eq!(sorted.len(), 5);
+
+        let parent_start_pos = sorted.iter().position(|r| 
+            r.operation.operation_id == "parent-ctx" && r.operation.action == OperationAction::Start
+        ).unwrap();
+        let parent_succeed_pos = sorted.iter().position(|r| 
+            r.operation.operation_id == "parent-ctx" && r.operation.action == OperationAction::Succeed
+        ).unwrap();
+        let child1_pos = sorted.iter().position(|r| r.operation.operation_id == "child-1").unwrap();
+        let child2_pos = sorted.iter().position(|r| r.operation.operation_id == "child-2").unwrap();
+        let exec_pos = sorted.iter().position(|r| r.operation.operation_id == "exec-1").unwrap();
+
+        assert!(parent_start_pos < parent_succeed_pos);
+        assert!(parent_start_pos < child1_pos);
+        assert!(parent_start_pos < child2_pos);
+        assert_eq!(exec_pos, 4);
+    }
+
+    #[test]
+    fn test_empty_batch() {
+        let batch: Vec<CheckpointRequest> = vec![];
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+        assert!(sorted.is_empty());
+    }
+
+    #[test]
+    fn test_single_item_batch() {
+        let batch = vec![create_request(create_start_update("step-1", OperationType::Step))];
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+        assert_eq!(sorted.len(), 1);
+        assert_eq!(sorted[0].operation.operation_id, "step-1");
+    }
+
+    #[test]
+    fn test_preserves_original_order() {
+        let batch = vec![
+            create_request(create_start_update("step-1", OperationType::Step)),
+            create_request(create_start_update("step-2", OperationType::Step)),
+            create_request(create_start_update("step-3", OperationType::Step)),
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        assert_eq!(sorted.len(), 3);
+        assert_eq!(sorted[0].operation.operation_id, "step-1");
+        assert_eq!(sorted[1].operation.operation_id, "step-2");
+        assert_eq!(sorted[2].operation.operation_id, "step-3");
+    }
+
+    #[test]
+    fn test_multiple_children_same_parent() {
+        let mut child1 = create_start_update("child-1", OperationType::Step);
+        child1.parent_id = Some("parent-ctx".to_string());
+
+        let mut child2 = create_start_update("child-2", OperationType::Step);
+        child2.parent_id = Some("parent-ctx".to_string());
+
+        let mut child3 = create_start_update("child-3", OperationType::Step);
+        child3.parent_id = Some("parent-ctx".to_string());
+
+        let batch = vec![
+            create_request(child1),
+            create_request(child2),
+            create_request(create_start_update("parent-ctx", OperationType::Context)),
+            create_request(child3),
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        assert_eq!(sorted[0].operation.operation_id, "parent-ctx");
+        
+        for i in 1..4 {
+            assert!(sorted[i].operation.parent_id.as_deref() == Some("parent-ctx"));
+        }
+    }
+
+    #[test]
+    fn test_nested_contexts() {
+        let mut parent_ctx = create_start_update("parent-ctx", OperationType::Context);
+        parent_ctx.parent_id = Some("grandparent-ctx".to_string());
+
+        let mut child = create_start_update("child-1", OperationType::Step);
+        child.parent_id = Some("parent-ctx".to_string());
+
+        let batch = vec![
+            create_request(child),
+            create_request(parent_ctx),
+            create_request(create_start_update("grandparent-ctx", OperationType::Context)),
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        let grandparent_pos = sorted.iter().position(|r| r.operation.operation_id == "grandparent-ctx").unwrap();
+        let parent_pos = sorted.iter().position(|r| r.operation.operation_id == "parent-ctx").unwrap();
+        let child_pos = sorted.iter().position(|r| r.operation.operation_id == "child-1").unwrap();
+
+        assert!(grandparent_pos < parent_pos);
+        assert!(parent_pos < child_pos);
+    }
+
+    #[test]
+    fn test_execution_start_not_affected() {
+        let batch = vec![
+            create_request(create_start_update("step-1", OperationType::Step)),
+            create_request(create_start_update("exec-1", OperationType::Execution)),
+            create_request(create_start_update("step-2", OperationType::Step)),
+        ];
+
+        let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+
+        assert_eq!(sorted.len(), 3);
+        assert_eq!(sorted[0].operation.operation_id, "step-1");
+        assert_eq!(sorted[1].operation.operation_id, "exec-1");
+        assert_eq!(sorted[2].operation.operation_id, "step-2");
+    }
+}
+
+
+#[cfg(test)]
+mod property_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
+    use async_trait::async_trait;
+    use proptest::prelude::*;
+    use crate::client::{CheckpointResponse, DurableServiceClient, GetOperationsResponse};
+
+    struct CountingMockClient {
+        checkpoint_count: Arc<AtomicUsize>,
+    }
+
+    impl CountingMockClient {
+        fn new() -> (Self, Arc<AtomicUsize>) {
+            let count = Arc::new(AtomicUsize::new(0));
+            (Self { checkpoint_count: count.clone() }, count)
+        }
+    }
+
+    #[async_trait]
+    impl DurableServiceClient for CountingMockClient {
+        async fn checkpoint(
+            &self,
+            _durable_execution_arn: &str,
+            _checkpoint_token: &str,
+            _operations: Vec<OperationUpdate>,
+        ) -> Result<CheckpointResponse, DurableError> {
+            self.checkpoint_count.fetch_add(1, AtomicOrdering::SeqCst);
+            Ok(CheckpointResponse {
+                checkpoint_token: format!("token-{}", self.checkpoint_count.load(AtomicOrdering::SeqCst)),
+            })
+        }
+
+        async fn get_operations(
+            &self,
+            _durable_execution_arn: &str,
+            _next_marker: &str,
+        ) -> Result<GetOperationsResponse, DurableError> {
+            Ok(GetOperationsResponse {
+                operations: vec![],
+                next_marker: None,
+            })
+        }
+    }
+
+    fn create_test_update_with_size(id: &str, result_size: usize) -> OperationUpdate {
+        let mut update = OperationUpdate::start(id, OperationType::Step);
+        if result_size > 0 {
+            update.result = Some("x".repeat(result_size));
+        }
+        update
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(100))]
+        
+        #[test]
+        fn prop_checkpoint_batching_respects_operation_count_limit(
+            num_requests in 1usize..20,
+            max_ops_per_batch in 1usize..10,
+        ) {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            let result: Result<(), TestCaseError> = rt.block_on(async {
+                let (client, call_count) = CountingMockClient::new();
+                let client = Arc::new(client);
+                
+                let (sender, rx) = create_checkpoint_queue(100);
+                let checkpoint_token = Arc::new(RwLock::new("initial-token".to_string()));
+                
+                let config = CheckpointBatcherConfig {
+                    max_batch_time_ms: 10,
+                    max_batch_operations: max_ops_per_batch,
+                    max_batch_size_bytes: usize::MAX,
+                };
+                
+                let mut batcher = CheckpointBatcher::new(
+                    config,
+                    rx,
+                    client,
+                    "arn:test".to_string(),
+                    checkpoint_token.clone(),
+                );
+                
+                for i in 0..num_requests {
+                    let update = create_test_update_with_size(&format!("op-{}", i), 0);
+                    sender.tx.send(CheckpointRequest::async_request(update)).await.unwrap();
+                }
+                
+                drop(sender);
+                batcher.run().await;
+                
+                let expected_max_calls = (num_requests + max_ops_per_batch - 1) / max_ops_per_batch;
+                let actual_calls = call_count.load(AtomicOrdering::SeqCst);
+                
+                if actual_calls > expected_max_calls {
+                    return Err(TestCaseError::fail(format!(
+                        "Expected at most {} API calls for {} requests with batch size {}, got {}",
+                        expected_max_calls, num_requests, max_ops_per_batch, actual_calls
+                    )));
+                }
+                
+                if actual_calls < 1 {
+                    return Err(TestCaseError::fail(format!(
+                        "Expected at least 1 API call for {} requests, got {}",
+                        num_requests, actual_calls
+                    )));
+                }
+                
+                Ok(())
+            });
+            result?;
+        }
+
+        #[test]
+        fn prop_checkpoint_batching_respects_size_limit(
+            num_requests in 1usize..10,
+            result_size in 100usize..500,
+            max_batch_size in 500usize..2000,
+        ) {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            let result: Result<(), TestCaseError> = rt.block_on(async {
+                let (client, call_count) = CountingMockClient::new();
+                let client = Arc::new(client);
+                
+                let (sender, rx) = create_checkpoint_queue(100);
+                let checkpoint_token = Arc::new(RwLock::new("initial-token".to_string()));
+                
+                let config = CheckpointBatcherConfig {
+                    max_batch_time_ms: 10,
+                    max_batch_operations: usize::MAX,
+                    max_batch_size_bytes: max_batch_size,
+                };
+                
+                let mut batcher = CheckpointBatcher::new(
+                    config,
+                    rx,
+                    client,
+                    "arn:test".to_string(),
+                    checkpoint_token.clone(),
+                );
+                
+                for i in 0..num_requests {
+                    let update = create_test_update_with_size(&format!("op-{}", i), result_size);
+                    sender.tx.send(CheckpointRequest::async_request(update)).await.unwrap();
+                }
+                
+                drop(sender);
+                batcher.run().await;
+                
+                let estimated_request_size = 100 + result_size;
+                let total_size = num_requests * estimated_request_size;
+                let expected_max_calls = (total_size + max_batch_size - 1) / max_batch_size;
+                let actual_calls = call_count.load(AtomicOrdering::SeqCst);
+                
+                if actual_calls > expected_max_calls.max(1) * 2 {
+                    return Err(TestCaseError::fail(format!(
+                        "Expected at most ~{} API calls for {} requests of size {}, got {}",
+                        expected_max_calls, num_requests, estimated_request_size, actual_calls
+                    )));
+                }
+                
+                if actual_calls < 1 {
+                    return Err(TestCaseError::fail(format!(
+                        "Expected at least 1 API call, got {}",
+                        actual_calls
+                    )));
+                }
+                
+                Ok(())
+            });
+            result?;
+        }
+
+        #[test]
+        fn prop_all_requests_are_processed(
+            num_requests in 1usize..20,
+        ) {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            let result: Result<(), TestCaseError> = rt.block_on(async {
+                let (client, _call_count) = CountingMockClient::new();
+                let client = Arc::new(client);
+                
+                let (sender, rx) = create_checkpoint_queue(100);
+                let checkpoint_token = Arc::new(RwLock::new("initial-token".to_string()));
+                
+                let config = CheckpointBatcherConfig {
+                    max_batch_time_ms: 10,
+                    max_batch_operations: 5,
+                    ..Default::default()
+                };
+                
+                let mut batcher = CheckpointBatcher::new(
+                    config,
+                    rx,
+                    client,
+                    "arn:test".to_string(),
+                    checkpoint_token.clone(),
+                );
+                
+                let mut receivers = Vec::new();
+                
+                for i in 0..num_requests {
+                    let update = create_test_update_with_size(&format!("op-{}", i), 0);
+                    let (request, rx) = CheckpointRequest::sync(update);
+                    sender.tx.send(request).await.unwrap();
+                    receivers.push(rx);
+                }
+                
+                drop(sender);
+                batcher.run().await;
+                
+                let mut success_count = 0;
+                for rx in receivers {
+                    if let Ok(result) = rx.await {
+                        if result.is_ok() {
+                            success_count += 1;
+                        }
+                    }
+                }
+                
+                if success_count != num_requests {
+                    return Err(TestCaseError::fail(format!(
+                        "Expected all {} requests to succeed, got {}",
+                        num_requests, success_count
+                    )));
+                }
+                
+                Ok(())
+            });
+            result?;
+        }
+    }
+}

@@ -113,6 +113,36 @@ let results = ctx.parallel(
 ).await?;
 ```
 
+## Promise Combinators
+
+Coordinate multiple durable operations with promise-style combinators:
+
+```rust
+// Wait for ALL operations to complete successfully
+let results = ctx.all(vec![
+    ctx.step(|_| Ok(1), None),
+    ctx.step(|_| Ok(2), None),
+]).await?;
+
+// Wait for ALL operations to settle (success or failure)
+let batch_result = ctx.all_settled(vec![
+    ctx.step(|_| Ok("success"), None),
+    ctx.step(|_| Err("failure".into()), None),
+]).await;
+
+// Return the FIRST operation to settle
+let first = ctx.race(vec![
+    ctx.step(|_| Ok("fast"), None),
+    ctx.step(|_| Ok("slow"), None),
+]).await?;
+
+// Return the FIRST operation to succeed
+let first_success = ctx.any(vec![
+    ctx.step(|_| Err("fail".into()), None),
+    ctx.step(|_| Ok("success"), None),
+]).await?;
+```
+
 ## Callbacks
 
 Wait for external systems to signal your workflow:
@@ -130,6 +160,40 @@ notify_approver(&callback.callback_id).await?;
 
 // Suspends until callback is received
 let approval = callback.result().await?;
+```
+
+## Replay-Safe Helpers
+
+Generate deterministic values that are safe for replay:
+
+```rust
+use aws_durable_execution_sdk::replay_safe::{
+    uuid_string_from_operation,
+    timestamp_from_execution,
+};
+
+// Deterministic UUID from operation ID (same inputs = same UUID)
+let operation_id = ctx.next_operation_id();
+let uuid = uuid_string_from_operation(&operation_id, 0);
+
+// Replay-safe timestamp (execution start time, not current time)
+if let Some(timestamp_ms) = timestamp_from_execution(ctx.state()) {
+    println!("Execution started at: {} ms", timestamp_ms);
+}
+```
+
+## Extended Duration Support
+
+```rust
+use aws_durable_execution_sdk::Duration;
+
+let seconds = Duration::from_seconds(30);
+let minutes = Duration::from_minutes(5);
+let hours = Duration::from_hours(2);
+let days = Duration::from_days(7);
+let weeks = Duration::from_weeks(2);      // 14 days
+let months = Duration::from_months(3);    // 90 days
+let years = Duration::from_years(1);      // 365 days
 ```
 
 ## Error Handling
@@ -151,9 +215,36 @@ if error.is_retriable() {
 }
 ```
 
+## Determinism Requirements
+
+Durable workflows must be deterministic — same input must produce the same sequence of operations. Common pitfalls:
+
+| Non-Deterministic | Solution |
+|-------------------|----------|
+| `HashMap` iteration | Use `BTreeMap` or sort keys |
+| Random numbers | Generate inside steps |
+| Current time | Use `timestamp_from_execution` |
+| UUIDs | Use `uuid_string_from_operation` |
+| Environment variables | Capture in step at workflow start |
+
+See [DETERMINISM.md](aws-durable-execution-sdk/docs/DETERMINISM.md) for detailed guidance.
+
+## Execution Limits
+
+| Limit | Value |
+|-------|-------|
+| Maximum execution duration | 1 year |
+| Maximum wait duration | 1 year |
+| Minimum wait duration | 1 second |
+| Maximum response payload | 6 MB |
+| Maximum checkpoint payload | 256 KB |
+| Maximum history size | 25,000 operations |
+
+See [LIMITS.md](aws-durable-execution-sdk/docs/LIMITS.md) for complete details.
+
 ## Examples
 
-See the `examples/` directory:
+See the `aws-durable-execution-sdk/examples/` directory:
 
 - `simple_workflow.rs` — Basic order processing with steps and waits
 - `parallel_processing.rs` — Concurrent item processing with map
@@ -170,7 +261,13 @@ cargo build --example simple_workflow
 - **DurableContext** — Main interface for all durable operations
 - **ExecutionState** — Manages checkpoints, replay logic, and operation state
 - **CheckpointBatcher** — Batches checkpoint requests for efficiency
-- **OperationIdGenerator** — Deterministic ID generation using blake2b (ensures same operation gets same ID across replays)
+- **OperationIdGenerator** — Deterministic ID generation using blake2b
+
+## Documentation
+
+- [API Documentation](aws-durable-execution-sdk/src/lib.rs) — Comprehensive rustdoc with examples
+- [Determinism Guide](aws-durable-execution-sdk/docs/DETERMINISM.md) — Writing replay-safe workflows
+- [Limits Reference](aws-durable-execution-sdk/docs/LIMITS.md) — Execution constraints
 
 ## License
 

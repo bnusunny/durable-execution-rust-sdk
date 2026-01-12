@@ -2,9 +2,104 @@
 //!
 //! This module defines a comprehensive error hierarchy for handling
 //! different failure modes in durable execution workflows.
+//!
+//! # Type Aliases
+//!
+//! This module provides semantic type aliases for common result types:
+//!
+//! - [`DurableResult<T>`] - General result type for durable operations
+//! - [`StepResult<T>`] - Result type for step operations
+//! - [`CheckpointResult<T>`] - Result type for checkpoint operations
+//!
+//! These aliases improve code readability and make function signatures
+//! more self-documenting.
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+// =============================================================================
+// Result Type Aliases
+// =============================================================================
+
+/// Result type for durable operations.
+///
+/// This is a type alias for `Result<T, DurableError>`, providing a more
+/// semantic and concise way to express the return type of durable operations.
+///
+/// # Examples
+///
+/// ```rust
+/// use aws_durable_execution_sdk::{DurableResult, DurableError};
+///
+/// fn process_data(data: &str) -> DurableResult<String> {
+///     if data.is_empty() {
+///         Err(DurableError::validation("Data cannot be empty"))
+///     } else {
+///         Ok(data.to_uppercase())
+///     }
+/// }
+/// ```
+///
+/// # Expanded Form
+///
+/// ```rust,ignore
+/// type DurableResult<T> = Result<T, DurableError>;
+/// ```
+pub type DurableResult<T> = Result<T, DurableError>;
+
+/// Result type for step operations.
+///
+/// This is a type alias for `Result<T, DurableError>`, specifically intended
+/// for step function return types. Using this alias makes it clear that a
+/// function is a step operation within a durable execution.
+///
+/// # Examples
+///
+/// ```rust
+/// use aws_durable_execution_sdk::{StepResult, DurableError};
+///
+/// fn validate_input(input: &str) -> StepResult<String> {
+///     if input.len() > 100 {
+///         Err(DurableError::validation("Input too long"))
+///     } else {
+///         Ok(input.to_string())
+///     }
+/// }
+/// ```
+///
+/// # Expanded Form
+///
+/// ```rust,ignore
+/// type StepResult<T> = Result<T, DurableError>;
+/// ```
+pub type StepResult<T> = Result<T, DurableError>;
+
+/// Result type for checkpoint operations.
+///
+/// This is a type alias for `Result<T, DurableError>`, specifically intended
+/// for checkpoint-related operations. Using this alias makes it clear that a
+/// function performs checkpointing within a durable execution.
+///
+/// # Examples
+///
+/// ```rust
+/// use aws_durable_execution_sdk::{CheckpointResult, DurableError};
+///
+/// fn save_checkpoint(data: &[u8]) -> CheckpointResult<()> {
+///     if data.len() > 1_000_000 {
+///         Err(DurableError::size_limit("Checkpoint data too large"))
+///     } else {
+///         Ok(())
+///     }
+/// }
+/// ```
+///
+/// # Expanded Form
+///
+/// ```rust,ignore
+/// type CheckpointResult<T> = Result<T, DurableError>;
+/// ```
+pub type CheckpointResult<T> = Result<T, DurableError>;
 
 /// The main error type for the AWS Durable Execution SDK.
 ///
@@ -400,27 +495,31 @@ impl DurableError {
 }
 
 /// Reason for execution termination.
+///
+/// This enum uses `#[repr(u8)]` for compact memory representation (1 byte).
+/// Explicit discriminant values ensure stability across versions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[repr(u8)]
 pub enum TerminationReason {
     /// Unhandled error in user code
     #[default]
-    UnhandledError,
+    UnhandledError = 0,
     /// Error during Lambda invocation
-    InvocationError,
+    InvocationError = 1,
     /// Explicit execution error
-    ExecutionError,
+    ExecutionError = 2,
     /// Checkpoint operation failed
-    CheckpointFailed,
+    CheckpointFailed = 3,
     /// Non-deterministic execution detected
-    NonDeterministicExecution,
+    NonDeterministicExecution = 4,
     /// Step was interrupted
-    StepInterrupted,
+    StepInterrupted = 5,
     /// Callback operation failed
-    CallbackError,
+    CallbackError = 6,
     /// Serialization/deserialization failed
-    SerializationError,
+    SerializationError = 7,
     /// Size limit exceeded (payload, response, or history)
-    SizeLimitExceeded,
+    SizeLimitExceeded = 8,
 }
 
 /// AWS error details for checkpoint failures.
@@ -781,5 +880,81 @@ mod tests {
     fn test_get_retry_after_ms_non_throttling() {
         let error = DurableError::validation("test");
         assert_eq!(error.get_retry_after_ms(), None);
+    }
+
+    // Size verification test for enum discriminant optimization
+    // Requirements: 6.7 - Verify TerminationReason is 1 byte after optimization
+
+    #[test]
+    fn test_termination_reason_size_is_one_byte() {
+        assert_eq!(
+            std::mem::size_of::<TerminationReason>(),
+            1,
+            "TerminationReason should be 1 byte with #[repr(u8)]"
+        );
+    }
+
+    // Serde compatibility tests for enum discriminant optimization
+    // Requirements: 6.6 - Verify JSON serialization uses string representations
+
+    #[test]
+    fn test_termination_reason_serde_uses_string_representation() {
+        // Verify serialization produces string values, not numeric discriminants
+        let reason = TerminationReason::UnhandledError;
+        let json = serde_json::to_string(&reason).unwrap();
+        assert_eq!(json, "\"UnhandledError\"");
+
+        let reason = TerminationReason::InvocationError;
+        let json = serde_json::to_string(&reason).unwrap();
+        assert_eq!(json, "\"InvocationError\"");
+
+        let reason = TerminationReason::ExecutionError;
+        let json = serde_json::to_string(&reason).unwrap();
+        assert_eq!(json, "\"ExecutionError\"");
+
+        let reason = TerminationReason::CheckpointFailed;
+        let json = serde_json::to_string(&reason).unwrap();
+        assert_eq!(json, "\"CheckpointFailed\"");
+
+        let reason = TerminationReason::NonDeterministicExecution;
+        let json = serde_json::to_string(&reason).unwrap();
+        assert_eq!(json, "\"NonDeterministicExecution\"");
+
+        let reason = TerminationReason::StepInterrupted;
+        let json = serde_json::to_string(&reason).unwrap();
+        assert_eq!(json, "\"StepInterrupted\"");
+
+        let reason = TerminationReason::CallbackError;
+        let json = serde_json::to_string(&reason).unwrap();
+        assert_eq!(json, "\"CallbackError\"");
+
+        let reason = TerminationReason::SerializationError;
+        let json = serde_json::to_string(&reason).unwrap();
+        assert_eq!(json, "\"SerializationError\"");
+
+        let reason = TerminationReason::SizeLimitExceeded;
+        let json = serde_json::to_string(&reason).unwrap();
+        assert_eq!(json, "\"SizeLimitExceeded\"");
+    }
+
+    #[test]
+    fn test_termination_reason_serde_round_trip() {
+        let reasons = [
+            TerminationReason::UnhandledError,
+            TerminationReason::InvocationError,
+            TerminationReason::ExecutionError,
+            TerminationReason::CheckpointFailed,
+            TerminationReason::NonDeterministicExecution,
+            TerminationReason::StepInterrupted,
+            TerminationReason::CallbackError,
+            TerminationReason::SerializationError,
+            TerminationReason::SizeLimitExceeded,
+        ];
+
+        for reason in reasons {
+            let json = serde_json::to_string(&reason).unwrap();
+            let deserialized: TerminationReason = serde_json::from_str(&json).unwrap();
+            assert_eq!(reason, deserialized, "Round-trip failed for {:?}", reason);
+        }
     }
 }

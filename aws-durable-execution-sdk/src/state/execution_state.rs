@@ -14,6 +14,7 @@ use tokio::sync::{Mutex, RwLock};
 use crate::client::SharedDurableServiceClient;
 use crate::error::{DurableError, ErrorObject};
 use crate::operation::{Operation, OperationStatus, OperationType, OperationUpdate};
+use crate::types::ExecutionArn;
 
 use super::batcher::{
     CheckpointBatcher, CheckpointBatcherConfig, CheckpointSender, create_checkpoint_queue,
@@ -254,6 +255,12 @@ impl ExecutionState {
     pub fn durable_execution_arn(&self) -> &str {
         &self.durable_execution_arn
     }
+
+    /// Returns the durable execution ARN as an `ExecutionArn` newtype.
+    #[inline]
+    pub fn durable_execution_arn_typed(&self) -> ExecutionArn {
+        ExecutionArn::from(self.durable_execution_arn.clone())
+    }
     
     /// Returns the current checkpoint token.
     pub async fn checkpoint_token(&self) -> String {
@@ -267,8 +274,19 @@ impl ExecutionState {
     }
     
     /// Returns the current replay status.
+    ///
+    /// # Memory Ordering
+    ///
+    /// Uses `Ordering::Acquire` to ensure that when we read the replay status,
+    /// we also see all the operations that were replayed before the status was
+    /// set to `New`. This creates a happens-before relationship with the
+    /// `Release` store in `track_replay`.
+    ///
+    /// Requirements: 4.2, 4.3, 4.6
     pub fn replay_status(&self) -> ReplayStatus {
-        ReplayStatus::from(self.replay_status.load(Ordering::SeqCst))
+        // Acquire ordering ensures we see all writes that happened before
+        // the corresponding Release store that set this value.
+        ReplayStatus::from(self.replay_status.load(Ordering::Acquire))
     }
     
     /// Returns true if currently in replay mode.
@@ -394,7 +412,13 @@ impl ExecutionState {
         if replayed_count >= total_count {
             let has_more = self.next_marker.read().await.is_some();
             if !has_more {
-                self.replay_status.store(ReplayStatus::New as u8, Ordering::SeqCst);
+                // Release ordering ensures that all the replay tracking writes
+                // (replayed_operations updates) are visible to any thread that
+                // subsequently reads the replay_status with Acquire ordering.
+                // This establishes a happens-before relationship.
+                //
+                // Requirements: 4.2, 4.3, 4.6
+                self.replay_status.store(ReplayStatus::New as u8, Ordering::Release);
             }
         }
     }
@@ -699,7 +723,7 @@ impl ExecutionState {
                 if let Some(op) = operations.get_mut(&update.operation_id) {
                     op.status = OperationStatus::Pending;
                     if update.result.is_some() || update.step_options.is_some() {
-                        let step_details = op.step_details.get_or_insert_with(|| crate::operation::StepDetails {
+                        let step_details = op.step_details.get_or_insert(crate::operation::StepDetails {
                             result: None,
                             attempt: None,
                             next_attempt_timestamp: None,

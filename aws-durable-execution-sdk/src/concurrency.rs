@@ -18,9 +18,17 @@ use crate::error::{DurableError, ErrorObject};
 /// This struct uses atomic counters to safely track the number of
 /// successful, failed, and completed tasks across concurrent executions.
 ///
+/// # Memory Ordering
+///
+/// The counters use `Ordering::Relaxed` for increments (only need atomicity)
+/// and `Ordering::Acquire` for loads (need to see latest writes from other threads).
+/// Note that reading multiple counters is not atomic - there may be slight
+/// inconsistencies between reads, which is acceptable for progress tracking.
+///
 /// # Requirements
 ///
 /// - 14.4: Use ExecutionCounters to track success/failure counts
+/// - 4.1, 4.6: Use appropriate memory orderings for atomic operations
 #[derive(Debug)]
 pub struct ExecutionCounters {
     /// Total number of tasks to execute
@@ -50,49 +58,107 @@ impl ExecutionCounters {
     /// Records a successful task completion.
     ///
     /// Returns the new success count.
+    ///
+    /// # Memory Ordering
+    ///
+    /// Uses `Ordering::Relaxed` for increments - we only need atomicity, not
+    /// synchronization with other data. The counters are independent values.
+    ///
+    /// Requirements: 4.1, 4.6
     pub fn complete_task(&self) -> usize {
-        self.completed_count.fetch_add(1, Ordering::SeqCst);
-        self.success_count.fetch_add(1, Ordering::SeqCst) + 1
+        // Relaxed ordering: we only need atomic increment, no synchronization
+        self.completed_count.fetch_add(1, Ordering::Relaxed);
+        self.success_count.fetch_add(1, Ordering::Relaxed) + 1
     }
 
     /// Records a failed task.
     ///
     /// Returns the new failure count.
+    ///
+    /// # Memory Ordering
+    ///
+    /// Uses `Ordering::Relaxed` for increments - we only need atomicity.
+    ///
+    /// Requirements: 4.1, 4.6
     pub fn fail_task(&self) -> usize {
-        self.completed_count.fetch_add(1, Ordering::SeqCst);
-        self.failure_count.fetch_add(1, Ordering::SeqCst) + 1
+        // Relaxed ordering: we only need atomic increment, no synchronization
+        self.completed_count.fetch_add(1, Ordering::Relaxed);
+        self.failure_count.fetch_add(1, Ordering::Relaxed) + 1
     }
 
     /// Records a suspended task.
     ///
     /// Returns the new suspended count.
+    ///
+    /// # Memory Ordering
+    ///
+    /// Uses `Ordering::Relaxed` for increments - we only need atomicity.
+    ///
+    /// Requirements: 4.1, 4.6
     pub fn suspend_task(&self) -> usize {
-        self.suspended_count.fetch_add(1, Ordering::SeqCst) + 1
+        // Relaxed ordering: we only need atomic increment, no synchronization
+        self.suspended_count.fetch_add(1, Ordering::Relaxed) + 1
     }
 
     /// Returns the total number of tasks.
+    ///
+    /// # Memory Ordering
+    ///
+    /// Uses `Ordering::Acquire` to ensure we see the latest value written
+    /// by other threads. This is important for making completion decisions.
+    ///
+    /// Requirements: 4.3, 4.6
     pub fn total_tasks(&self) -> usize {
-        self.total_tasks.load(Ordering::SeqCst)
+        // Acquire ordering: ensures we see writes from other threads
+        self.total_tasks.load(Ordering::Acquire)
     }
 
     /// Returns the current success count.
+    ///
+    /// # Memory Ordering
+    ///
+    /// Uses `Ordering::Acquire` to ensure we see the latest value.
+    ///
+    /// Requirements: 4.3, 4.6
     pub fn success_count(&self) -> usize {
-        self.success_count.load(Ordering::SeqCst)
+        // Acquire ordering: ensures we see writes from other threads
+        self.success_count.load(Ordering::Acquire)
     }
 
     /// Returns the current failure count.
+    ///
+    /// # Memory Ordering
+    ///
+    /// Uses `Ordering::Acquire` to ensure we see the latest value.
+    ///
+    /// Requirements: 4.3, 4.6
     pub fn failure_count(&self) -> usize {
-        self.failure_count.load(Ordering::SeqCst)
+        // Acquire ordering: ensures we see writes from other threads
+        self.failure_count.load(Ordering::Acquire)
     }
 
     /// Returns the current completed count (success + failure).
+    ///
+    /// # Memory Ordering
+    ///
+    /// Uses `Ordering::Acquire` to ensure we see the latest value.
+    ///
+    /// Requirements: 4.3, 4.6
     pub fn completed_count(&self) -> usize {
-        self.completed_count.load(Ordering::SeqCst)
+        // Acquire ordering: ensures we see writes from other threads
+        self.completed_count.load(Ordering::Acquire)
     }
 
     /// Returns the current suspended count.
+    ///
+    /// # Memory Ordering
+    ///
+    /// Uses `Ordering::Acquire` to ensure we see the latest value.
+    ///
+    /// Requirements: 4.3, 4.6
     pub fn suspended_count(&self) -> usize {
-        self.suspended_count.load(Ordering::SeqCst)
+        // Acquire ordering: ensures we see writes from other threads
+        self.suspended_count.load(Ordering::Acquire)
     }
 
     /// Returns the number of pending tasks (not yet completed or suspended).
@@ -864,6 +930,116 @@ mod tests {
             
             counters.complete_task();
             assert!(!counters.has_pending());
+        }
+
+        /// Test concurrent access to ExecutionCounters with optimized memory orderings.
+        /// This verifies that the Relaxed/Acquire orderings work correctly under concurrent access.
+        ///
+        /// Requirements: 4.7
+        #[test]
+        fn test_concurrent_counter_updates() {
+            use std::sync::Arc;
+            use std::thread;
+
+            let counters = Arc::new(ExecutionCounters::new(1000));
+            let mut handles = vec![];
+
+            // Spawn threads that concurrently complete tasks
+            for _ in 0..10 {
+                let counters_clone = counters.clone();
+                handles.push(thread::spawn(move || {
+                    for _ in 0..50 {
+                        counters_clone.complete_task();
+                    }
+                }));
+            }
+
+            // Spawn threads that concurrently fail tasks
+            for _ in 0..5 {
+                let counters_clone = counters.clone();
+                handles.push(thread::spawn(move || {
+                    for _ in 0..50 {
+                        counters_clone.fail_task();
+                    }
+                }));
+            }
+
+            // Spawn threads that concurrently suspend tasks
+            for _ in 0..5 {
+                let counters_clone = counters.clone();
+                handles.push(thread::spawn(move || {
+                    for _ in 0..50 {
+                        counters_clone.suspend_task();
+                    }
+                }));
+            }
+
+            // Wait for all threads to complete
+            for handle in handles {
+                handle.join().unwrap();
+            }
+
+            // Verify final counts
+            // 10 threads * 50 = 500 successes
+            // 5 threads * 50 = 250 failures
+            // 5 threads * 50 = 250 suspends
+            assert_eq!(counters.success_count(), 500);
+            assert_eq!(counters.failure_count(), 250);
+            assert_eq!(counters.suspended_count(), 250);
+            // completed_count = successes + failures = 750
+            assert_eq!(counters.completed_count(), 750);
+        }
+
+        /// Test that concurrent reads and writes don't cause data races.
+        /// This stress test verifies the atomic ordering optimizations are safe.
+        ///
+        /// Requirements: 4.7
+        #[test]
+        fn test_concurrent_read_write_stress() {
+            use std::sync::Arc;
+            use std::thread;
+
+            let counters = Arc::new(ExecutionCounters::new(10000));
+            let mut handles = vec![];
+
+            // Writer threads
+            for _ in 0..5 {
+                let counters_clone = counters.clone();
+                handles.push(thread::spawn(move || {
+                    for _ in 0..200 {
+                        counters_clone.complete_task();
+                    }
+                }));
+            }
+
+            // Reader threads that continuously check counts
+            for _ in 0..5 {
+                let counters_clone = counters.clone();
+                handles.push(thread::spawn(move || {
+                    let mut last_success = 0;
+                    for _ in 0..1000 {
+                        let current_success = counters_clone.success_count();
+                        // Success count should be monotonically increasing
+                        assert!(current_success >= last_success, 
+                            "Success count decreased from {} to {}", last_success, current_success);
+                        last_success = current_success;
+                        
+                        // completed_count should always be >= success_count
+                        let completed = counters_clone.completed_count();
+                        assert!(completed >= current_success,
+                            "Completed {} should be >= success {}", completed, current_success);
+                    }
+                }));
+            }
+
+            // Wait for all threads
+            for handle in handles {
+                handle.join().unwrap();
+            }
+
+            // Final verification
+            assert_eq!(counters.success_count(), 1000); // 5 threads * 200
+            assert_eq!(counters.completed_count(), 1000);
         }
     }
 

@@ -9,10 +9,11 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::config::{StepConfig, StepSemantics};
 use crate::context::{Logger, LogInfo, OperationIdentifier};
-use crate::error::{DurableError, ErrorObject, TerminationReason};
+use crate::error::{DurableError, ErrorObject, StepResult, TerminationReason};
 use crate::operation::{OperationType, OperationUpdate};
 use crate::serdes::{JsonSerDes, SerDes, SerDesContext};
 use crate::state::{CheckpointedResult, ExecutionState};
+use crate::traits::{DurableValue, StepFn};
 
 /// Context provided to step functions during execution.
 ///
@@ -134,6 +135,7 @@ impl StepContext {
 ///
 /// # Requirements
 ///
+/// - 2.3: WHEN defining public APIs, THE SDK SHALL use trait aliases instead of repeated bound combinations
 /// - 3.7: READY status resume without re-checkpointing START
 /// - 4.1: AT_MOST_ONCE_PER_RETRY semantics checkpoint before execution
 /// - 4.2: AT_LEAST_ONCE_PER_RETRY semantics checkpoint after execution
@@ -141,16 +143,17 @@ impl StepContext {
 /// - 4.4: Support custom SerDes for result serialization
 /// - 4.5: Checkpoint serialized result on success
 /// - 4.6: Checkpoint error after all retries exhausted
+/// - 5.2: THE SDK SHALL provide a `StepResult<T>` type alias for step operation results
 pub async fn step_handler<T, F>(
     func: F,
     state: &Arc<ExecutionState>,
     op_id: &OperationIdentifier,
     config: &StepConfig,
     logger: &Arc<dyn Logger>,
-) -> Result<T, DurableError>
+) -> StepResult<T>
 where
-    T: Serialize + DeserializeOwned + Send,
-    F: FnOnce(StepContext) -> Result<T, Box<dyn std::error::Error + Send + Sync>> + Send,
+    T: DurableValue,
+    F: StepFn<T>,
 {
     let mut log_info = LogInfo::new(state.durable_execution_arn())
         .with_operation_id(&op_id.operation_id);
@@ -211,7 +214,7 @@ async fn handle_replay<T>(
     state: &Arc<ExecutionState>,
     op_id: &OperationIdentifier,
     logger: &Arc<dyn Logger>,
-) -> Result<Option<T>, DurableError>
+) -> StepResult<Option<T>>
 where
     T: Serialize + DeserializeOwned,
 {
@@ -339,10 +342,10 @@ async fn execute_at_most_once<T, F>(
     config: &StepConfig,
     logger: &Arc<dyn Logger>,
     skip_start_checkpoint: bool,
-) -> Result<T, DurableError>
+) -> StepResult<T>
 where
-    T: Serialize + DeserializeOwned + Send,
-    F: FnOnce(StepContext) -> Result<T, Box<dyn std::error::Error + Send + Sync>> + Send,
+    T: DurableValue,
+    F: StepFn<T>,
 {
     let mut log_info = LogInfo::new(state.durable_execution_arn())
         .with_operation_id(&op_id.operation_id);
@@ -405,10 +408,10 @@ async fn execute_at_least_once<T, F>(
     serdes_ctx: &SerDesContext,
     config: &StepConfig,
     logger: &Arc<dyn Logger>,
-) -> Result<T, DurableError>
+) -> StepResult<T>
 where
-    T: Serialize + DeserializeOwned + Send,
-    F: FnOnce(StepContext) -> Result<T, Box<dyn std::error::Error + Send + Sync>> + Send,
+    T: DurableValue,
+    F: StepFn<T>,
 {
     let mut log_info = LogInfo::new(state.durable_execution_arn())
         .with_operation_id(&op_id.operation_id);

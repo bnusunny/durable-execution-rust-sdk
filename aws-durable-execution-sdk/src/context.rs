@@ -8,7 +8,11 @@ use std::sync::Arc;
 
 use blake2::{Blake2b512, Digest};
 
+use crate::error::DurableResult;
+use crate::sealed::Sealed;
 use crate::state::ExecutionState;
+use crate::traits::{DurableValue, StepFn};
+use crate::types::OperationId;
 
 /// Identifies an operation within a durable execution.
 ///
@@ -61,6 +65,18 @@ impl OperationIdentifier {
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
+    }
+
+    /// Returns the operation ID as an `OperationId` newtype.
+    #[inline]
+    pub fn operation_id_typed(&self) -> OperationId {
+        OperationId::from(self.operation_id.clone())
+    }
+
+    /// Returns the parent ID as an `OperationId` newtype, if present.
+    #[inline]
+    pub fn parent_id_typed(&self) -> Option<OperationId> {
+        self.parent_id.as_ref().map(|id| OperationId::from(id.clone()))
     }
 }
 
@@ -123,8 +139,20 @@ impl OperationIdGenerator {
     /// # Returns
     ///
     /// A unique, deterministic operation ID string.
+    ///
+    /// # Memory Ordering
+    ///
+    /// Uses `Ordering::Relaxed` because the step counter only needs to provide
+    /// unique values - there's no synchronization requirement with other data.
+    /// Each call gets a unique counter value, and the hash function ensures
+    /// deterministic ID generation regardless of ordering between threads.
+    ///
+    /// Requirements: 4.1, 4.6
     pub fn next_id(&self) -> String {
-        let counter = self.step_counter.fetch_add(1, Ordering::SeqCst);
+        // Relaxed ordering is sufficient: we only need uniqueness, not synchronization.
+        // The counter value is combined with base_id in a hash, so the only requirement
+        // is that each call gets a different counter value, which fetch_add guarantees.
+        let counter = self.step_counter.fetch_add(1, Ordering::Relaxed);
         generate_operation_id(&self.base_id, counter)
     }
 
@@ -145,8 +173,19 @@ impl OperationIdGenerator {
     }
 
     /// Returns the current counter value without incrementing.
+    ///
+    /// # Memory Ordering
+    ///
+    /// Uses `Ordering::Relaxed` because this is an informational read that doesn't
+    /// need to synchronize with other operations. The value may be slightly stale
+    /// in concurrent scenarios, but this is acceptable for debugging/monitoring use.
+    ///
+    /// Requirements: 4.1, 4.6
     pub fn current_counter(&self) -> u64 {
-        self.step_counter.load(Ordering::SeqCst)
+        // Relaxed ordering is sufficient: this is an informational read with no
+        // synchronization requirements. Callers should not rely on this value
+        // for correctness in concurrent scenarios.
+        self.step_counter.load(Ordering::Relaxed)
     }
 
     /// Returns the base ID used for generation.
@@ -171,7 +210,10 @@ impl Clone for OperationIdGenerator {
     fn clone(&self) -> Self {
         Self {
             base_id: self.base_id.clone(),
-            step_counter: AtomicU64::new(self.step_counter.load(Ordering::SeqCst)),
+            // Relaxed ordering is sufficient: we're creating a snapshot of the counter
+            // for a new generator. The clone doesn't need to synchronize with the
+            // original - it just needs a reasonable starting point.
+            step_counter: AtomicU64::new(self.step_counter.load(Ordering::Relaxed)),
         }
     }
 }
@@ -200,7 +242,20 @@ pub fn generate_operation_id(base_id: &str, counter: u64) -> String {
 ///
 /// This trait is compatible with the `tracing` crate and allows
 /// custom logging implementations.
-pub trait Logger: Send + Sync {
+///
+/// # Sealed Trait
+///
+/// This trait is sealed and cannot be implemented outside of this crate.
+/// This allows the SDK maintainers to evolve the logging interface without
+/// breaking external code. If you need custom logging behavior, use the
+/// provided factory functions or wrap one of the existing implementations.
+///
+/// # Requirements
+///
+/// - 3.1: THE SDK SHALL implement the sealed trait pattern for the `Logger` trait
+/// - 3.5: THE SDK SHALL document that these traits are sealed and cannot be implemented externally
+#[allow(private_bounds)]
+pub trait Logger: Sealed + Send + Sync {
     /// Logs a debug message.
     fn debug(&self, message: &str, info: &LogInfo);
     /// Logs an info message.
@@ -298,6 +353,9 @@ impl LogInfo {
 #[derive(Debug, Clone, Default)]
 pub struct TracingLogger;
 
+// Implement Sealed for TracingLogger to allow it to implement Logger
+impl Sealed for TracingLogger {}
+
 impl Logger for TracingLogger {
     fn debug(&self, message: &str, info: &LogInfo) {
         tracing::debug!(
@@ -354,12 +412,13 @@ impl Logger for TracingLogger {
 ///
 /// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
 /// - 16.7: THE Logging_System SHALL allow users to configure replay logging behavior
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ReplayLoggingConfig {
     /// Suppress all logs during replay (default).
     ///
     /// When in replay mode, no log messages will be emitted. This is useful
     /// to reduce noise in logs when replaying previously executed operations.
+    #[default]
     SuppressAll,
     
     /// Allow all logs during replay.
@@ -379,12 +438,6 @@ pub enum ReplayLoggingConfig {
     /// Error and warning-level messages will be emitted during replay.
     /// Debug and info messages will be suppressed.
     WarningsAndErrors,
-}
-
-impl Default for ReplayLoggingConfig {
-    fn default() -> Self {
-        Self::SuppressAll
-    }
 }
 
 /// A logger wrapper that can suppress logs during replay based on configuration.
@@ -422,6 +475,9 @@ pub struct ReplayAwareLogger {
     /// Configuration for replay logging behavior
     config: ReplayLoggingConfig,
 }
+
+// Implement Sealed for ReplayAwareLogger to allow it to implement Logger
+impl Sealed for ReplayAwareLogger {}
 
 impl ReplayAwareLogger {
     /// Creates a new `ReplayAwareLogger` with the specified configuration.
@@ -534,6 +590,188 @@ impl Logger for ReplayAwareLogger {
             self.inner.error(message, info);
         }
     }
+}
+
+/// A custom logger that delegates to user-provided closures.
+///
+/// This struct allows users to provide custom logging behavior without
+/// implementing the sealed `Logger` trait directly. Each log level can
+/// have its own closure for handling log messages.
+///
+/// # Example
+///
+/// ```rust
+/// use aws_durable_execution_sdk::context::{custom_logger, LogInfo};
+/// use std::sync::Arc;
+///
+/// // Create a custom logger that prints to stdout
+/// let logger = custom_logger(
+///     |msg, info| println!("[DEBUG] {}: {:?}", msg, info),
+///     |msg, info| println!("[INFO] {}: {:?}", msg, info),
+///     |msg, info| println!("[WARN] {}: {:?}", msg, info),
+///     |msg, info| println!("[ERROR] {}: {:?}", msg, info),
+/// );
+/// ```
+///
+/// # Requirements
+///
+/// - 3.6: THE SDK SHALL provide factory functions or builders for users who need custom behavior
+pub struct CustomLogger<D, I, W, E>
+where
+    D: Fn(&str, &LogInfo) + Send + Sync,
+    I: Fn(&str, &LogInfo) + Send + Sync,
+    W: Fn(&str, &LogInfo) + Send + Sync,
+    E: Fn(&str, &LogInfo) + Send + Sync,
+{
+    debug_fn: D,
+    info_fn: I,
+    warn_fn: W,
+    error_fn: E,
+}
+
+// Implement Sealed for CustomLogger to allow it to implement Logger
+impl<D, I, W, E> Sealed for CustomLogger<D, I, W, E>
+where
+    D: Fn(&str, &LogInfo) + Send + Sync,
+    I: Fn(&str, &LogInfo) + Send + Sync,
+    W: Fn(&str, &LogInfo) + Send + Sync,
+    E: Fn(&str, &LogInfo) + Send + Sync,
+{
+}
+
+impl<D, I, W, E> Logger for CustomLogger<D, I, W, E>
+where
+    D: Fn(&str, &LogInfo) + Send + Sync,
+    I: Fn(&str, &LogInfo) + Send + Sync,
+    W: Fn(&str, &LogInfo) + Send + Sync,
+    E: Fn(&str, &LogInfo) + Send + Sync,
+{
+    fn debug(&self, message: &str, info: &LogInfo) {
+        (self.debug_fn)(message, info);
+    }
+
+    fn info(&self, message: &str, info: &LogInfo) {
+        (self.info_fn)(message, info);
+    }
+
+    fn warn(&self, message: &str, info: &LogInfo) {
+        (self.warn_fn)(message, info);
+    }
+
+    fn error(&self, message: &str, info: &LogInfo) {
+        (self.error_fn)(message, info);
+    }
+}
+
+impl<D, I, W, E> std::fmt::Debug for CustomLogger<D, I, W, E>
+where
+    D: Fn(&str, &LogInfo) + Send + Sync,
+    I: Fn(&str, &LogInfo) + Send + Sync,
+    W: Fn(&str, &LogInfo) + Send + Sync,
+    E: Fn(&str, &LogInfo) + Send + Sync,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CustomLogger").finish()
+    }
+}
+
+/// Creates a custom logger with user-provided closures for each log level.
+///
+/// This factory function allows users to create custom logging behavior without
+/// implementing the sealed `Logger` trait directly. Each log level has its own
+/// closure that receives the log message and context information.
+///
+/// # Arguments
+///
+/// * `debug_fn` - Closure called for debug-level messages
+/// * `info_fn` - Closure called for info-level messages
+/// * `warn_fn` - Closure called for warning-level messages
+/// * `error_fn` - Closure called for error-level messages
+///
+/// # Example
+///
+/// ```rust
+/// use aws_durable_execution_sdk::context::{custom_logger, LogInfo};
+/// use std::sync::Arc;
+///
+/// // Create a custom logger that prints to stdout
+/// let logger = custom_logger(
+///     |msg, info| println!("[DEBUG] {}: {:?}", msg, info),
+///     |msg, info| println!("[INFO] {}: {:?}", msg, info),
+///     |msg, info| println!("[WARN] {}: {:?}", msg, info),
+///     |msg, info| println!("[ERROR] {}: {:?}", msg, info),
+/// );
+///
+/// // Use with Arc for sharing across contexts
+/// let shared_logger = Arc::new(logger);
+/// ```
+///
+/// # Requirements
+///
+/// - 3.6: THE SDK SHALL provide factory functions or builders for users who need custom behavior
+pub fn custom_logger<D, I, W, E>(
+    debug_fn: D,
+    info_fn: I,
+    warn_fn: W,
+    error_fn: E,
+) -> CustomLogger<D, I, W, E>
+where
+    D: Fn(&str, &LogInfo) + Send + Sync,
+    I: Fn(&str, &LogInfo) + Send + Sync,
+    W: Fn(&str, &LogInfo) + Send + Sync,
+    E: Fn(&str, &LogInfo) + Send + Sync,
+{
+    CustomLogger {
+        debug_fn,
+        info_fn,
+        warn_fn,
+        error_fn,
+    }
+}
+
+/// Creates a simple custom logger that uses a single closure for all log levels.
+///
+/// This is a convenience function for cases where you want the same handling
+/// for all log levels. The closure receives the log level as a string, the
+/// message, and the log info.
+///
+/// # Arguments
+///
+/// * `log_fn` - Closure called for all log messages. Receives (level, message, info).
+///
+/// # Example
+///
+/// ```rust
+/// use aws_durable_execution_sdk::context::{simple_custom_logger, LogInfo};
+/// use std::sync::Arc;
+///
+/// // Create a simple logger that prints all messages with their level
+/// let logger = simple_custom_logger(|level, msg, info| {
+///     println!("[{}] {}: {:?}", level, msg, info);
+/// });
+///
+/// // Use with Arc for sharing across contexts
+/// let shared_logger = Arc::new(logger);
+/// ```
+///
+/// # Requirements
+///
+/// - 3.6: THE SDK SHALL provide factory functions or builders for users who need custom behavior
+pub fn simple_custom_logger<F>(log_fn: F) -> impl Logger
+where
+    F: Fn(&str, &str, &LogInfo) + Send + Sync + Clone + 'static,
+{
+    let debug_fn = log_fn.clone();
+    let info_fn = log_fn.clone();
+    let warn_fn = log_fn.clone();
+    let error_fn = log_fn;
+
+    custom_logger(
+        move |msg, info| debug_fn("DEBUG", msg, info),
+        move |msg, info| info_fn("INFO", msg, info),
+        move |msg, info| warn_fn("WARN", msg, info),
+        move |msg, info| error_fn("ERROR", msg, info),
+    )
 }
 
 /// The main context for durable execution operations.
@@ -797,7 +1035,8 @@ impl DurableContext {
     ///
     /// - 1.11: THE DurableContext SHALL provide access to the original user input from the EXECUTION operation
     /// - 19.2: THE EXECUTION_Operation SHALL provide access to original user input from ExecutionDetails.InputPayload
-    pub fn get_original_input<T>(&self) -> Result<T, crate::error::DurableError>
+    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
+    pub fn get_original_input<T>(&self) -> DurableResult<T>
     where
         T: serde::de::DeserializeOwned,
     {
@@ -871,7 +1110,8 @@ impl DurableContext {
     ///
     /// - 19.3: THE EXECUTION_Operation SHALL support completing execution via SUCCEED action with result
     /// - 19.5: WHEN execution result exceeds response size limits, THE EXECUTION_Operation SHALL checkpoint the result and return empty Result field
-    pub async fn complete_execution_success<T>(&self, result: &T) -> Result<(), crate::error::DurableError>
+    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
+    pub async fn complete_execution_success<T>(&self, result: &T) -> DurableResult<()>
     where
         T: serde::Serialize,
     {
@@ -915,7 +1155,8 @@ impl DurableContext {
     /// # Requirements
     ///
     /// - 19.4: THE EXECUTION_Operation SHALL support completing execution via FAIL action with error
-    pub async fn complete_execution_failure(&self, error: crate::error::ErrorObject) -> Result<(), crate::error::DurableError> {
+    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
+    pub async fn complete_execution_failure(&self, error: crate::error::ErrorObject) -> DurableResult<()> {
         self.state.complete_execution_failure(error).await
     }
     
@@ -957,7 +1198,8 @@ impl DurableContext {
     /// # Requirements
     ///
     /// - 19.5: WHEN execution result exceeds response size limits, THE EXECUTION_Operation SHALL checkpoint the result and return empty Result field
-    pub async fn complete_execution_if_large<T>(&self, result: &T) -> Result<bool, crate::error::DurableError>
+    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
+    pub async fn complete_execution_if_large<T>(&self, result: &T) -> DurableResult<bool>
     where
         T: serde::Serialize,
     {
@@ -999,14 +1241,16 @@ impl DurableContext {
     /// # Requirements
     ///
     /// - 1.1: THE DurableContext SHALL provide a `step` method that executes a closure and checkpoints the result
+    /// - 2.3: WHEN defining public APIs, THE SDK SHALL use trait aliases instead of repeated bound combinations
+    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn step<T, F>(
         &self,
         func: F,
         config: Option<crate::config::StepConfig>,
-    ) -> Result<T, crate::error::DurableError>
+    ) -> DurableResult<T>
     where
-        T: serde::Serialize + serde::de::DeserializeOwned + Send,
-        F: FnOnce(crate::handlers::StepContext) -> Result<T, Box<dyn std::error::Error + Send + Sync>> + Send,
+        T: DurableValue,
+        F: StepFn<T>,
     {
         let op_id = self.next_operation_identifier(None);
         let config = config.unwrap_or_default();
@@ -1044,15 +1288,20 @@ impl DurableContext {
     ///     Ok(42)
     /// }, None).await?;
     /// ```
+    ///
+    /// # Requirements
+    ///
+    /// - 2.3: WHEN defining public APIs, THE SDK SHALL use trait aliases instead of repeated bound combinations
+    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn step_named<T, F>(
         &self,
         name: &str,
         func: F,
         config: Option<crate::config::StepConfig>,
-    ) -> Result<T, crate::error::DurableError>
+    ) -> DurableResult<T>
     where
-        T: serde::Serialize + serde::de::DeserializeOwned + Send,
-        F: FnOnce(crate::handlers::StepContext) -> Result<T, Box<dyn std::error::Error + Send + Sync>> + Send,
+        T: DurableValue,
+        F: StepFn<T>,
     {
         let op_id = self.next_operation_identifier(Some(name.to_string()));
         let config = config.unwrap_or_default();
@@ -1101,11 +1350,12 @@ impl DurableContext {
     /// # Requirements
     ///
     /// - 1.2: THE DurableContext SHALL provide a `wait` method that pauses execution for a specified Duration
+    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn wait(
         &self,
         duration: crate::duration::Duration,
         name: Option<&str>,
-    ) -> Result<(), crate::error::DurableError> {
+    ) -> DurableResult<()> {
         let op_id = self.next_operation_identifier(name.map(|s| s.to_string()));
         
         let result = crate::handlers::wait_handler(
@@ -1153,10 +1403,11 @@ impl DurableContext {
     /// # Requirements
     ///
     /// - 5.5: THE Wait_Operation SHALL support cancellation of active waits via CANCEL action
+    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn cancel_wait(
         &self,
         operation_id: &str,
-    ) -> Result<(), crate::error::DurableError> {
+    ) -> DurableResult<()> {
         crate::handlers::wait_cancel_handler(
             &self.state,
             operation_id,
@@ -1193,10 +1444,11 @@ impl DurableContext {
     /// # Requirements
     ///
     /// - 1.3: THE DurableContext SHALL provide a `create_callback` method that returns a Callback with a unique callback_id
+    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn create_callback<T>(
         &self,
         config: Option<crate::config::CallbackConfig>,
-    ) -> Result<crate::handlers::Callback<T>, crate::error::DurableError>
+    ) -> DurableResult<crate::handlers::Callback<T>>
     where
         T: serde::Serialize + serde::de::DeserializeOwned,
     {
@@ -1221,11 +1473,15 @@ impl DurableContext {
     /// Creates a named callback and returns a handle to wait for the result.
     ///
     /// Same as `create_callback`, but allows specifying a human-readable name.
+    ///
+    /// # Requirements
+    ///
+    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn create_callback_named<T>(
         &self,
         name: &str,
         config: Option<crate::config::CallbackConfig>,
-    ) -> Result<crate::handlers::Callback<T>, crate::error::DurableError>
+    ) -> DurableResult<crate::handlers::Callback<T>>
     where
         T: serde::Serialize + serde::de::DeserializeOwned,
     {
@@ -1276,12 +1532,13 @@ impl DurableContext {
     /// # Requirements
     ///
     /// - 1.4: THE DurableContext SHALL provide an `invoke` method that calls other durable functions
+    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn invoke<P, R>(
         &self,
         function_name: &str,
         payload: P,
         config: Option<crate::config::InvokeConfig<P, R>>,
-    ) -> Result<R, crate::error::DurableError>
+    ) -> DurableResult<R>
     where
         P: serde::Serialize + serde::de::DeserializeOwned + Send,
         R: serde::Serialize + serde::de::DeserializeOwned + Send,
@@ -1339,17 +1596,18 @@ impl DurableContext {
     /// # Requirements
     ///
     /// - 1.5: THE DurableContext SHALL provide a `map` method that processes a collection in parallel with configurable concurrency
+    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn map<T, U, F, Fut>(
         &self,
         items: Vec<T>,
         func: F,
         config: Option<crate::config::MapConfig>,
-    ) -> Result<crate::concurrency::BatchResult<U>, crate::error::DurableError>
+    ) -> DurableResult<crate::concurrency::BatchResult<U>>
     where
         T: serde::Serialize + serde::de::DeserializeOwned + Send + Sync + Clone + 'static,
         U: serde::Serialize + serde::de::DeserializeOwned + Send + 'static,
         F: Fn(DurableContext, T, usize) -> Fut + Send + Sync + Clone + 'static,
-        Fut: std::future::Future<Output = Result<U, crate::error::DurableError>> + Send + 'static,
+        Fut: std::future::Future<Output = DurableResult<U>> + Send + 'static,
     {
         let op_id = self.next_operation_identifier(Some("map".to_string()));
         let config = config.unwrap_or_default();
@@ -1402,15 +1660,16 @@ impl DurableContext {
     /// # Requirements
     ///
     /// - 1.6: THE DurableContext SHALL provide a `parallel` method that executes multiple closures concurrently
+    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn parallel<T, F, Fut>(
         &self,
         branches: Vec<F>,
         config: Option<crate::config::ParallelConfig>,
-    ) -> Result<crate::concurrency::BatchResult<T>, crate::error::DurableError>
+    ) -> DurableResult<crate::concurrency::BatchResult<T>>
     where
         T: serde::Serialize + serde::de::DeserializeOwned + Send + 'static,
         F: FnOnce(DurableContext) -> Fut + Send + 'static,
-        Fut: std::future::Future<Output = Result<T, crate::error::DurableError>> + Send + 'static,
+        Fut: std::future::Future<Output = DurableResult<T>> + Send + 'static,
     {
         let op_id = self.next_operation_identifier(Some("parallel".to_string()));
         let config = config.unwrap_or_default();
@@ -1459,15 +1718,16 @@ impl DurableContext {
     /// # Requirements
     ///
     /// - 1.7: THE DurableContext SHALL provide a `run_in_child_context` method that creates isolated nested workflows
+    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn run_in_child_context<T, F, Fut>(
         &self,
         func: F,
         config: Option<crate::config::ChildConfig>,
-    ) -> Result<T, crate::error::DurableError>
+    ) -> DurableResult<T>
     where
         T: serde::Serialize + serde::de::DeserializeOwned + Send,
         F: FnOnce(DurableContext) -> Fut + Send,
-        Fut: std::future::Future<Output = Result<T, crate::error::DurableError>> + Send,
+        Fut: std::future::Future<Output = DurableResult<T>> + Send,
     {
         let op_id = self.next_operation_identifier(Some("child_context".to_string()));
         let config = config.unwrap_or_default();
@@ -1492,16 +1752,20 @@ impl DurableContext {
     /// Executes a named function in a child context.
     ///
     /// Same as `run_in_child_context`, but allows specifying a human-readable name.
+    ///
+    /// # Requirements
+    ///
+    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn run_in_child_context_named<T, F, Fut>(
         &self,
         name: &str,
         func: F,
         config: Option<crate::config::ChildConfig>,
-    ) -> Result<T, crate::error::DurableError>
+    ) -> DurableResult<T>
     where
         T: serde::Serialize + serde::de::DeserializeOwned + Send,
         F: FnOnce(DurableContext) -> Fut + Send,
-        Fut: std::future::Future<Output = Result<T, crate::error::DurableError>> + Send,
+        Fut: std::future::Future<Output = DurableResult<T>> + Send,
     {
         let op_id = self.next_operation_identifier(Some(name.to_string()));
         let config = config.unwrap_or_default();
@@ -1571,11 +1835,12 @@ impl DurableContext {
     ///
     /// - 1.8: THE DurableContext SHALL provide a `wait_for_condition` method that polls until a condition is met
     /// - 4.9: THE Step_Operation SHALL support RETRY action with Payload for wait-for-condition pattern
+    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn wait_for_condition<T, S, F>(
         &self,
         check: F,
         config: WaitForConditionConfig<S>,
-    ) -> Result<T, crate::error::DurableError>
+    ) -> DurableResult<T>
     where
         T: serde::Serialize + serde::de::DeserializeOwned + Send,
         S: serde::Serialize + serde::de::DeserializeOwned + Clone + Send + Sync,
@@ -1633,11 +1898,12 @@ impl DurableContext {
     /// # Requirements
     ///
     /// - 1.9: THE DurableContext SHALL provide a `wait_for_callback` method that combines callback creation with a submitter function
+    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn wait_for_callback<T, F, Fut>(
         &self,
         submitter: F,
         config: Option<crate::config::CallbackConfig>,
-    ) -> Result<T, crate::error::DurableError>
+    ) -> DurableResult<T>
     where
         T: serde::Serialize + serde::de::DeserializeOwned + Send + Sync,
         F: FnOnce(String) -> Fut + Send,
@@ -1701,13 +1967,14 @@ impl DurableContext {
     ///
     /// - 20.1: Wait for all promises to complete successfully, return error on first failure
     /// - 20.5: Implement within a STEP operation for durability
+    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn all<T, Fut>(
         &self,
         futures: Vec<Fut>,
-    ) -> Result<Vec<T>, crate::error::DurableError>
+    ) -> DurableResult<Vec<T>>
     where
         T: serde::Serialize + serde::de::DeserializeOwned + Send + Clone + 'static,
-        Fut: std::future::Future<Output = Result<T, crate::error::DurableError>> + Send + 'static,
+        Fut: std::future::Future<Output = DurableResult<T>> + Send + 'static,
     {
         let op_id = self.next_operation_identifier(Some("all".to_string()));
         
@@ -1755,13 +2022,14 @@ impl DurableContext {
     ///
     /// - 20.2: Wait for all promises to settle, return BatchResult with all outcomes
     /// - 20.5: Implement within a STEP operation for durability
+    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn all_settled<T, Fut>(
         &self,
         futures: Vec<Fut>,
-    ) -> Result<crate::concurrency::BatchResult<T>, crate::error::DurableError>
+    ) -> DurableResult<crate::concurrency::BatchResult<T>>
     where
         T: serde::Serialize + serde::de::DeserializeOwned + Send + Clone + 'static,
-        Fut: std::future::Future<Output = Result<T, crate::error::DurableError>> + Send + 'static,
+        Fut: std::future::Future<Output = DurableResult<T>> + Send + 'static,
     {
         let op_id = self.next_operation_identifier(Some("all_settled".to_string()));
         
@@ -1807,13 +2075,14 @@ impl DurableContext {
     ///
     /// - 20.3: Return result of first promise to settle
     /// - 20.5: Implement within a STEP operation for durability
+    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn race<T, Fut>(
         &self,
         futures: Vec<Fut>,
-    ) -> Result<T, crate::error::DurableError>
+    ) -> DurableResult<T>
     where
         T: serde::Serialize + serde::de::DeserializeOwned + Send + Clone + 'static,
-        Fut: std::future::Future<Output = Result<T, crate::error::DurableError>> + Send + 'static,
+        Fut: std::future::Future<Output = DurableResult<T>> + Send + 'static,
     {
         let op_id = self.next_operation_identifier(Some("race".to_string()));
         
@@ -1861,13 +2130,14 @@ impl DurableContext {
     ///
     /// - 20.4: Return result of first promise to succeed, return error only if all fail
     /// - 20.5: Implement within a STEP operation for durability
+    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn any<T, Fut>(
         &self,
         futures: Vec<Fut>,
-    ) -> Result<T, crate::error::DurableError>
+    ) -> DurableResult<T>
     where
         T: serde::Serialize + serde::de::DeserializeOwned + Send + Clone + 'static,
-        Fut: std::future::Future<Output = Result<T, crate::error::DurableError>> + Send + 'static,
+        Fut: std::future::Future<Output = DurableResult<T>> + Send + 'static,
     {
         let op_id = self.next_operation_identifier(Some("any".to_string()));
         
@@ -2351,37 +2621,32 @@ mod durable_context_tests {
     fn test_replay_aware_logger_suppress_all() {
         use std::sync::atomic::{AtomicUsize, Ordering};
         
-        // Create a test logger that counts calls
-        struct CountingLogger {
-            debug_count: AtomicUsize,
-            info_count: AtomicUsize,
-            warn_count: AtomicUsize,
-            error_count: AtomicUsize,
-        }
+        // Create counters for each log level
+        let debug_count = Arc::new(AtomicUsize::new(0));
+        let info_count = Arc::new(AtomicUsize::new(0));
+        let warn_count = Arc::new(AtomicUsize::new(0));
+        let error_count = Arc::new(AtomicUsize::new(0));
         
-        impl Logger for CountingLogger {
-            fn debug(&self, _: &str, _: &LogInfo) {
-                self.debug_count.fetch_add(1, Ordering::SeqCst);
-            }
-            fn info(&self, _: &str, _: &LogInfo) {
-                self.info_count.fetch_add(1, Ordering::SeqCst);
-            }
-            fn warn(&self, _: &str, _: &LogInfo) {
-                self.warn_count.fetch_add(1, Ordering::SeqCst);
-            }
-            fn error(&self, _: &str, _: &LogInfo) {
-                self.error_count.fetch_add(1, Ordering::SeqCst);
-            }
-        }
+        let inner = Arc::new(custom_logger(
+            {
+                let count = debug_count.clone();
+                move |_, _| { count.fetch_add(1, Ordering::SeqCst); }
+            },
+            {
+                let count = info_count.clone();
+                move |_, _| { count.fetch_add(1, Ordering::SeqCst); }
+            },
+            {
+                let count = warn_count.clone();
+                move |_, _| { count.fetch_add(1, Ordering::SeqCst); }
+            },
+            {
+                let count = error_count.clone();
+                move |_, _| { count.fetch_add(1, Ordering::SeqCst); }
+            },
+        ));
         
-        let inner = Arc::new(CountingLogger {
-            debug_count: AtomicUsize::new(0),
-            info_count: AtomicUsize::new(0),
-            warn_count: AtomicUsize::new(0),
-            error_count: AtomicUsize::new(0),
-        });
-        
-        let logger = ReplayAwareLogger::new(inner.clone(), ReplayLoggingConfig::SuppressAll);
+        let logger = ReplayAwareLogger::new(inner, ReplayLoggingConfig::SuppressAll);
         
         // Non-replay logs should pass through
         let non_replay_info = LogInfo::new("arn:test").with_replay(false);
@@ -2390,10 +2655,10 @@ mod durable_context_tests {
         logger.warn("test", &non_replay_info);
         logger.error("test", &non_replay_info);
         
-        assert_eq!(inner.debug_count.load(Ordering::SeqCst), 1);
-        assert_eq!(inner.info_count.load(Ordering::SeqCst), 1);
-        assert_eq!(inner.warn_count.load(Ordering::SeqCst), 1);
-        assert_eq!(inner.error_count.load(Ordering::SeqCst), 1);
+        assert_eq!(debug_count.load(Ordering::SeqCst), 1);
+        assert_eq!(info_count.load(Ordering::SeqCst), 1);
+        assert_eq!(warn_count.load(Ordering::SeqCst), 1);
+        assert_eq!(error_count.load(Ordering::SeqCst), 1);
         
         // Replay logs should be suppressed
         let replay_info = LogInfo::new("arn:test").with_replay(true);
@@ -2403,40 +2668,38 @@ mod durable_context_tests {
         logger.error("test", &replay_info);
         
         // Counts should not have increased
-        assert_eq!(inner.debug_count.load(Ordering::SeqCst), 1);
-        assert_eq!(inner.info_count.load(Ordering::SeqCst), 1);
-        assert_eq!(inner.warn_count.load(Ordering::SeqCst), 1);
-        assert_eq!(inner.error_count.load(Ordering::SeqCst), 1);
+        assert_eq!(debug_count.load(Ordering::SeqCst), 1);
+        assert_eq!(info_count.load(Ordering::SeqCst), 1);
+        assert_eq!(warn_count.load(Ordering::SeqCst), 1);
+        assert_eq!(error_count.load(Ordering::SeqCst), 1);
     }
 
     #[test]
     fn test_replay_aware_logger_allow_all() {
         use std::sync::atomic::{AtomicUsize, Ordering};
         
-        struct CountingLogger {
-            call_count: AtomicUsize,
-        }
+        let call_count = Arc::new(AtomicUsize::new(0));
         
-        impl Logger for CountingLogger {
-            fn debug(&self, _: &str, _: &LogInfo) {
-                self.call_count.fetch_add(1, Ordering::SeqCst);
-            }
-            fn info(&self, _: &str, _: &LogInfo) {
-                self.call_count.fetch_add(1, Ordering::SeqCst);
-            }
-            fn warn(&self, _: &str, _: &LogInfo) {
-                self.call_count.fetch_add(1, Ordering::SeqCst);
-            }
-            fn error(&self, _: &str, _: &LogInfo) {
-                self.call_count.fetch_add(1, Ordering::SeqCst);
-            }
-        }
+        let inner = Arc::new(custom_logger(
+            {
+                let count = call_count.clone();
+                move |_, _| { count.fetch_add(1, Ordering::SeqCst); }
+            },
+            {
+                let count = call_count.clone();
+                move |_, _| { count.fetch_add(1, Ordering::SeqCst); }
+            },
+            {
+                let count = call_count.clone();
+                move |_, _| { count.fetch_add(1, Ordering::SeqCst); }
+            },
+            {
+                let count = call_count.clone();
+                move |_, _| { count.fetch_add(1, Ordering::SeqCst); }
+            },
+        ));
         
-        let inner = Arc::new(CountingLogger {
-            call_count: AtomicUsize::new(0),
-        });
-        
-        let logger = ReplayAwareLogger::allow_all(inner.clone());
+        let logger = ReplayAwareLogger::allow_all(inner);
         
         // All logs should pass through even during replay
         let replay_info = LogInfo::new("arn:test").with_replay(true);
@@ -2445,43 +2708,38 @@ mod durable_context_tests {
         logger.warn("test", &replay_info);
         logger.error("test", &replay_info);
         
-        assert_eq!(inner.call_count.load(Ordering::SeqCst), 4);
+        assert_eq!(call_count.load(Ordering::SeqCst), 4);
     }
 
     #[test]
     fn test_replay_aware_logger_errors_only() {
         use std::sync::atomic::{AtomicUsize, Ordering};
         
-        struct CountingLogger {
-            debug_count: AtomicUsize,
-            info_count: AtomicUsize,
-            warn_count: AtomicUsize,
-            error_count: AtomicUsize,
-        }
+        let debug_count = Arc::new(AtomicUsize::new(0));
+        let info_count = Arc::new(AtomicUsize::new(0));
+        let warn_count = Arc::new(AtomicUsize::new(0));
+        let error_count = Arc::new(AtomicUsize::new(0));
         
-        impl Logger for CountingLogger {
-            fn debug(&self, _: &str, _: &LogInfo) {
-                self.debug_count.fetch_add(1, Ordering::SeqCst);
-            }
-            fn info(&self, _: &str, _: &LogInfo) {
-                self.info_count.fetch_add(1, Ordering::SeqCst);
-            }
-            fn warn(&self, _: &str, _: &LogInfo) {
-                self.warn_count.fetch_add(1, Ordering::SeqCst);
-            }
-            fn error(&self, _: &str, _: &LogInfo) {
-                self.error_count.fetch_add(1, Ordering::SeqCst);
-            }
-        }
+        let inner = Arc::new(custom_logger(
+            {
+                let count = debug_count.clone();
+                move |_, _| { count.fetch_add(1, Ordering::SeqCst); }
+            },
+            {
+                let count = info_count.clone();
+                move |_, _| { count.fetch_add(1, Ordering::SeqCst); }
+            },
+            {
+                let count = warn_count.clone();
+                move |_, _| { count.fetch_add(1, Ordering::SeqCst); }
+            },
+            {
+                let count = error_count.clone();
+                move |_, _| { count.fetch_add(1, Ordering::SeqCst); }
+            },
+        ));
         
-        let inner = Arc::new(CountingLogger {
-            debug_count: AtomicUsize::new(0),
-            info_count: AtomicUsize::new(0),
-            warn_count: AtomicUsize::new(0),
-            error_count: AtomicUsize::new(0),
-        });
-        
-        let logger = ReplayAwareLogger::new(inner.clone(), ReplayLoggingConfig::ErrorsOnly);
+        let logger = ReplayAwareLogger::new(inner, ReplayLoggingConfig::ErrorsOnly);
         
         // During replay, only errors should pass through
         let replay_info = LogInfo::new("arn:test").with_replay(true);
@@ -2490,46 +2748,41 @@ mod durable_context_tests {
         logger.warn("test", &replay_info);
         logger.error("test", &replay_info);
         
-        assert_eq!(inner.debug_count.load(Ordering::SeqCst), 0);
-        assert_eq!(inner.info_count.load(Ordering::SeqCst), 0);
-        assert_eq!(inner.warn_count.load(Ordering::SeqCst), 0);
-        assert_eq!(inner.error_count.load(Ordering::SeqCst), 1);
+        assert_eq!(debug_count.load(Ordering::SeqCst), 0);
+        assert_eq!(info_count.load(Ordering::SeqCst), 0);
+        assert_eq!(warn_count.load(Ordering::SeqCst), 0);
+        assert_eq!(error_count.load(Ordering::SeqCst), 1);
     }
 
     #[test]
     fn test_replay_aware_logger_warnings_and_errors() {
         use std::sync::atomic::{AtomicUsize, Ordering};
         
-        struct CountingLogger {
-            debug_count: AtomicUsize,
-            info_count: AtomicUsize,
-            warn_count: AtomicUsize,
-            error_count: AtomicUsize,
-        }
+        let debug_count = Arc::new(AtomicUsize::new(0));
+        let info_count = Arc::new(AtomicUsize::new(0));
+        let warn_count = Arc::new(AtomicUsize::new(0));
+        let error_count = Arc::new(AtomicUsize::new(0));
         
-        impl Logger for CountingLogger {
-            fn debug(&self, _: &str, _: &LogInfo) {
-                self.debug_count.fetch_add(1, Ordering::SeqCst);
-            }
-            fn info(&self, _: &str, _: &LogInfo) {
-                self.info_count.fetch_add(1, Ordering::SeqCst);
-            }
-            fn warn(&self, _: &str, _: &LogInfo) {
-                self.warn_count.fetch_add(1, Ordering::SeqCst);
-            }
-            fn error(&self, _: &str, _: &LogInfo) {
-                self.error_count.fetch_add(1, Ordering::SeqCst);
-            }
-        }
+        let inner = Arc::new(custom_logger(
+            {
+                let count = debug_count.clone();
+                move |_, _| { count.fetch_add(1, Ordering::SeqCst); }
+            },
+            {
+                let count = info_count.clone();
+                move |_, _| { count.fetch_add(1, Ordering::SeqCst); }
+            },
+            {
+                let count = warn_count.clone();
+                move |_, _| { count.fetch_add(1, Ordering::SeqCst); }
+            },
+            {
+                let count = error_count.clone();
+                move |_, _| { count.fetch_add(1, Ordering::SeqCst); }
+            },
+        ));
         
-        let inner = Arc::new(CountingLogger {
-            debug_count: AtomicUsize::new(0),
-            info_count: AtomicUsize::new(0),
-            warn_count: AtomicUsize::new(0),
-            error_count: AtomicUsize::new(0),
-        });
-        
-        let logger = ReplayAwareLogger::new(inner.clone(), ReplayLoggingConfig::WarningsAndErrors);
+        let logger = ReplayAwareLogger::new(inner, ReplayLoggingConfig::WarningsAndErrors);
         
         // During replay, only warnings and errors should pass through
         let replay_info = LogInfo::new("arn:test").with_replay(true);
@@ -2538,10 +2791,10 @@ mod durable_context_tests {
         logger.warn("test", &replay_info);
         logger.error("test", &replay_info);
         
-        assert_eq!(inner.debug_count.load(Ordering::SeqCst), 0);
-        assert_eq!(inner.info_count.load(Ordering::SeqCst), 0);
-        assert_eq!(inner.warn_count.load(Ordering::SeqCst), 1);
-        assert_eq!(inner.error_count.load(Ordering::SeqCst), 1);
+        assert_eq!(debug_count.load(Ordering::SeqCst), 0);
+        assert_eq!(info_count.load(Ordering::SeqCst), 0);
+        assert_eq!(warn_count.load(Ordering::SeqCst), 1);
+        assert_eq!(error_count.load(Ordering::SeqCst), 1);
     }
 
     #[test]
@@ -2844,4 +3097,231 @@ mod property_tests {
         }
     }
 
+}
+
+#[cfg(test)]
+mod sealed_trait_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    /// Tests for sealed Logger trait implementations.
+    ///
+    /// The Logger trait is sealed, meaning it cannot be implemented outside this crate.
+    /// This is enforced at compile time by requiring the private `Sealed` supertrait.
+    /// External crates attempting to implement Logger will get a compile error:
+    /// "the trait bound `MyType: Sealed` is not satisfied"
+    ///
+    /// These tests verify that the internal implementations work correctly.
+    mod logger_tests {
+        use super::*;
+
+        #[test]
+        fn test_tracing_logger_implements_logger() {
+            // TracingLogger should implement Logger (compile-time check)
+            let logger: &dyn Logger = &TracingLogger;
+            let info = LogInfo::default();
+            
+            // These calls should not panic
+            logger.debug("test debug", &info);
+            logger.info("test info", &info);
+            logger.warn("test warn", &info);
+            logger.error("test error", &info);
+        }
+
+        #[test]
+        fn test_replay_aware_logger_implements_logger() {
+            // ReplayAwareLogger should implement Logger (compile-time check)
+            let inner = Arc::new(TracingLogger);
+            let logger = ReplayAwareLogger::new(inner, ReplayLoggingConfig::AllowAll);
+            let logger_ref: &dyn Logger = &logger;
+            let info = LogInfo::default();
+            
+            // These calls should not panic
+            logger_ref.debug("test debug", &info);
+            logger_ref.info("test info", &info);
+            logger_ref.warn("test warn", &info);
+            logger_ref.error("test error", &info);
+        }
+
+        #[test]
+        fn test_custom_logger_implements_logger() {
+            // CustomLogger should implement Logger (compile-time check)
+            let call_count = Arc::new(AtomicUsize::new(0));
+            let count_clone = call_count.clone();
+            
+            let logger = custom_logger(
+                {
+                    let count = count_clone.clone();
+                    move |_msg, _info| { count.fetch_add(1, Ordering::SeqCst); }
+                },
+                {
+                    let count = count_clone.clone();
+                    move |_msg, _info| { count.fetch_add(1, Ordering::SeqCst); }
+                },
+                {
+                    let count = count_clone.clone();
+                    move |_msg, _info| { count.fetch_add(1, Ordering::SeqCst); }
+                },
+                {
+                    let count = count_clone.clone();
+                    move |_msg, _info| { count.fetch_add(1, Ordering::SeqCst); }
+                },
+            );
+            
+            let logger_ref: &dyn Logger = &logger;
+            let info = LogInfo::default();
+            
+            logger_ref.debug("test", &info);
+            logger_ref.info("test", &info);
+            logger_ref.warn("test", &info);
+            logger_ref.error("test", &info);
+            
+            assert_eq!(call_count.load(Ordering::SeqCst), 4);
+        }
+
+        #[test]
+        fn test_simple_custom_logger() {
+            let call_count = Arc::new(AtomicUsize::new(0));
+            let count_clone = call_count.clone();
+            
+            let logger = simple_custom_logger(move |_level, _msg, _info| {
+                count_clone.fetch_add(1, Ordering::SeqCst);
+            });
+            
+            let info = LogInfo::default();
+            
+            logger.debug("test", &info);
+            logger.info("test", &info);
+            logger.warn("test", &info);
+            logger.error("test", &info);
+            
+            assert_eq!(call_count.load(Ordering::SeqCst), 4);
+        }
+
+        #[test]
+        fn test_custom_logger_receives_correct_messages() {
+            let messages = Arc::new(std::sync::Mutex::new(Vec::new()));
+            let messages_clone = messages.clone();
+            
+            let logger = simple_custom_logger(move |level, msg, _info| {
+                messages_clone.lock().unwrap().push(format!("[{}] {}", level, msg));
+            });
+            
+            let info = LogInfo::default();
+            
+            logger.debug("debug message", &info);
+            logger.info("info message", &info);
+            logger.warn("warn message", &info);
+            logger.error("error message", &info);
+            
+            let logged = messages.lock().unwrap();
+            assert_eq!(logged.len(), 4);
+            assert_eq!(logged[0], "[DEBUG] debug message");
+            assert_eq!(logged[1], "[INFO] info message");
+            assert_eq!(logged[2], "[WARN] warn message");
+            assert_eq!(logged[3], "[ERROR] error message");
+        }
+
+        #[test]
+        fn test_custom_logger_receives_log_info() {
+            let received_info = Arc::new(std::sync::Mutex::new(None));
+            let info_clone = received_info.clone();
+            
+            let logger = simple_custom_logger(move |_level, _msg, info| {
+                *info_clone.lock().unwrap() = Some(info.clone());
+            });
+            
+            let info = LogInfo::new("arn:aws:test")
+                .with_operation_id("op-123")
+                .with_parent_id("parent-456")
+                .with_replay(true);
+            
+            logger.info("test", &info);
+            
+            let received = received_info.lock().unwrap().clone().unwrap();
+            assert_eq!(received.durable_execution_arn, Some("arn:aws:test".to_string()));
+            assert_eq!(received.operation_id, Some("op-123".to_string()));
+            assert_eq!(received.parent_id, Some("parent-456".to_string()));
+            assert!(received.is_replay);
+        }
+
+        #[test]
+        fn test_replay_aware_logger_suppresses_during_replay() {
+            let call_count = Arc::new(AtomicUsize::new(0));
+            let count_clone = call_count.clone();
+            
+            let inner_logger = Arc::new(custom_logger(
+                {
+                    let count = count_clone.clone();
+                    move |_msg, _info| { count.fetch_add(1, Ordering::SeqCst); }
+                },
+                {
+                    let count = count_clone.clone();
+                    move |_msg, _info| { count.fetch_add(1, Ordering::SeqCst); }
+                },
+                {
+                    let count = count_clone.clone();
+                    move |_msg, _info| { count.fetch_add(1, Ordering::SeqCst); }
+                },
+                {
+                    let count = count_clone.clone();
+                    move |_msg, _info| { count.fetch_add(1, Ordering::SeqCst); }
+                },
+            ));
+            
+            let logger = ReplayAwareLogger::new(inner_logger, ReplayLoggingConfig::SuppressAll);
+            
+            // Non-replay logs should pass through
+            let non_replay_info = LogInfo::default().with_replay(false);
+            logger.debug("test", &non_replay_info);
+            logger.info("test", &non_replay_info);
+            logger.warn("test", &non_replay_info);
+            logger.error("test", &non_replay_info);
+            assert_eq!(call_count.load(Ordering::SeqCst), 4);
+            
+            // Replay logs should be suppressed
+            let replay_info = LogInfo::default().with_replay(true);
+            logger.debug("test", &replay_info);
+            logger.info("test", &replay_info);
+            logger.warn("test", &replay_info);
+            logger.error("test", &replay_info);
+            assert_eq!(call_count.load(Ordering::SeqCst), 4); // Still 4, no new calls
+        }
+
+        #[test]
+        fn test_replay_aware_logger_errors_only_during_replay() {
+            let call_count = Arc::new(AtomicUsize::new(0));
+            let count_clone = call_count.clone();
+            
+            let inner_logger = Arc::new(custom_logger(
+                {
+                    let count = count_clone.clone();
+                    move |_msg, _info| { count.fetch_add(1, Ordering::SeqCst); }
+                },
+                {
+                    let count = count_clone.clone();
+                    move |_msg, _info| { count.fetch_add(1, Ordering::SeqCst); }
+                },
+                {
+                    let count = count_clone.clone();
+                    move |_msg, _info| { count.fetch_add(1, Ordering::SeqCst); }
+                },
+                {
+                    let count = count_clone.clone();
+                    move |_msg, _info| { count.fetch_add(1, Ordering::SeqCst); }
+                },
+            ));
+            
+            let logger = ReplayAwareLogger::new(inner_logger, ReplayLoggingConfig::ErrorsOnly);
+            
+            let replay_info = LogInfo::default().with_replay(true);
+            logger.debug("test", &replay_info);
+            logger.info("test", &replay_info);
+            logger.warn("test", &replay_info);
+            logger.error("test", &replay_info);
+            
+            // Only error should pass through during replay
+            assert_eq!(call_count.load(Ordering::SeqCst), 1);
+        }
+    }
 }

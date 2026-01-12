@@ -20,10 +20,13 @@
 //!   concurrency limits and failure tolerance.
 //! - **External Integration**: Wait for callbacks from external systems with configurable
 //!   timeouts.
-//! - **Type Safety**: Full Rust type safety with generics and trait-based abstractions.
+//! - **Type Safety**: Full Rust type safety with generics, trait-based abstractions,
+//!   and newtype wrappers for domain identifiers.
 //! - **Promise Combinators**: Coordinate multiple durable promises with `all`, `any`, `race`, and `all_settled`.
 //! - **Replay-Safe Helpers**: Generate deterministic UUIDs and timestamps that are safe for replay.
 //! - **Configurable Checkpointing**: Choose between eager, batched, or optimistic checkpointing modes.
+//! - **Trait Aliases**: Cleaner function signatures with [`DurableValue`] and [`StepFn`] trait aliases.
+//! - **Sealed Traits**: Internal traits are sealed to allow API evolution without breaking changes.
 //!
 //! ## Important Documentation
 //!
@@ -372,6 +375,188 @@
 //! assert_eq!(years.to_seconds(), 365 * 24 * 60 * 60);
 //! ```
 //!
+//! ## Type-Safe Identifiers (Newtypes)
+//!
+//! The SDK provides newtype wrappers for domain identifiers to prevent accidental
+//! mixing of different ID types at compile time. These types are available in the
+//! [`types`] module and re-exported at the crate root.
+//!
+//! ### Available Newtypes
+//!
+//! - [`OperationId`]: Unique identifier for an operation within a durable execution
+//! - [`ExecutionArn`]: Amazon Resource Name identifying a durable execution
+//! - [`CallbackId`]: Unique identifier for a callback operation
+//!
+//! ### Creating Newtypes
+//!
+//! ```rust
+//! use aws_durable_execution_sdk::{OperationId, ExecutionArn, CallbackId};
+//!
+//! // From String or &str (no validation, for backward compatibility)
+//! let op_id = OperationId::from("op-123");
+//! let op_id2: OperationId = "op-456".into();
+//!
+//! // With validation (rejects empty strings)
+//! let op_id3 = OperationId::new("op-789").unwrap();
+//! assert!(OperationId::new("").is_err());
+//!
+//! // ExecutionArn validates ARN format
+//! let arn = ExecutionArn::new("arn:aws:lambda:us-east-1:123456789012:function:my-func:durable:abc123");
+//! assert!(arn.is_ok());
+//!
+//! // CallbackId for external system integration
+//! let callback_id = CallbackId::from("callback-xyz");
+//! ```
+//!
+//! ### Using Newtypes as Strings
+//!
+//! All newtypes implement `Deref<Target=str>` and `AsRef<str>` for convenient string access:
+//!
+//! ```rust
+//! use aws_durable_execution_sdk::OperationId;
+//!
+//! let op_id = OperationId::from("op-123");
+//!
+//! // Use string methods directly via Deref
+//! assert!(op_id.starts_with("op-"));
+//! assert_eq!(op_id.len(), 6);
+//!
+//! // Use as &str via AsRef
+//! let s: &str = op_id.as_ref();
+//! assert_eq!(s, "op-123");
+//! ```
+//!
+//! ### Newtypes in Collections
+//!
+//! All newtypes implement `Hash` and `Eq`, making them suitable for use in `HashMap` and `HashSet`:
+//!
+//! ```rust
+//! use aws_durable_execution_sdk::OperationId;
+//! use std::collections::HashMap;
+//!
+//! let mut results: HashMap<OperationId, String> = HashMap::new();
+//! results.insert(OperationId::from("op-1"), "success".to_string());
+//! results.insert(OperationId::from("op-2"), "pending".to_string());
+//!
+//! assert_eq!(results.get(&OperationId::from("op-1")), Some(&"success".to_string()));
+//! ```
+//!
+//! ### Serialization
+//!
+//! All newtypes use `#[serde(transparent)]` for seamless JSON serialization:
+//!
+//! ```rust
+//! use aws_durable_execution_sdk::OperationId;
+//!
+//! let op_id = OperationId::from("op-123");
+//! let json = serde_json::to_string(&op_id).unwrap();
+//! assert_eq!(json, "\"op-123\""); // Serializes as plain string
+//!
+//! let restored: OperationId = serde_json::from_str(&json).unwrap();
+//! assert_eq!(restored, op_id);
+//! ```
+//!
+//! ## Trait Aliases
+//!
+//! The SDK provides trait aliases to simplify common trait bound combinations.
+//! These are available in the [`traits`] module and re-exported at the crate root.
+//!
+//! ### DurableValue
+//!
+//! [`DurableValue`] is a trait alias for types that can be durably stored and retrieved:
+//!
+//! ```rust
+//! use aws_durable_execution_sdk::DurableValue;
+//! use serde::{Deserialize, Serialize};
+//!
+//! // DurableValue is equivalent to: Serialize + DeserializeOwned + Send
+//!
+//! // Any type implementing these traits automatically implements DurableValue
+//! #[derive(Debug, Clone, Serialize, Deserialize)]
+//! struct OrderResult {
+//!     order_id: String,
+//!     status: String,
+//! }
+//!
+//! // Use in generic functions for cleaner signatures
+//! fn process_result<T: DurableValue>(result: T) -> String {
+//!     serde_json::to_string(&result).unwrap_or_default()
+//! }
+//! ```
+//!
+//! ### StepFn
+//!
+//! [`StepFn`] is a trait alias for step function closures:
+//!
+//! ```rust
+//! use aws_durable_execution_sdk::{StepFn, DurableValue};
+//! use aws_durable_execution_sdk::handlers::StepContext;
+//!
+//! // StepFn<T> is equivalent to:
+//! // FnOnce(StepContext) -> Result<T, Box<dyn Error + Send + Sync>> + Send
+//!
+//! // Use in generic functions
+//! fn execute_step<T: DurableValue, F: StepFn<T>>(func: F) {
+//!     // func can be called with a StepContext
+//! }
+//!
+//! // Works with closures
+//! execute_step(|_ctx| Ok(42i32));
+//!
+//! // Works with named functions
+//! fn my_step(ctx: StepContext) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+//!     Ok(format!("Processed by {}", ctx.operation_id))
+//! }
+//! execute_step(my_step);
+//! ```
+//!
+//! ## Sealed Traits and Factory Functions
+//!
+//! Some SDK traits are "sealed" - they cannot be implemented outside this crate.
+//! This allows the SDK to evolve without breaking external code. Sealed traits include:
+//!
+//! - [`Logger`]: For structured logging in durable executions
+//! - [`SerDes`]: For custom serialization/deserialization
+//!
+//! ### Custom Loggers
+//!
+//! Instead of implementing `Logger` directly, use the factory functions:
+//!
+//! ```rust
+//! use aws_durable_execution_sdk::{custom_logger, simple_custom_logger, LogInfo};
+//!
+//! // Simple custom logger with a single function for all levels
+//! let logger = simple_custom_logger(|level, msg, info| {
+//!     println!("[{}] {}: {:?}", level, msg, info);
+//! });
+//!
+//! // Full custom logger with separate functions for each level
+//! let logger = custom_logger(
+//!     |msg, info| println!("[DEBUG] {}", msg),  // debug
+//!     |msg, info| println!("[INFO] {}", msg),   // info
+//!     |msg, info| println!("[WARN] {}", msg),   // warn
+//!     |msg, info| println!("[ERROR] {}", msg),  // error
+//! );
+//! ```
+//!
+//! ### Custom Serializers
+//!
+//! Instead of implementing `SerDes` directly, use the factory function:
+//!
+//! ```rust
+//! use aws_durable_execution_sdk::serdes::{custom_serdes, SerDesContext, SerDesError};
+//!
+//! // Create a custom serializer for a specific type
+//! let serdes = custom_serdes::<String, _, _>(
+//!     |value, _ctx| Ok(format!("custom:{}", value)),  // serialize
+//!     |data, _ctx| {                                   // deserialize
+//!         data.strip_prefix("custom:")
+//!             .map(|s| s.to_string())
+//!             .ok_or_else(|| SerDesError::deserialization("Invalid format"))
+//!     },
+//! );
+//! ```
+//!
 //! ## Configuration Types
 //!
 //! The SDK provides type-safe configuration for all operations:
@@ -560,23 +745,53 @@
 //! 8. **Use replay-safe helpers**: When you need UUIDs or timestamps, use the
 //!    helpers in [`replay_safe`] to ensure consistent values across replays.
 //!
+//! 9. **Use type-safe identifiers**: Prefer [`OperationId`], [`ExecutionArn`], and
+//!    [`CallbackId`] over raw strings to catch type mismatches at compile time.
+//!
+//! 10. **Use trait aliases**: Use [`DurableValue`] and [`StepFn`] in your generic
+//!     functions for cleaner, more maintainable signatures.
+//!
+//! ## Result Type Aliases
+//!
+//! The SDK provides semantic result type aliases for cleaner function signatures:
+//!
+//! - [`DurableResult<T>`](DurableResult): Alias for `Result<T, DurableError>` - general durable operations
+//! - [`StepResult<T>`](StepResult): Alias for `Result<T, DurableError>` - step operation results
+//! - [`CheckpointResult<T>`](CheckpointResult): Alias for `Result<T, DurableError>` - checkpoint operation results
+//!
+//! ```rust,ignore
+//! use aws_durable_execution_sdk::{DurableResult, StepResult, DurableError};
+//!
+//! // Use in function signatures for clarity
+//! fn process_order(order_id: &str) -> DurableResult<String> {
+//!     Ok(format!("Processed: {}", order_id))
+//! }
+//!
+//! fn execute_step() -> StepResult<i32> {
+//!     Ok(42)
+//! }
+//! ```
+//!
 //! ## Module Organization
 //!
 //! - [`client`]: Lambda service client for checkpoint operations
 //! - [`concurrency`]: Concurrent execution types (BatchResult, ConcurrentExecutor)
 //! - [`config`]: Configuration types for all operations
-//! - [`context`]: DurableContext and operation identifier types
+//! - [`context`]: DurableContext, operation identifiers, and logging (includes factory functions
+//!   [`custom_logger`] and [`simple_custom_logger`] for creating custom loggers)
 //! - [`docs`]: **Documentation modules** - determinism requirements and execution limits
 //!   - [`docs::determinism`]: Understanding determinism for replay-safe workflows
 //!   - [`docs::limits`]: Execution limits and constraints
 //! - [`duration`]: Duration type with convenient constructors
-//! - [`error`]: Error types and error handling
+//! - [`error`]: Error types, error handling, and result type aliases ([`DurableResult`], [`StepResult`], [`CheckpointResult`])
 //! - [`handlers`]: Operation handlers (step, wait, callback, etc.)
 //! - [`lambda`]: Lambda integration types (input/output)
-//! - [`operation`]: Operation types and status enums
+//! - [`operation`]: Operation types and status enums (optimized with `#[repr(u8)]` for compact memory layout)
 //! - [`replay_safe`]: Replay-safe helpers for deterministic UUIDs and timestamps
-//! - [`serdes`]: Serialization/deserialization system
+//! - [`serdes`]: Serialization/deserialization system (includes [`custom_serdes`] factory function)
 //! - [`state`]: Execution state and checkpointing system
+//! - [`traits`]: Trait aliases for common bounds ([`DurableValue`], [`StepFn`])
+//! - [`types`]: Type-safe newtype wrappers for domain identifiers ([`OperationId`], [`ExecutionArn`], [`CallbackId`])
 
 pub mod client;
 pub mod concurrency;
@@ -591,6 +806,11 @@ pub mod operation;
 pub mod replay_safe;
 pub mod serdes;
 pub mod state;
+pub mod traits;
+pub mod types;
+
+// Private module for sealed trait pattern
+mod sealed;
 
 // Re-export main types at crate root
 pub use client::{
@@ -600,11 +820,11 @@ pub use client::{
 pub use config::*;
 pub use context::{
     DurableContext, LogInfo, Logger, OperationIdGenerator, OperationIdentifier, TracingLogger,
-    ReplayAwareLogger, ReplayLoggingConfig,
-    generate_operation_id, WaitForConditionConfig, WaitForConditionContext,
+    ReplayAwareLogger, ReplayLoggingConfig, CustomLogger,
+    generate_operation_id, custom_logger, simple_custom_logger, WaitForConditionConfig, WaitForConditionContext,
 };
 pub use duration::Duration;
-pub use error::{AwsError, DurableError, ErrorObject, TerminationReason};
+pub use error::{AwsError, DurableError, ErrorObject, TerminationReason, DurableResult, StepResult, CheckpointResult};
 pub use lambda::{
     DurableExecutionInvocationInput, DurableExecutionInvocationOutput, InitialExecutionState,
     InvocationStatus,
@@ -614,11 +834,17 @@ pub use operation::{
     WaitOptions, StepOptions, CallbackOptions, ChainedInvokeOptions, ContextOptions,
     ExecutionDetails, StepDetails, WaitDetails, CallbackDetails, ChainedInvokeDetails, ContextDetails,
 };
-pub use serdes::{JsonSerDes, SerDes, SerDesContext, SerDesError};
+pub use serdes::{JsonSerDes, SerDes, SerDesContext, SerDesError, CustomSerDes, custom_serdes};
 pub use state::{
     CheckpointBatcher, CheckpointBatcherConfig, CheckpointRequest, CheckpointSender,
     CheckpointedResult, ExecutionState, ReplayStatus, create_checkpoint_queue,
 };
+
+// Re-export newtype wrappers for domain identifiers
+pub use types::{CallbackId, ExecutionArn, OperationId, ValidationError};
+
+// Re-export trait aliases for common bounds
+pub use traits::{DurableValue, StepFn};
 
 // Re-export concurrency types
 pub use concurrency::{

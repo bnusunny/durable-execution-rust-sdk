@@ -72,7 +72,7 @@ where
     let checkpoint_result = state.get_checkpoint_result(&op_id.operation_id).await;
     
     // Handle replay scenarios
-    if let Some(result) = handle_replay::<T, S>(&checkpoint_result, state, op_id, logger).await? {
+    if let Some(result) = handle_replay::<T>(&checkpoint_result, state, op_id, logger).await? {
         return Ok(result);
     }
 
@@ -180,7 +180,7 @@ where
 }
 
 /// Handles replay by checking if the operation was previously checkpointed.
-async fn handle_replay<T, S>(
+async fn handle_replay<T>(
     checkpoint_result: &CheckpointedResult,
     state: &Arc<ExecutionState>,
     op_id: &OperationIdentifier,
@@ -188,7 +188,6 @@ async fn handle_replay<T, S>(
 ) -> Result<Option<T>, DurableError>
 where
     T: Serialize + DeserializeOwned,
-    S: Serialize + DeserializeOwned,
 {
     if !checkpoint_result.is_existent() {
         return Ok(None);

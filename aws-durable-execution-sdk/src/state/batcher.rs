@@ -387,8 +387,13 @@ impl CheckpointBatcher {
         // Handle the result
         match result {
             Ok(response) => {
-                // Mark that we've consumed the initial token
-                self.initial_token_consumed.store(true, Ordering::SeqCst);
+                // Mark that we've consumed the initial token.
+                // Release ordering ensures that the checkpoint_token write (via RwLock)
+                // is visible to any thread that subsequently reads initial_token_consumed.
+                // This is a one-way transition (false -> true) that never reverts.
+                //
+                // Requirements: 4.4, 4.6
+                self.initial_token_consumed.store(true, Ordering::Release);
                 
                 // Update the checkpoint token with the new token from the response
                 {

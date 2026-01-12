@@ -8,6 +8,12 @@
 //!
 //! The SDK supports different checkpointing modes that trade off between
 //! durability and performance. See [`CheckpointingMode`] for details.
+//!
+//! ## Sealed Traits
+//!
+//! The `RetryStrategy` trait is sealed and cannot be implemented outside of this crate.
+//! This allows the SDK maintainers to evolve the retry interface without breaking
+//! external code.
 
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -15,6 +21,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::duration::Duration;
+use crate::sealed::Sealed;
 
 /// Checkpointing mode that controls the trade-off between durability and performance.
 ///
@@ -164,7 +171,20 @@ impl CheckpointingMode {
 }
 
 /// Retry strategy trait for configuring step retry behavior.
-pub trait RetryStrategy: Send + Sync {
+///
+/// # Sealed Trait
+///
+/// This trait is sealed and cannot be implemented outside of this crate.
+/// This allows the SDK maintainers to evolve the retry interface without
+/// breaking external code. If you need custom retry behavior, use the
+/// provided factory functions.
+///
+/// # Requirements
+///
+/// - 3.3: THE SDK SHALL implement the sealed trait pattern for the `RetryStrategy` trait
+/// - 3.5: THE SDK SHALL document that these traits are sealed and cannot be implemented externally
+#[allow(private_bounds)]
+pub trait RetryStrategy: Sealed + Send + Sync {
     /// Returns the delay before the next retry attempt, or None if no more retries.
     fn next_delay(&self, attempt: u32, error: &str) -> Option<Duration>;
     

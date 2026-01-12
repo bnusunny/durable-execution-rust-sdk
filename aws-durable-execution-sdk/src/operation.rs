@@ -302,26 +302,30 @@ impl Operation {
 
 
 /// The type of operation in a durable execution.
+///
+/// This enum uses `#[repr(u8)]` for compact memory representation (1 byte).
+/// Explicit discriminant values ensure stability across versions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(u8)]
 pub enum OperationType {
     /// The root execution operation
     #[serde(rename = "EXECUTION")]
-    Execution,
+    Execution = 0,
     /// A step operation (unit of work)
     #[serde(rename = "STEP")]
-    Step,
+    Step = 1,
     /// A wait/sleep operation
     #[serde(rename = "WAIT")]
-    Wait,
+    Wait = 2,
     /// A callback operation waiting for external signal
     #[serde(rename = "CALLBACK")]
-    Callback,
+    Callback = 3,
     /// An invoke operation calling another Lambda function
     #[serde(rename = "INVOKE")]
-    Invoke,
+    Invoke = 4,
     /// A context operation for nested child contexts
     #[serde(rename = "CONTEXT")]
-    Context,
+    Context = 5,
 }
 
 impl std::fmt::Display for OperationType {
@@ -338,34 +342,38 @@ impl std::fmt::Display for OperationType {
 }
 
 /// The status of an operation in a durable execution.
+///
+/// This enum uses `#[repr(u8)]` for compact memory representation (1 byte).
+/// Explicit discriminant values ensure stability across versions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(u8)]
 pub enum OperationStatus {
     /// Operation has started but not completed
     #[serde(rename = "STARTED")]
-    Started,
+    Started = 0,
     /// Operation is pending (e.g., step waiting for retry)
     /// Requirements: 3.7, 4.7
     #[serde(rename = "PENDING")]
-    Pending,
+    Pending = 1,
     /// Operation is ready to resume execution (e.g., after retry delay)
     /// Requirements: 3.7, 4.7
     #[serde(rename = "READY")]
-    Ready,
+    Ready = 2,
     /// Operation completed successfully
     #[serde(rename = "SUCCEEDED")]
-    Succeeded,
+    Succeeded = 3,
     /// Operation failed with an error
     #[serde(rename = "FAILED")]
-    Failed,
+    Failed = 4,
     /// Operation was cancelled
     #[serde(rename = "CANCELLED")]
-    Cancelled,
+    Cancelled = 5,
     /// Operation timed out
     #[serde(rename = "TIMED_OUT")]
-    TimedOut,
+    TimedOut = 6,
     /// Operation was stopped externally
     #[serde(rename = "STOPPED")]
-    Stopped,
+    Stopped = 7,
 }
 
 impl OperationStatus {
@@ -420,25 +428,29 @@ impl std::fmt::Display for OperationStatus {
 }
 
 /// Action to perform on an operation during checkpoint.
+///
+/// This enum uses `#[repr(u8)]` for compact memory representation (1 byte).
+/// Explicit discriminant values ensure stability across versions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(u8)]
 pub enum OperationAction {
     /// Start a new operation
     #[serde(rename = "START")]
-    Start,
+    Start = 0,
     /// Mark operation as succeeded
     #[serde(rename = "SUCCEED")]
-    Succeed,
+    Succeed = 1,
     /// Mark operation as failed
     #[serde(rename = "FAIL")]
-    Fail,
+    Fail = 2,
     /// Cancel an operation (e.g., cancel a wait)
     /// Requirements: 5.5
     #[serde(rename = "CANCEL")]
-    Cancel,
+    Cancel = 3,
     /// Retry an operation with optional payload (state) for wait-for-condition pattern
     /// Requirements: 4.7, 4.8, 4.9
     #[serde(rename = "RETRY")]
-    Retry,
+    Retry = 4,
 }
 
 impl std::fmt::Display for OperationAction {
@@ -1313,5 +1325,181 @@ mod tests {
     fn test_operation_get_retry_payload_wrong_type() {
         let op = Operation::new("op-123", OperationType::Wait);
         assert_eq!(op.get_retry_payload(), None);
+    }
+
+    // Size verification tests for enum discriminant optimization
+    // Requirements: 6.7 - Verify each enum is 1 byte after optimization
+
+    #[test]
+    fn test_operation_status_size_is_one_byte() {
+        assert_eq!(
+            std::mem::size_of::<OperationStatus>(),
+            1,
+            "OperationStatus should be 1 byte with #[repr(u8)]"
+        );
+    }
+
+    #[test]
+    fn test_operation_type_size_is_one_byte() {
+        assert_eq!(
+            std::mem::size_of::<OperationType>(),
+            1,
+            "OperationType should be 1 byte with #[repr(u8)]"
+        );
+    }
+
+    #[test]
+    fn test_operation_action_size_is_one_byte() {
+        assert_eq!(
+            std::mem::size_of::<OperationAction>(),
+            1,
+            "OperationAction should be 1 byte with #[repr(u8)]"
+        );
+    }
+
+    // Serde compatibility tests for enum discriminant optimization
+    // Requirements: 6.6 - Verify JSON serialization uses string representations
+
+    #[test]
+    fn test_operation_status_serde_uses_string_representation() {
+        // Verify serialization produces string values, not numeric discriminants
+        let status = OperationStatus::Started;
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(json, "\"STARTED\"");
+
+        let status = OperationStatus::Pending;
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(json, "\"PENDING\"");
+
+        let status = OperationStatus::Ready;
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(json, "\"READY\"");
+
+        let status = OperationStatus::Succeeded;
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(json, "\"SUCCEEDED\"");
+
+        let status = OperationStatus::Failed;
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(json, "\"FAILED\"");
+
+        let status = OperationStatus::Cancelled;
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(json, "\"CANCELLED\"");
+
+        let status = OperationStatus::TimedOut;
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(json, "\"TIMED_OUT\"");
+
+        let status = OperationStatus::Stopped;
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(json, "\"STOPPED\"");
+    }
+
+    #[test]
+    fn test_operation_status_serde_round_trip() {
+        let statuses = [
+            OperationStatus::Started,
+            OperationStatus::Pending,
+            OperationStatus::Ready,
+            OperationStatus::Succeeded,
+            OperationStatus::Failed,
+            OperationStatus::Cancelled,
+            OperationStatus::TimedOut,
+            OperationStatus::Stopped,
+        ];
+
+        for status in statuses {
+            let json = serde_json::to_string(&status).unwrap();
+            let deserialized: OperationStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(status, deserialized, "Round-trip failed for {:?}", status);
+        }
+    }
+
+    #[test]
+    fn test_operation_type_serde_uses_string_representation() {
+        // Verify serialization produces string values, not numeric discriminants
+        let op_type = OperationType::Execution;
+        let json = serde_json::to_string(&op_type).unwrap();
+        assert_eq!(json, "\"EXECUTION\"");
+
+        let op_type = OperationType::Step;
+        let json = serde_json::to_string(&op_type).unwrap();
+        assert_eq!(json, "\"STEP\"");
+
+        let op_type = OperationType::Wait;
+        let json = serde_json::to_string(&op_type).unwrap();
+        assert_eq!(json, "\"WAIT\"");
+
+        let op_type = OperationType::Callback;
+        let json = serde_json::to_string(&op_type).unwrap();
+        assert_eq!(json, "\"CALLBACK\"");
+
+        let op_type = OperationType::Invoke;
+        let json = serde_json::to_string(&op_type).unwrap();
+        assert_eq!(json, "\"INVOKE\"");
+
+        let op_type = OperationType::Context;
+        let json = serde_json::to_string(&op_type).unwrap();
+        assert_eq!(json, "\"CONTEXT\"");
+    }
+
+    #[test]
+    fn test_operation_type_serde_round_trip() {
+        let types = [
+            OperationType::Execution,
+            OperationType::Step,
+            OperationType::Wait,
+            OperationType::Callback,
+            OperationType::Invoke,
+            OperationType::Context,
+        ];
+
+        for op_type in types {
+            let json = serde_json::to_string(&op_type).unwrap();
+            let deserialized: OperationType = serde_json::from_str(&json).unwrap();
+            assert_eq!(op_type, deserialized, "Round-trip failed for {:?}", op_type);
+        }
+    }
+
+    #[test]
+    fn test_operation_action_serde_uses_string_representation() {
+        // Verify serialization produces string values, not numeric discriminants
+        let action = OperationAction::Start;
+        let json = serde_json::to_string(&action).unwrap();
+        assert_eq!(json, "\"START\"");
+
+        let action = OperationAction::Succeed;
+        let json = serde_json::to_string(&action).unwrap();
+        assert_eq!(json, "\"SUCCEED\"");
+
+        let action = OperationAction::Fail;
+        let json = serde_json::to_string(&action).unwrap();
+        assert_eq!(json, "\"FAIL\"");
+
+        let action = OperationAction::Cancel;
+        let json = serde_json::to_string(&action).unwrap();
+        assert_eq!(json, "\"CANCEL\"");
+
+        let action = OperationAction::Retry;
+        let json = serde_json::to_string(&action).unwrap();
+        assert_eq!(json, "\"RETRY\"");
+    }
+
+    #[test]
+    fn test_operation_action_serde_round_trip() {
+        let actions = [
+            OperationAction::Start,
+            OperationAction::Succeed,
+            OperationAction::Fail,
+            OperationAction::Cancel,
+            OperationAction::Retry,
+        ];
+
+        for action in actions {
+            let json = serde_json::to_string(&action).unwrap();
+            let deserialized: OperationAction = serde_json::from_str(&json).unwrap();
+            assert_eq!(action, deserialized, "Round-trip failed for {:?}", action);
+        }
     }
 }

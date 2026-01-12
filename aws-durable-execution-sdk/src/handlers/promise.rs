@@ -421,7 +421,6 @@ where
         let success_tx = success_tx.clone();
         let errors = errors.clone();
         let completed_count = completed_count.clone();
-        let total = total;
         
         tokio::spawn(async move {
             let result = future.await;
@@ -436,7 +435,10 @@ where
                     drop(errors_guard);
                     
                     // Check if all have failed
-                    let count = completed_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+                    // Relaxed ordering is sufficient: we only need atomic increment.
+                    // The count comparison with total is a simple threshold check.
+                    // Requirements: 4.1, 4.6
+                    let count = completed_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
                     if count == total {
                         // All failed - close the channel to unblock receiver
                         drop(success_tx);

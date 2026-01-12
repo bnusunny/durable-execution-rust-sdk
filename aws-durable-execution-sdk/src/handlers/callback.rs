@@ -14,6 +14,7 @@ use crate::error::DurableError;
 use crate::operation::{OperationType, OperationUpdate};
 use crate::serdes::{JsonSerDes, SerDes, SerDesContext};
 use crate::state::ExecutionState;
+use crate::types::CallbackId;
 
 /// A callback handle that can be used to wait for external signals.
 ///
@@ -68,6 +69,12 @@ where
     /// Returns the callback ID that external systems should use.
     pub fn id(&self) -> &str {
         &self.callback_id
+    }
+
+    /// Returns the callback ID as a `CallbackId` newtype.
+    #[inline]
+    pub fn id_typed(&self) -> CallbackId {
+        CallbackId::from(self.callback_id.clone())
     }
 
     /// Waits for the callback result.

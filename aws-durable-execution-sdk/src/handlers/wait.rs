@@ -214,12 +214,8 @@ mod tests {
     fn create_mock_client() -> SharedDurableServiceClient {
         Arc::new(
             MockDurableServiceClient::new()
-                .with_checkpoint_response(Ok(CheckpointResponse {
-                    checkpoint_token: "token-1".to_string(),
-                }))
-                .with_checkpoint_response(Ok(CheckpointResponse {
-                    checkpoint_token: "token-2".to_string(),
-                }))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("token-1")))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("token-2")))
         )
     }
 
@@ -409,9 +405,7 @@ mod tests {
     async fn test_wait_cancel_handler_cancels_active_wait() {
         let client = Arc::new(
             MockDurableServiceClient::new()
-                .with_checkpoint_response(Ok(CheckpointResponse {
-                    checkpoint_token: "token-1".to_string(),
-                }))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("token-1")))
         );
         
         // Create state with a started wait operation (active wait)

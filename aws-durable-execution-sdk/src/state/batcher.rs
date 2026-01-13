@@ -674,9 +674,7 @@ mod tests {
     async fn test_checkpoint_batcher_processes_batch() {
         let client = Arc::new(
             MockDurableServiceClient::new()
-                .with_checkpoint_response(Ok(CheckpointResponse {
-                    checkpoint_token: "new-token".to_string(),
-                }))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("new-token")))
         );
         
         let (sender, rx) = create_checkpoint_queue(10);
@@ -750,9 +748,7 @@ mod tests {
     async fn test_checkpoint_batcher_batches_multiple_requests() {
         let client = Arc::new(
             MockDurableServiceClient::new()
-                .with_checkpoint_response(Ok(CheckpointResponse {
-                    checkpoint_token: "new-token".to_string(),
-                }))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("new-token")))
         );
         
         let (sender, rx) = create_checkpoint_queue(10);
@@ -1045,9 +1041,7 @@ mod property_tests {
             _operations: Vec<OperationUpdate>,
         ) -> Result<CheckpointResponse, DurableError> {
             self.checkpoint_count.fetch_add(1, AtomicOrdering::SeqCst);
-            Ok(CheckpointResponse {
-                checkpoint_token: format!("token-{}", self.checkpoint_count.load(AtomicOrdering::SeqCst)),
-            })
+            Ok(CheckpointResponse::new(format!("token-{}", self.checkpoint_count.load(AtomicOrdering::SeqCst))))
         }
 
         async fn get_operations(

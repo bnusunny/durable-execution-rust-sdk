@@ -222,9 +222,10 @@ where
             }
         }
 
-        // Callback already exists - return the existing callback handle
-        // The callback_id is stored in the operation's name or derived from operation_id
-        let callback_id = op_id.name.clone().unwrap_or_else(|| op_id.operation_id.clone());
+        // Callback already exists - get the callback_id from CallbackDetails
+        // The service generates the callback_id and stores it in CallbackDetails.CallbackId
+        let callback_id = checkpoint_result.callback_id()
+            .unwrap_or_else(|| op_id.name.clone().unwrap_or_else(|| op_id.operation_id.clone()));
         
         logger.debug(&format!("Returning existing callback: {}", callback_id), &log_info);
         
@@ -236,13 +237,28 @@ where
         ));
     }
 
-    // Generate a unique callback_id (Requirement 6.1)
-    // Use the operation_id as the callback_id for uniqueness
-    let callback_id = op_id.operation_id.clone();
-
     // Create the callback checkpoint with configuration
-    let start_update = create_callback_start_update(op_id, &callback_id, config);
-    state.create_checkpoint(start_update, true).await?;
+    let start_update = create_callback_start_update(op_id, config);
+    
+    // Use create_checkpoint_with_response to get the service-generated callback_id
+    let response = state.create_checkpoint_with_response(start_update).await?;
+    
+    // Extract the callback_id from the response's NewExecutionState
+    // The service MUST return a callback_id - if not present, it's an error
+    let callback_id = response.new_execution_state
+        .as_ref()
+        .and_then(|new_state| new_state.find_operation(&op_id.operation_id))
+        .and_then(|op| op.callback_details.as_ref())
+        .and_then(|details| details.callback_id.clone())
+        .ok_or_else(|| {
+            DurableError::Callback {
+                message: format!(
+                    "Service did not return callback_id in checkpoint response for operation {}",
+                    op_id.operation_id
+                ),
+                callback_id: None,
+            }
+        })?;
 
     logger.debug(&format!("Callback created with ID: {}", callback_id), &log_info);
 
@@ -257,18 +273,16 @@ where
 /// Creates a Start operation update for callback.
 fn create_callback_start_update(
     op_id: &OperationIdentifier,
-    callback_id: &str,
     config: &CallbackConfig,
 ) -> OperationUpdate {
-    // Store callback configuration in the result field as JSON
-    let config_json = serde_json::json!({
-        "callback_id": callback_id,
-        "timeout_seconds": config.timeout.to_seconds(),
-        "heartbeat_timeout_seconds": config.heartbeat_timeout.to_seconds(),
+    let mut update = OperationUpdate::start(&op_id.operation_id, OperationType::Callback);
+    
+    // Set callback options for timeout configuration
+    update.callback_options = Some(crate::operation::CallbackOptions {
+        timeout_seconds: Some(config.timeout.to_seconds()),
+        heartbeat_timeout_seconds: Some(config.heartbeat_timeout.to_seconds()),
     });
     
-    let mut update = OperationUpdate::start(&op_id.operation_id, OperationType::Callback);
-    update.result = Some(config_json.to_string());
     if let Some(ref parent_id) = op_id.parent_id {
         update = update.with_parent_id(parent_id);
     }
@@ -281,18 +295,30 @@ fn create_callback_start_update(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::client::{CheckpointResponse, MockDurableServiceClient, SharedDurableServiceClient};
+    use crate::client::{CheckpointResponse, MockDurableServiceClient, NewExecutionState, SharedDurableServiceClient};
     use crate::context::TracingLogger;
     use crate::duration::Duration;
     use crate::error::ErrorObject;
     use crate::lambda::InitialExecutionState;
-    use crate::operation::{Operation, OperationStatus};
+    use crate::operation::{CallbackDetails, Operation, OperationStatus};
 
     fn create_mock_client() -> SharedDurableServiceClient {
         Arc::new(
             MockDurableServiceClient::new()
                 .with_checkpoint_response(Ok(CheckpointResponse {
                     checkpoint_token: "token-1".to_string(),
+                    new_execution_state: Some(NewExecutionState {
+                        operations: vec![{
+                            let mut op = Operation::new("test-callback-123", OperationType::Callback);
+                            op.callback_details = Some(CallbackDetails {
+                                callback_id: Some("service-generated-callback-id".to_string()),
+                                result: None,
+                                error: None,
+                            });
+                            op
+                        }],
+                        next_marker: None,
+                    }),
                 }))
         )
     }
@@ -339,7 +365,121 @@ mod tests {
 
         assert!(result.is_ok());
         let callback = result.unwrap();
-        assert_eq!(callback.id(), "test-callback-123");
+        assert_eq!(callback.id(), "service-generated-callback-id");
+    }
+
+    #[tokio::test]
+    async fn test_callback_handler_error_when_no_callback_id_returned() {
+        // Create a mock client that returns a response without callback_id
+        let client = Arc::new(
+            MockDurableServiceClient::new()
+                .with_checkpoint_response(Ok(CheckpointResponse {
+                    checkpoint_token: "token-1".to_string(),
+                    new_execution_state: None, // No NewExecutionState means no callback_id
+                }))
+        );
+        let state = create_test_state(client);
+        let op_id = create_test_op_id();
+        let config = create_test_config();
+        let logger = create_test_logger();
+
+        let result: Result<Callback<String>, DurableError> = callback_handler(
+            &state,
+            &op_id,
+            &config,
+            &logger,
+        ).await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DurableError::Callback { message, callback_id } => {
+                assert!(message.contains("did not return callback_id"));
+                assert!(callback_id.is_none());
+            }
+            e => panic!("Expected Callback error, got {:?}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_callback_handler_error_when_operation_not_in_response() {
+        // Create a mock client that returns operations but none match our operation_id
+        let client = Arc::new(
+            MockDurableServiceClient::new()
+                .with_checkpoint_response(Ok(CheckpointResponse {
+                    checkpoint_token: "token-1".to_string(),
+                    new_execution_state: Some(NewExecutionState {
+                        operations: vec![{
+                            // Different operation_id than what we're looking for
+                            let mut op = Operation::new("different-operation-id", OperationType::Callback);
+                            op.callback_details = Some(CallbackDetails {
+                                callback_id: Some("some-callback-id".to_string()),
+                                result: None,
+                                error: None,
+                            });
+                            op
+                        }],
+                        next_marker: None,
+                    }),
+                }))
+        );
+        let state = create_test_state(client);
+        let op_id = create_test_op_id(); // Uses "test-callback-123"
+        let config = create_test_config();
+        let logger = create_test_logger();
+
+        let result: Result<Callback<String>, DurableError> = callback_handler(
+            &state,
+            &op_id,
+            &config,
+            &logger,
+        ).await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DurableError::Callback { message, callback_id } => {
+                assert!(message.contains("did not return callback_id"));
+                assert!(callback_id.is_none());
+            }
+            e => panic!("Expected Callback error, got {:?}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_callback_handler_error_when_callback_details_missing() {
+        // Create a mock client that returns the operation but without CallbackDetails
+        let client = Arc::new(
+            MockDurableServiceClient::new()
+                .with_checkpoint_response(Ok(CheckpointResponse {
+                    checkpoint_token: "token-1".to_string(),
+                    new_execution_state: Some(NewExecutionState {
+                        operations: vec![{
+                            // Correct operation_id but no callback_details
+                            Operation::new("test-callback-123", OperationType::Callback)
+                        }],
+                        next_marker: None,
+                    }),
+                }))
+        );
+        let state = create_test_state(client);
+        let op_id = create_test_op_id();
+        let config = create_test_config();
+        let logger = create_test_logger();
+
+        let result: Result<Callback<String>, DurableError> = callback_handler(
+            &state,
+            &op_id,
+            &config,
+            &logger,
+        ).await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DurableError::Callback { message, callback_id } => {
+                assert!(message.contains("did not return callback_id"));
+                assert!(callback_id.is_none());
+            }
+            e => panic!("Expected Callback error, got {:?}", e),
+        }
     }
 
     #[tokio::test]
@@ -553,12 +693,14 @@ mod tests {
     fn test_create_callback_start_update() {
         let op_id = OperationIdentifier::new("op-123", Some("parent-456".to_string()), Some("my-callback".to_string()));
         let config = create_test_config();
-        let update = create_callback_start_update(&op_id, "callback-id-123", &config);
+        let update = create_callback_start_update(&op_id, &config);
         
         assert_eq!(update.operation_id, "op-123");
         assert_eq!(update.operation_type, OperationType::Callback);
-        assert!(update.result.is_some());
-        assert!(update.result.as_ref().unwrap().contains("callback_id"));
+        assert!(update.callback_options.is_some());
+        let callback_opts = update.callback_options.unwrap();
+        assert_eq!(callback_opts.timeout_seconds, Some(86400)); // 24 hours in seconds
+        assert_eq!(callback_opts.heartbeat_timeout_seconds, Some(300)); // 5 minutes in seconds
         assert_eq!(update.parent_id, Some("parent-456".to_string()));
         assert_eq!(update.name, Some("my-callback".to_string()));
     }

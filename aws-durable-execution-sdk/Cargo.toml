@@ -46,6 +46,9 @@ lambda_runtime = "1"
 blake2 = "0.10"
 hex = "0.4"
 
+# Date/time handling
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+
 # Static assertions for compile-time checks
 static_assertions = "1.1"
 

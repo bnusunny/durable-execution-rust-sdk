@@ -3,9 +3,127 @@
 //! This module defines the core operation types used for checkpointing
 //! and replay in durable execution workflows.
 
-use serde::{Deserialize, Serialize};
+use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Utc};
+use serde::{Deserialize, Serialize, Deserializer};
 
 use crate::error::ErrorObject;
+
+/// Custom deserializer for timestamp fields that can be either i64 or ISO 8601 string.
+fn deserialize_timestamp<'de, D>(deserializer: D) -> Result<Option<i64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::{self, Visitor};
+    
+    struct TimestampVisitor;
+    
+    impl<'de> Visitor<'de> for TimestampVisitor {
+        type Value = Option<i64>;
+        
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("an integer timestamp or ISO 8601 string")
+        }
+        
+        fn visit_none<E>(self) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(None)
+        }
+        
+        fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            deserializer.deserialize_any(TimestampValueVisitor)
+        }
+        
+        fn visit_unit<E>(self) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(None)
+        }
+    }
+    
+    struct TimestampValueVisitor;
+    
+    impl<'de> Visitor<'de> for TimestampValueVisitor {
+        type Value = Option<i64>;
+        
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("an integer timestamp, floating point timestamp, or ISO 8601 string")
+        }
+        
+        fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Some(value))
+        }
+        
+        fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Some(value as i64))
+        }
+        
+        fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            // Floating point timestamps are typically in seconds with fractional milliseconds
+            // Convert to milliseconds by multiplying by 1000
+            // The value 1768279889.004 represents seconds since epoch
+            // Use round() before casting to avoid precision loss for large timestamps
+            Ok(Some((value * 1000.0).round() as i64))
+        }
+        
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            // Try to parse as ISO 8601 datetime string using chrono
+            parse_iso8601_to_millis(value)
+                .map(Some)
+                .map_err(|e| de::Error::custom(format!("invalid timestamp string '{}': {}", value, e)))
+        }
+    }
+    
+    deserializer.deserialize_option(TimestampVisitor)
+}
+
+/// Parse an ISO 8601 datetime string to milliseconds since epoch using chrono.
+fn parse_iso8601_to_millis(s: &str) -> Result<i64, String> {
+    // Normalize space separator to 'T' for ISO 8601 compliance
+    let normalized = s.replace(' ', "T");
+    
+    // Try parsing as DateTime with timezone (e.g., "2026-01-13T04:10:18.841055+00:00")
+    if let Ok(dt) = DateTime::parse_from_rfc3339(&normalized) {
+        return Ok(dt.timestamp_millis());
+    }
+    
+    // Try parsing with various timezone formats
+    if let Ok(dt) = DateTime::<FixedOffset>::parse_from_str(&normalized, "%Y-%m-%dT%H:%M:%S%.f%:z") {
+        return Ok(dt.timestamp_millis());
+    }
+    
+    if let Ok(dt) = DateTime::<FixedOffset>::parse_from_str(&normalized, "%Y-%m-%dT%H:%M:%S%:z") {
+        return Ok(dt.timestamp_millis());
+    }
+    
+    // Try parsing as naive datetime (no timezone) and assume UTC
+    if let Ok(naive) = NaiveDateTime::parse_from_str(&normalized, "%Y-%m-%dT%H:%M:%S%.f") {
+        return Ok(Utc.from_utc_datetime(&naive).timestamp_millis());
+    }
+    
+    if let Ok(naive) = NaiveDateTime::parse_from_str(&normalized, "%Y-%m-%dT%H:%M:%S") {
+        return Ok(Utc.from_utc_datetime(&naive).timestamp_millis());
+    }
+    
+    Err(format!("unable to parse as ISO 8601 datetime"))
+}
 
 /// Represents a checkpointed operation in a durable execution.
 ///
@@ -47,11 +165,11 @@ pub struct Operation {
     pub sub_type: Option<String>,
 
     /// Start timestamp of the operation (milliseconds since epoch)
-    #[serde(rename = "StartTimestamp", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "StartTimestamp", skip_serializing_if = "Option::is_none", default, deserialize_with = "deserialize_timestamp")]
     pub start_timestamp: Option<i64>,
 
     /// End timestamp of the operation (milliseconds since epoch)
-    #[serde(rename = "EndTimestamp", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "EndTimestamp", skip_serializing_if = "Option::is_none", default, deserialize_with = "deserialize_timestamp")]
     pub end_timestamp: Option<i64>,
 
     /// Execution details for EXECUTION type operations
@@ -97,7 +215,7 @@ pub struct StepDetails {
     #[serde(rename = "Attempt", skip_serializing_if = "Option::is_none")]
     pub attempt: Option<u32>,
     /// Timestamp for the next retry attempt
-    #[serde(rename = "NextAttemptTimestamp", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "NextAttemptTimestamp", skip_serializing_if = "Option::is_none", default, deserialize_with = "deserialize_timestamp")]
     pub next_attempt_timestamp: Option<i64>,
     /// Error details if the step failed
     #[serde(rename = "Error", skip_serializing_if = "Option::is_none")]
@@ -112,7 +230,7 @@ pub struct StepDetails {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WaitDetails {
     /// Timestamp when the wait is scheduled to end
-    #[serde(rename = "ScheduledEndTimestamp", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "ScheduledEndTimestamp", skip_serializing_if = "Option::is_none", default, deserialize_with = "deserialize_timestamp")]
     pub scheduled_end_timestamp: Option<i64>,
 }
 
@@ -1501,5 +1619,120 @@ mod tests {
             let deserialized: OperationAction = serde_json::from_str(&json).unwrap();
             assert_eq!(action, deserialized, "Round-trip failed for {:?}", action);
         }
+    }
+
+    // Timestamp parsing tests
+
+    #[test]
+    fn test_parse_iso8601_rfc3339_format() {
+        // Standard RFC 3339 format
+        let result = parse_iso8601_to_millis("2026-01-13T04:10:18.841+00:00");
+        assert!(result.is_ok(), "Failed to parse: {:?}", result);
+        let millis = result.unwrap();
+        // 2026-01-13T04:10:18.841Z - verify it's a reasonable timestamp
+        // January 13, 2026 is in the future, so millis should be > current time
+        // Let's just verify it parsed to a positive value and is in a reasonable range
+        assert!(millis > 0, "Timestamp should be positive, got {}", millis);
+        // Should be after year 2020 (1577836800000) and before year 2100 (4102444800000)
+        assert!(millis > 1577836800000 && millis < 4102444800000, 
+            "Timestamp {} is outside reasonable range", millis);
+    }
+
+    #[test]
+    fn test_parse_iso8601_with_space_separator() {
+        // Format with space instead of T (common in some systems)
+        let result = parse_iso8601_to_millis("2026-01-13 04:10:18.841055+00:00");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_iso8601_without_timezone() {
+        // Naive datetime (assumes UTC)
+        let result = parse_iso8601_to_millis("2026-01-13T04:10:18.841");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_iso8601_without_fractional_seconds() {
+        // No fractional seconds
+        let result = parse_iso8601_to_millis("2026-01-13T04:10:18+00:00");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_iso8601_invalid_format() {
+        // Invalid format should return error
+        let result = parse_iso8601_to_millis("not-a-timestamp");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_timestamp_deserialization_integer() {
+        let json = r#"{
+            "Id": "op-123",
+            "Type": "STEP",
+            "Status": "STARTED",
+            "StartTimestamp": 1768279818841
+        }"#;
+        
+        let op: Operation = serde_json::from_str(json).unwrap();
+        assert_eq!(op.start_timestamp, Some(1768279818841));
+    }
+
+    #[test]
+    fn test_timestamp_deserialization_float() {
+        // Floating point timestamp (seconds with fractional milliseconds)
+        let json = r#"{
+            "Id": "op-123",
+            "Type": "STEP",
+            "Status": "STARTED",
+            "StartTimestamp": 1768279818.841
+        }"#;
+        
+        let op: Operation = serde_json::from_str(json).unwrap();
+        // Should be converted to milliseconds
+        assert_eq!(op.start_timestamp, Some(1768279818841));
+    }
+
+    #[test]
+    fn test_timestamp_deserialization_iso8601_string() {
+        let json = r#"{
+            "Id": "op-123",
+            "Type": "STEP",
+            "Status": "STARTED",
+            "StartTimestamp": "2026-01-13T04:10:18.841+00:00"
+        }"#;
+        
+        let op: Operation = serde_json::from_str(json).unwrap();
+        assert!(op.start_timestamp.is_some());
+        let ts = op.start_timestamp.unwrap();
+        // Should be a reasonable timestamp (after 2020, before 2100)
+        assert!(ts > 1577836800000 && ts < 4102444800000,
+            "Timestamp {} is outside reasonable range", ts);
+    }
+
+    #[test]
+    fn test_timestamp_deserialization_null() {
+        let json = r#"{
+            "Id": "op-123",
+            "Type": "STEP",
+            "Status": "STARTED",
+            "StartTimestamp": null
+        }"#;
+        
+        let op: Operation = serde_json::from_str(json).unwrap();
+        assert!(op.start_timestamp.is_none());
+    }
+
+    #[test]
+    fn test_timestamp_deserialization_missing() {
+        let json = r#"{
+            "Id": "op-123",
+            "Type": "STEP",
+            "Status": "STARTED"
+        }"#;
+        
+        let op: Operation = serde_json::from_str(json).unwrap();
+        assert!(op.start_timestamp.is_none());
     }
 }

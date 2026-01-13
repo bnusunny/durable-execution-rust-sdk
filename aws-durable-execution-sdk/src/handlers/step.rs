@@ -594,12 +594,8 @@ mod tests {
     fn create_mock_client() -> SharedDurableServiceClient {
         Arc::new(
             MockDurableServiceClient::new()
-                .with_checkpoint_response(Ok(CheckpointResponse {
-                    checkpoint_token: "token-1".to_string(),
-                }))
-                .with_checkpoint_response(Ok(CheckpointResponse {
-                    checkpoint_token: "token-2".to_string(),
-                }))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("token-1")))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("token-2")))
         )
     }
 
@@ -1009,12 +1005,8 @@ mod property_tests {
                     let order_counter_clone = order_counter.clone();
 
                     let client = Arc::new(MockDurableServiceClient::new()
-                        .with_checkpoint_response(Ok(CheckpointResponse {
-                            checkpoint_token: "token-1".to_string(),
-                        }))
-                        .with_checkpoint_response(Ok(CheckpointResponse {
-                            checkpoint_token: "token-2".to_string(),
-                        })));
+                        .with_checkpoint_response(Ok(CheckpointResponse::new("token-1")))
+                        .with_checkpoint_response(Ok(CheckpointResponse::new("token-2"))));
                     
                     let state = create_test_state(client);
                     let op_id = OperationIdentifier::new(
@@ -1064,9 +1056,7 @@ mod property_tests {
                 let rt = tokio::runtime::Runtime::new().unwrap();
                 rt.block_on(async {
                     let client = Arc::new(MockDurableServiceClient::new()
-                        .with_checkpoint_response(Ok(CheckpointResponse {
-                            checkpoint_token: "token-1".to_string(),
-                        })));
+                        .with_checkpoint_response(Ok(CheckpointResponse::new("token-1"))));
                     
                     let state = create_test_state(client);
                     let op_id = OperationIdentifier::new(
@@ -1117,12 +1107,8 @@ mod property_tests {
                 let rt = tokio::runtime::Runtime::new().unwrap();
                 rt.block_on(async {
                     let client = Arc::new(MockDurableServiceClient::new()
-                        .with_checkpoint_response(Ok(CheckpointResponse {
-                            checkpoint_token: "token-1".to_string(),
-                        }))
-                        .with_checkpoint_response(Ok(CheckpointResponse {
-                            checkpoint_token: "token-2".to_string(),
-                        })));
+                        .with_checkpoint_response(Ok(CheckpointResponse::new("token-1")))
+                        .with_checkpoint_response(Ok(CheckpointResponse::new("token-2"))));
                     
                     let state = create_test_state(client);
                     let op_id = OperationIdentifier::new(
@@ -1167,9 +1153,7 @@ mod property_tests {
                 let rt = tokio::runtime::Runtime::new().unwrap();
                 rt.block_on(async {
                     let client = Arc::new(MockDurableServiceClient::new()
-                        .with_checkpoint_response(Ok(CheckpointResponse {
-                            checkpoint_token: "token-1".to_string(),
-                        })));
+                        .with_checkpoint_response(Ok(CheckpointResponse::new("token-1"))));
                     
                     let state = create_test_state(client);
                     let op_id = OperationIdentifier::new(
@@ -1278,9 +1262,7 @@ mod property_tests {
                 rt.block_on(async {
                     // Create a mock client that tracks checkpoint calls
                     let client = Arc::new(MockDurableServiceClient::new()
-                        .with_checkpoint_response(Ok(CheckpointResponse {
-                            checkpoint_token: "token-1".to_string(),
-                        })));
+                        .with_checkpoint_response(Ok(CheckpointResponse::new("token-1"))));
                     
                     // Create state with a pre-existing READY operation
                     let mut op = Operation::new("test-op-ready", OperationType::Step);

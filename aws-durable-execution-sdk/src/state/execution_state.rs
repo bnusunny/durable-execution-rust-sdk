@@ -624,8 +624,67 @@ impl ExecutionState {
             *token_guard = response.checkpoint_token;
         }
         
-        self.update_local_cache_from_update(&operation).await;
+        // Update local cache from the response's NewExecutionState if available
+        if let Some(ref new_state) = response.new_execution_state {
+            self.update_local_cache_from_response(new_state).await;
+        } else {
+            self.update_local_cache_from_update(&operation).await;
+        }
         Ok(())
+    }
+    
+    /// Creates a checkpoint and returns the full response including NewExecutionState.
+    /// This is useful for operations like CALLBACK that need service-generated values.
+    pub async fn create_checkpoint_with_response(
+        &self,
+        operation: OperationUpdate,
+    ) -> Result<crate::client::CheckpointResponse, DurableError> {
+        // Check for orphaned child
+        if let Some(ref parent_id) = operation.parent_id {
+            if self.is_parent_done(parent_id).await {
+                return Err(DurableError::OrphanedChild {
+                    message: format!(
+                        "Cannot checkpoint operation {} - parent {} has completed",
+                        operation.operation_id, parent_id
+                    ),
+                    operation_id: operation.operation_id.clone(),
+                });
+            }
+        }
+        
+        let token = self.checkpoint_token.read().await.clone();
+        let response = self
+            .service_client
+            .checkpoint(&self.durable_execution_arn, &token, vec![operation.clone()])
+            .await?;
+        
+        tracing::debug!(
+            has_new_state = response.new_execution_state.is_some(),
+            num_operations = response.new_execution_state.as_ref().map(|s| s.operations.len()).unwrap_or(0),
+            "Checkpoint response received"
+        );
+        
+        {
+            let mut token_guard = self.checkpoint_token.write().await;
+            *token_guard = response.checkpoint_token.clone();
+        }
+        
+        // Update local cache from the response's NewExecutionState if available
+        if let Some(ref new_state) = response.new_execution_state {
+            self.update_local_cache_from_response(new_state).await;
+        } else {
+            self.update_local_cache_from_update(&operation).await;
+        }
+        
+        Ok(response)
+    }
+    
+    /// Updates the local operation cache from a checkpoint response's NewExecutionState.
+    async fn update_local_cache_from_response(&self, new_state: &crate::client::NewExecutionState) {
+        let mut operations = self.operations.write().await;
+        for op in &new_state.operations {
+            operations.insert(op.operation_id.clone(), op.clone());
+        }
     }
     
     /// Creates a synchronous checkpoint (waits for confirmation).
@@ -1138,9 +1197,7 @@ mod tests {
     async fn test_create_checkpoint_direct() {
         let client = Arc::new(
             MockDurableServiceClient::new()
-                .with_checkpoint_response(Ok(CheckpointResponse {
-                    checkpoint_token: "new-token".to_string(),
-                }))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("new-token")))
         );
         
         let state = ExecutionState::new(
@@ -1162,12 +1219,8 @@ mod tests {
     async fn test_create_checkpoint_updates_local_cache_on_succeed() {
         let client = Arc::new(
             MockDurableServiceClient::new()
-                .with_checkpoint_response(Ok(CheckpointResponse {
-                    checkpoint_token: "token-1".to_string(),
-                }))
-                .with_checkpoint_response(Ok(CheckpointResponse {
-                    checkpoint_token: "token-2".to_string(),
-                }))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("token-1")))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("token-2")))
         );
         
         let state = ExecutionState::new(
@@ -1220,9 +1273,7 @@ mod tests {
     async fn test_with_batcher_creates_state_and_batcher() {
         let client = Arc::new(
             MockDurableServiceClient::new()
-                .with_checkpoint_response(Ok(CheckpointResponse {
-                    checkpoint_token: "new-token".to_string(),
-                }))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("new-token")))
         );
         
         let (state, mut batcher) = ExecutionState::with_batcher(
@@ -1257,9 +1308,7 @@ mod tests {
     async fn test_checkpoint_sync_convenience_method() {
         let client = Arc::new(
             MockDurableServiceClient::new()
-                .with_checkpoint_response(Ok(CheckpointResponse {
-                    checkpoint_token: "new-token".to_string(),
-                }))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("new-token")))
         );
         
         let state = ExecutionState::new(
@@ -1279,9 +1328,7 @@ mod tests {
     async fn test_checkpoint_async_convenience_method() {
         let client = Arc::new(
             MockDurableServiceClient::new()
-                .with_checkpoint_response(Ok(CheckpointResponse {
-                    checkpoint_token: "new-token".to_string(),
-                }))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("new-token")))
         );
         
         let state = ExecutionState::new(
@@ -1516,9 +1563,7 @@ mod tests {
     async fn test_checkpoint_optimal_eager_mode() {
         let client = Arc::new(
             MockDurableServiceClient::new()
-                .with_checkpoint_response(Ok(CheckpointResponse {
-                    checkpoint_token: "new-token".to_string(),
-                }))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("new-token")))
         );
         
         let state = ExecutionState::with_checkpointing_mode(
@@ -1539,9 +1584,7 @@ mod tests {
     async fn test_eager_mode_bypasses_batcher() {
         let client = Arc::new(
             MockDurableServiceClient::new()
-                .with_checkpoint_response(Ok(CheckpointResponse {
-                    checkpoint_token: "new-token".to_string(),
-                }))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("new-token")))
         );
         
         let (state, mut batcher) = ExecutionState::with_batcher_and_mode(
@@ -1652,9 +1695,7 @@ mod tests {
     async fn test_complete_execution_success() {
         let client = Arc::new(
             MockDurableServiceClient::new()
-                .with_checkpoint_response(Ok(CheckpointResponse {
-                    checkpoint_token: "new-token".to_string(),
-                }))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("new-token")))
         );
         
         let exec_op = create_execution_operation(Some(r#"{"order_id": "123"}"#));
@@ -1691,9 +1732,7 @@ mod tests {
     async fn test_complete_execution_failure() {
         let client = Arc::new(
             MockDurableServiceClient::new()
-                .with_checkpoint_response(Ok(CheckpointResponse {
-                    checkpoint_token: "new-token".to_string(),
-                }))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("new-token")))
         );
         
         let exec_op = create_execution_operation(Some(r#"{"order_id": "123"}"#));
@@ -1768,9 +1807,7 @@ mod tests {
                 let result: Result<(), TestCaseError> = rt.block_on(async {
                     let client = Arc::new(
                         MockDurableServiceClient::new()
-                            .with_checkpoint_response(Ok(CheckpointResponse {
-                                checkpoint_token: "new-token".to_string(),
-                            }))
+                            .with_checkpoint_response(Ok(CheckpointResponse::new("new-token")))
                     );
                     
                     let state = ExecutionState::new(
@@ -1822,9 +1859,7 @@ mod tests {
                 let result: Result<(), TestCaseError> = rt.block_on(async {
                     let client = Arc::new(
                         MockDurableServiceClient::new()
-                            .with_checkpoint_response(Ok(CheckpointResponse {
-                                checkpoint_token: "new-token".to_string(),
-                            }))
+                            .with_checkpoint_response(Ok(CheckpointResponse::new("new-token")))
                     );
                     
                     let state = ExecutionState::new(
@@ -1858,9 +1893,7 @@ mod tests {
                 let result: Result<(), TestCaseError> = rt.block_on(async {
                     let client = Arc::new(
                         MockDurableServiceClient::new()
-                            .with_checkpoint_response(Ok(CheckpointResponse {
-                                checkpoint_token: "new-token".to_string(),
-                            }))
+                            .with_checkpoint_response(Ok(CheckpointResponse::new("new-token")))
                     );
                     
                     let state = ExecutionState::new(
@@ -1895,12 +1928,8 @@ mod tests {
                 let result: Result<(), TestCaseError> = rt.block_on(async {
                     let client = Arc::new(
                         MockDurableServiceClient::new()
-                            .with_checkpoint_response(Ok(CheckpointResponse {
-                                checkpoint_token: "token-1".to_string(),
-                            }))
-                            .with_checkpoint_response(Ok(CheckpointResponse {
-                                checkpoint_token: "token-2".to_string(),
-                            }))
+                            .with_checkpoint_response(Ok(CheckpointResponse::new("token-1")))
+                            .with_checkpoint_response(Ok(CheckpointResponse::new("token-2")))
                     );
                     
                     let state = ExecutionState::new(

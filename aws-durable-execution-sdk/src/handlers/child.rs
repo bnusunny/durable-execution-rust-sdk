@@ -250,9 +250,7 @@ mod tests {
     fn create_mock_client() -> SharedDurableServiceClient {
         Arc::new(
             MockDurableServiceClient::new()
-                .with_checkpoint_response(Ok(CheckpointResponse {
-                    checkpoint_token: "token-1".to_string(),
-                }))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("token-1")))
         )
     }
 

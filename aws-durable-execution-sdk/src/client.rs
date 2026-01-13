@@ -59,11 +59,53 @@ pub trait DurableServiceClient: Send + Sync {
 }
 
 /// Response from a checkpoint operation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CheckpointResponse {
     /// The new checkpoint token to use for subsequent checkpoints
-    #[serde(rename = "CheckpointToken")]
+    #[serde(rename = "CheckpointToken", default)]
     pub checkpoint_token: String,
+    
+    /// The new execution state containing updated operations
+    /// This includes service-generated values like CallbackDetails.CallbackId
+    #[serde(rename = "NewExecutionState", skip_serializing_if = "Option::is_none", default)]
+    pub new_execution_state: Option<NewExecutionState>,
+}
+
+impl CheckpointResponse {
+    /// Creates a new CheckpointResponse with just a checkpoint token.
+    pub fn new(checkpoint_token: impl Into<String>) -> Self {
+        Self {
+            checkpoint_token: checkpoint_token.into(),
+            new_execution_state: None,
+        }
+    }
+}
+
+/// New execution state returned from checkpoint operations.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewExecutionState {
+    /// The updated operations with service-generated values
+    #[serde(rename = "Operations", default)]
+    pub operations: Vec<Operation>,
+    
+    /// Marker for the next page of results, if any
+    #[serde(rename = "NextMarker", skip_serializing_if = "Option::is_none")]
+    pub next_marker: Option<String>,
+}
+
+impl NewExecutionState {
+    /// Finds an operation by its ID.
+    ///
+    /// # Arguments
+    ///
+    /// * `operation_id` - The ID of the operation to find
+    ///
+    /// # Returns
+    ///
+    /// A reference to the operation if found, None otherwise.
+    pub fn find_operation(&self, operation_id: &str) -> Option<&Operation> {
+        self.operations.iter().find(|op| op.operation_id == operation_id)
+    }
 }
 
 /// Response from a get_operations call.
@@ -523,6 +565,7 @@ impl MockDurableServiceClient {
         for i in 0..count {
             responses.push(Ok(CheckpointResponse {
                 checkpoint_token: format!("token-{}", i),
+                new_execution_state: None,
             }));
         }
         drop(responses);
@@ -543,6 +586,7 @@ impl DurableServiceClient for MockDurableServiceClient {
         if responses.is_empty() {
             Ok(CheckpointResponse {
                 checkpoint_token: "mock-token".to_string(),
+                new_execution_state: None,
             })
         } else {
             responses.remove(0)
@@ -579,6 +623,7 @@ mod tests {
     fn test_checkpoint_response_serialization() {
         let response = CheckpointResponse {
             checkpoint_token: "token-123".to_string(),
+            new_execution_state: None,
         };
         let json = serde_json::to_string(&response).unwrap();
         assert!(json.contains(r#""CheckpointToken":"token-123""#));
@@ -662,6 +707,7 @@ mod tests {
         let client = MockDurableServiceClient::new().with_checkpoint_response(Ok(
             CheckpointResponse {
                 checkpoint_token: "custom-token".to_string(),
+                new_execution_state: None,
             },
         ));
         let result = client

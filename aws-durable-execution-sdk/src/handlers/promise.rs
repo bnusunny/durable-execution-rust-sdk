@@ -647,15 +647,9 @@ mod tests {
     fn create_mock_client() -> SharedDurableServiceClient {
         Arc::new(
             MockDurableServiceClient::new()
-                .with_checkpoint_response(Ok(CheckpointResponse {
-                    checkpoint_token: "token-1".to_string(),
-                }))
-                .with_checkpoint_response(Ok(CheckpointResponse {
-                    checkpoint_token: "token-2".to_string(),
-                }))
-                .with_checkpoint_response(Ok(CheckpointResponse {
-                    checkpoint_token: "token-3".to_string(),
-                }))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("token-1")))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("token-2")))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("token-3")))
         )
     }
 
@@ -909,9 +903,7 @@ mod property_tests {
     fn create_mock_client_with_responses(count: usize) -> SharedDurableServiceClient {
         let mut client = MockDurableServiceClient::new();
         for i in 0..count {
-            client = client.with_checkpoint_response(Ok(CheckpointResponse {
-                checkpoint_token: format!("token-{}", i),
-            }));
+            client = client.with_checkpoint_response(Ok(CheckpointResponse::new(format!("token-{}", i))));
         }
         Arc::new(client)
     }

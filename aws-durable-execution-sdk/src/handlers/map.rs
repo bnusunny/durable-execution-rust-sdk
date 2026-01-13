@@ -154,6 +154,11 @@ where
         items.into_iter().enumerate().map(|(i, item)| (i, vec![item])).collect()
     };
 
+    // Checkpoint START for the map operation before spawning children
+    // This ensures the parent operation exists when children reference it
+    let start_update = create_start_update(op_id);
+    state.create_checkpoint(start_update, true).await?;
+
     // Create the map context (child of parent)
     let map_ctx = parent_ctx.create_child_context(&op_id.operation_id);
 
@@ -266,6 +271,18 @@ fn batch_items<T: Clone>(items: &[T], batcher: &ItemBatcher) -> Vec<(usize, Vec<
     }
 
     batches
+}
+
+/// Creates a Start operation update for map operation.
+fn create_start_update(op_id: &OperationIdentifier) -> OperationUpdate {
+    let mut update = OperationUpdate::start(&op_id.operation_id, OperationType::Context);
+    if let Some(ref parent_id) = op_id.parent_id {
+        update = update.with_parent_id(parent_id);
+    }
+    if let Some(ref name) = op_id.name {
+        update = update.with_name(name);
+    }
+    update
 }
 
 /// Creates a Succeed operation update for map operation.

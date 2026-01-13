@@ -1,0 +1,39 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  parrallel_processing
+
+  Sample SAM Template for parrallel_processing
+
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 256
+
+
+Resources:
+  HelloWorldFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Metadata:
+      BuildMethod: rust-cargolambda # More info about Cargo Lambda: https://github.com/cargo-lambda/cargo-lambda
+    Properties:
+      CodeUri: ./rust_app   # Points to dir of Cargo.toml
+      Handler: bootstrap    # Do not change, as this is the default executable name produced by Cargo Lambda
+      Runtime: python3.13
+      Architectures:
+        - x86_64
+      DurableConfig:
+        ExecutionTimeout: 3600
+        RetentionPeriodInDays: 7        
+      Environment:
+        Variables:
+          AWS_LAMBDA_EXEC_WRAPPER: /var/task/bootstrap
+
+Outputs:
+  HelloWorldFunction:
+    Description: "Hello World Lambda Function ARN"
+    Value: !GetAtt HelloWorldFunction.Arn
+  HelloWorldFunctionIamRole:
+    Description: "Implicit IAM Role created for Hello World function"
+    Value: !GetAtt HelloWorldFunctionRole.Arn

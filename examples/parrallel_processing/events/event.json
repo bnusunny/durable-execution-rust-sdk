@@ -1,0 +1,15 @@
+{
+   "batch_id": "batch-123234345234",
+   "items": [
+    {"id": "1", "data": "adsffwefe", "priority": 1},
+    {"id": "2", "data": "adsffwefe", "priority": 3},
+    {"id": "3", "data": "adsffwefe", "priority": 2},
+    {"id": "4", "data": "adsffwefe", "priority": 7},
+    {"id": "5", "data": "adsffwefe", "priority": 4},
+    {"id": "6", "data": "adsffwefe", "priority": 5},
+    {"id": "7", "data": "adsffwefe", "priority": 6},
+    {"id": "8", "data": "adsffwefe", "priority": 8},
+    {"id": "9", "data": "adsffwefe", "priority": 9},
+    {"id": "10", "data": "adsffwefe", "priority": 10}
+   ]
+}

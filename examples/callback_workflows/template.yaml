@@ -1,0 +1,109 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Callback Workflows Example
+  
+  Demonstrates approval workflows using callbacks with the AWS Durable Execution SDK.
+  Includes a simulated approver that auto-processes approval requests via SQS.
+
+Globals:
+  Function:
+    MemorySize: 256
+    Architectures:
+      - x86_64
+
+Resources:
+  # =============================================================================
+  # SQS Queue for Approval Notifications
+  # =============================================================================
+  ApprovalQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${AWS::StackName}-approval-queue"
+      VisibilityTimeout: 120  # 2 minutes to account for processing time
+      MessageRetentionPeriod: 86400  # 1 day
+
+  # =============================================================================
+  # Approval Workflow Lambda (Durable Execution)
+  # =============================================================================
+  ApprovalWorkflowFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: rust-cargolambda
+      BuildProperties:
+        Binary: approval_workflow
+    Properties:
+      CodeUri: ./rust_app
+      Handler: bootstrap
+      Runtime: python3.13
+      Timeout: 30
+      DurableConfig:
+        ExecutionTimeout: 3600
+        RetentionPeriodInDays: 7
+      Environment:
+        Variables:
+          APPROVAL_QUEUE_URL: !Ref ApprovalQueue
+          AWS_LAMBDA_EXEC_WRAPPER: /var/task/bootstrap
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+                - sqs:GetQueueAttributes
+              Resource: !GetAtt ApprovalQueue.Arn
+
+  # =============================================================================
+  # Simulated Approver Lambda (processes SQS messages)
+  # =============================================================================
+  SimulatedApproverFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: rust-cargolambda
+      BuildProperties:
+        Binary: simulated_approver
+    Properties:
+      CodeUri: ./rust_app
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Timeout: 120
+      Events:
+        ApprovalQueueEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt ApprovalQueue.Arn
+            BatchSize: 1
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - lambda:InvokeDurableExecution
+                - lambda:CompleteDurableExecutionCallback
+                - lambda:SendDurableExecutionCallback
+                - lambda:SendDurableExecutionCallbackSuccess
+                - lambda:SendDurableExecutionCallbackFailure
+                - lambda:SendDurableExecutionCallbackHeartbeat
+                - lambda:InvokeFunction
+              Resource: "*"
+
+Outputs:
+  ApprovalWorkflowFunction:
+    Description: "Approval Workflow Lambda Function ARN"
+    Value: !GetAtt ApprovalWorkflowFunction.Arn
+  
+  ApprovalWorkflowFunctionIamRole:
+    Description: "IAM Role for Approval Workflow function"
+    Value: !GetAtt ApprovalWorkflowFunctionRole.Arn
+  
+  SimulatedApproverFunction:
+    Description: "Simulated Approver Lambda Function ARN"
+    Value: !GetAtt SimulatedApproverFunction.Arn
+  
+  ApprovalQueueUrl:
+    Description: "SQS Queue URL for approval notifications"
+    Value: !Ref ApprovalQueue
+  
+  ApprovalQueueArn:
+    Description: "SQS Queue ARN for approval notifications"
+    Value: !GetAtt ApprovalQueue.Arn

@@ -1,0 +1,9 @@
+{
+  "request_id": "REQ-001",
+  "approval_type": "expense",
+  "requester": "john.doe@example.com",
+  "description": "Q1 Marketing Campaign Budget",
+  "amount": 5000.0,
+  "approvers": ["manager@example.com"],
+  "timeout_hours": 24
+}

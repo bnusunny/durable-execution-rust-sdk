@@ -1,0 +1,9 @@
+{
+  "request_id": "REQ-002",
+  "approval_type": "expense",
+  "requester": "jane.smith@example.com",
+  "description": "Enterprise Software License",
+  "amount": 15000.0,
+  "approvers": ["manager@example.com", "director@example.com"],
+  "timeout_hours": 48
+}

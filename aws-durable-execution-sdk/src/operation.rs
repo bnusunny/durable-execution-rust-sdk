@@ -129,6 +129,35 @@ fn parse_iso8601_to_millis(s: &str) -> Result<i64, String> {
 ///
 /// Operations are the fundamental unit of state in durable executions.
 /// Each operation has a unique ID and tracks its type, status, and result.
+///
+/// # Examples
+///
+/// Creating a new operation:
+///
+/// ```
+/// use aws_durable_execution_sdk::operation::{Operation, OperationType, OperationStatus};
+///
+/// let op = Operation::new("step-001", OperationType::Step);
+/// assert_eq!(op.operation_id, "step-001");
+/// assert_eq!(op.operation_type, OperationType::Step);
+/// assert_eq!(op.status, OperationStatus::Started);
+/// ```
+///
+/// Serializing and deserializing operations:
+///
+/// ```
+/// use aws_durable_execution_sdk::operation::{Operation, OperationType, OperationStatus};
+///
+/// let mut op = Operation::new("wait-001", OperationType::Wait);
+/// op.status = OperationStatus::Succeeded;
+/// op.result = Some("done".to_string());
+///
+/// let json = serde_json::to_string(&op).unwrap();
+/// let restored: Operation = serde_json::from_str(&json).unwrap();
+///
+/// assert_eq!(restored.operation_id, "wait-001");
+/// assert_eq!(restored.status, OperationStatus::Succeeded);
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Operation {
     /// Unique identifier for this operation
@@ -423,6 +452,23 @@ impl Operation {
 ///
 /// This enum uses `#[repr(u8)]` for compact memory representation (1 byte).
 /// Explicit discriminant values ensure stability across versions.
+///
+/// # Examples
+///
+/// ```
+/// use aws_durable_execution_sdk::operation::OperationType;
+///
+/// let step = OperationType::Step;
+/// let wait = OperationType::Wait;
+///
+/// // Serialization uses uppercase names
+/// let json = serde_json::to_string(&step).unwrap();
+/// assert_eq!(json, "\"STEP\"");
+///
+/// // Display uses title case
+/// assert_eq!(format!("{}", step), "Step");
+/// assert_eq!(format!("{}", wait), "Wait");
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum OperationType {
@@ -463,6 +509,27 @@ impl std::fmt::Display for OperationType {
 ///
 /// This enum uses `#[repr(u8)]` for compact memory representation (1 byte).
 /// Explicit discriminant values ensure stability across versions.
+///
+/// # Examples
+///
+/// ```
+/// use aws_durable_execution_sdk::operation::OperationStatus;
+///
+/// let succeeded = OperationStatus::Succeeded;
+/// let pending = OperationStatus::Pending;
+///
+/// // Check terminal status
+/// assert!(succeeded.is_terminal());
+/// assert!(!pending.is_terminal());
+///
+/// // Check success/failure
+/// assert!(succeeded.is_success());
+/// assert!(!succeeded.is_failure());
+///
+/// // Serialization uses uppercase names
+/// let json = serde_json::to_string(&succeeded).unwrap();
+/// assert_eq!(json, "\"SUCCEEDED\"");
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum OperationStatus {
@@ -949,6 +1016,235 @@ impl OperationUpdate {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
+
+    // ============================================================================
+    // Proptest Strategies
+    // ============================================================================
+
+    /// Strategy for generating valid OperationType values
+    /// Feature: rust-sdk-test-suite, Property 1: OperationType Serialization Round-Trip
+    fn operation_type_strategy() -> impl Strategy<Value = OperationType> {
+        prop_oneof![
+            Just(OperationType::Execution),
+            Just(OperationType::Step),
+            Just(OperationType::Wait),
+            Just(OperationType::Callback),
+            Just(OperationType::Invoke),
+            Just(OperationType::Context),
+        ]
+    }
+
+    /// Strategy for generating valid OperationStatus values
+    /// Feature: rust-sdk-test-suite, Property 2: OperationStatus Serialization Round-Trip
+    fn operation_status_strategy() -> impl Strategy<Value = OperationStatus> {
+        prop_oneof![
+            Just(OperationStatus::Started),
+            Just(OperationStatus::Pending),
+            Just(OperationStatus::Ready),
+            Just(OperationStatus::Succeeded),
+            Just(OperationStatus::Failed),
+            Just(OperationStatus::Cancelled),
+            Just(OperationStatus::TimedOut),
+            Just(OperationStatus::Stopped),
+        ]
+    }
+
+    /// Strategy for generating valid OperationAction values
+    /// Feature: rust-sdk-test-suite, Property 3: OperationAction Serialization Round-Trip
+    fn operation_action_strategy() -> impl Strategy<Value = OperationAction> {
+        prop_oneof![
+            Just(OperationAction::Start),
+            Just(OperationAction::Succeed),
+            Just(OperationAction::Fail),
+            Just(OperationAction::Cancel),
+            Just(OperationAction::Retry),
+        ]
+    }
+
+    /// Strategy for generating non-empty strings (for IDs and names)
+    fn non_empty_string_strategy() -> impl Strategy<Value = String> {
+        "[a-zA-Z0-9_-]{1,64}".prop_map(|s| s)
+    }
+
+    /// Strategy for generating optional strings
+    fn optional_string_strategy() -> impl Strategy<Value = Option<String>> {
+        prop_oneof![
+            Just(None),
+            non_empty_string_strategy().prop_map(Some),
+        ]
+    }
+
+    /// Strategy for generating optional JSON result strings
+    fn optional_result_strategy() -> impl Strategy<Value = Option<String>> {
+        prop_oneof![
+            Just(None),
+            Just(Some(r#"{"value": 42}"#.to_string())),
+            Just(Some(r#""simple string""#.to_string())),
+            Just(Some("123".to_string())),
+            Just(Some("true".to_string())),
+            Just(Some("null".to_string())),
+        ]
+    }
+
+    /// Strategy for generating optional ErrorObject
+    fn optional_error_strategy() -> impl Strategy<Value = Option<ErrorObject>> {
+        prop_oneof![
+            Just(None),
+            (non_empty_string_strategy(), non_empty_string_strategy())
+                .prop_map(|(error_type, message)| Some(ErrorObject::new(error_type, message))),
+        ]
+    }
+
+    /// Strategy for generating optional timestamps
+    fn optional_timestamp_strategy() -> impl Strategy<Value = Option<i64>> {
+        prop_oneof![
+            Just(None),
+            // Generate timestamps in a reasonable range (2020-2030)
+            (1577836800000i64..1893456000000i64).prop_map(Some),
+        ]
+    }
+
+    /// Strategy for generating valid Operation instances
+    /// Feature: rust-sdk-test-suite, Property 5: Operation Serialization Round-Trip
+    fn operation_strategy() -> impl Strategy<Value = Operation> {
+        (
+            non_empty_string_strategy(),      // operation_id
+            operation_type_strategy(),         // operation_type
+            operation_status_strategy(),       // status
+            optional_result_strategy(),        // result
+            optional_error_strategy(),         // error
+            optional_string_strategy(),        // parent_id
+            optional_string_strategy(),        // name
+            optional_string_strategy(),        // sub_type
+            optional_timestamp_strategy(),     // start_timestamp
+            optional_timestamp_strategy(),     // end_timestamp
+        ).prop_map(|(
+            operation_id,
+            operation_type,
+            status,
+            result,
+            error,
+            parent_id,
+            name,
+            sub_type,
+            start_timestamp,
+            end_timestamp,
+        )| {
+            Operation {
+                operation_id,
+                operation_type,
+                status,
+                result,
+                error,
+                parent_id,
+                name,
+                sub_type,
+                start_timestamp,
+                end_timestamp,
+                execution_details: None,
+                step_details: None,
+                wait_details: None,
+                callback_details: None,
+                chained_invoke_details: None,
+                context_details: None,
+            }
+        })
+    }
+
+    // ============================================================================
+    // Property-Based Tests
+    // ============================================================================
+
+    proptest! {
+        /// Feature: rust-sdk-test-suite, Property 1: OperationType Serialization Round-Trip
+        /// For any OperationType value, serializing to JSON then deserializing SHALL produce the same value.
+        /// **Validates: Requirements 2.1**
+        #[test]
+        fn prop_operation_type_serialization_round_trip(op_type in operation_type_strategy()) {
+            let json = serde_json::to_string(&op_type).expect("serialization should succeed");
+            let deserialized: OperationType = serde_json::from_str(&json).expect("deserialization should succeed");
+            prop_assert_eq!(op_type, deserialized, "Round-trip failed for {:?}", op_type);
+        }
+
+        /// Feature: rust-sdk-test-suite, Property 2: OperationStatus Serialization Round-Trip
+        /// For any OperationStatus value, serializing to JSON then deserializing SHALL produce the same value.
+        /// **Validates: Requirements 2.2**
+        #[test]
+        fn prop_operation_status_serialization_round_trip(status in operation_status_strategy()) {
+            let json = serde_json::to_string(&status).expect("serialization should succeed");
+            let deserialized: OperationStatus = serde_json::from_str(&json).expect("deserialization should succeed");
+            prop_assert_eq!(status, deserialized, "Round-trip failed for {:?}", status);
+        }
+
+        /// Feature: rust-sdk-test-suite, Property 3: OperationAction Serialization Round-Trip
+        /// For any OperationAction value, serializing to JSON then deserializing SHALL produce the same value.
+        /// **Validates: Requirements 2.3**
+        #[test]
+        fn prop_operation_action_serialization_round_trip(action in operation_action_strategy()) {
+            let json = serde_json::to_string(&action).expect("serialization should succeed");
+            let deserialized: OperationAction = serde_json::from_str(&json).expect("deserialization should succeed");
+            prop_assert_eq!(action, deserialized, "Round-trip failed for {:?}", action);
+        }
+
+        /// Feature: rust-sdk-test-suite, Property 4: Terminal Status Classification
+        /// For any OperationStatus that is terminal (Succeeded, Failed, Cancelled, TimedOut, Stopped),
+        /// is_terminal() SHALL return true, and for non-terminal statuses (Started, Pending, Ready),
+        /// is_terminal() SHALL return false.
+        /// **Validates: Requirements 2.4, 2.5**
+        #[test]
+        fn prop_terminal_status_classification(status in operation_status_strategy()) {
+            let is_terminal = status.is_terminal();
+            let expected_terminal = matches!(
+                status,
+                OperationStatus::Succeeded
+                    | OperationStatus::Failed
+                    | OperationStatus::Cancelled
+                    | OperationStatus::TimedOut
+                    | OperationStatus::Stopped
+            );
+            prop_assert_eq!(
+                is_terminal, expected_terminal,
+                "Terminal classification mismatch for {:?}: got {}, expected {}",
+                status, is_terminal, expected_terminal
+            );
+        }
+
+        /// Feature: rust-sdk-test-suite, Property 5: Operation Serialization Round-Trip
+        /// For any Operation instance with valid fields, serializing to JSON then deserializing
+        /// SHALL produce an equivalent Operation.
+        /// **Validates: Requirements 2.6, 9.2**
+        #[test]
+        fn prop_operation_serialization_round_trip(op in operation_strategy()) {
+            let json = serde_json::to_string(&op).expect("serialization should succeed");
+            let deserialized: Operation = serde_json::from_str(&json).expect("deserialization should succeed");
+            
+            // Compare all fields
+            prop_assert_eq!(op.operation_id, deserialized.operation_id, "operation_id mismatch");
+            prop_assert_eq!(op.operation_type, deserialized.operation_type, "operation_type mismatch");
+            prop_assert_eq!(op.status, deserialized.status, "status mismatch");
+            prop_assert_eq!(op.result, deserialized.result, "result mismatch");
+            prop_assert_eq!(op.parent_id, deserialized.parent_id, "parent_id mismatch");
+            prop_assert_eq!(op.name, deserialized.name, "name mismatch");
+            prop_assert_eq!(op.sub_type, deserialized.sub_type, "sub_type mismatch");
+            prop_assert_eq!(op.start_timestamp, deserialized.start_timestamp, "start_timestamp mismatch");
+            prop_assert_eq!(op.end_timestamp, deserialized.end_timestamp, "end_timestamp mismatch");
+            
+            // Compare error if present
+            match (&op.error, &deserialized.error) {
+                (Some(e1), Some(e2)) => {
+                    prop_assert_eq!(&e1.error_type, &e2.error_type, "error_type mismatch");
+                    prop_assert_eq!(&e1.error_message, &e2.error_message, "error_message mismatch");
+                }
+                (None, None) => {}
+                _ => prop_assert!(false, "error presence mismatch"),
+            }
+        }
+    }
+
+    // ============================================================================
+    // Unit Tests
+    // ============================================================================
 
     #[test]
     fn test_operation_new() {

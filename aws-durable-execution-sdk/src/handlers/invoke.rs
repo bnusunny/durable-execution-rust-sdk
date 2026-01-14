@@ -482,4 +482,136 @@ mod tests {
         assert!(update.error.is_some());
         assert_eq!(update.error.unwrap().error_type, "InvokeError");
     }
+
+    // Gap Tests for Invoke Handler (Task 10)
+    // Requirements: 12.1, 12.2, 12.3
+
+    /// Test for TIMED_OUT status handling (Requirement 12.1)
+    /// WHEN an invoke operation times out, THE Test_Suite SHALL verify TIMED_OUT status is handled correctly
+    #[tokio::test]
+    async fn test_invoke_handler_replay_timed_out() {
+        let client = Arc::new(MockDurableServiceClient::new());
+        
+        // Create state with a pre-existing timed out invoke operation
+        let mut op = Operation::new("test-invoke-123", OperationType::Invoke);
+        op.status = OperationStatus::TimedOut;
+        
+        let initial_state = InitialExecutionState::with_operations(vec![op]);
+        let state = Arc::new(ExecutionState::new(
+            "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+            "initial-token",
+            initial_state,
+            client,
+        ));
+        
+        let op_id = create_test_op_id();
+        let config = create_test_config();
+        let logger = create_test_logger();
+
+        let result: Result<String, DurableError> = invoke_handler(
+            "target-function",
+            "test-payload".to_string(),
+            &state,
+            &op_id,
+            &config,
+            &logger,
+        ).await;
+
+        // Should return an Invocation error indicating timeout
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DurableError::Invocation { message, .. } => {
+                assert!(message.contains("TimedOut"), "Expected message to contain 'TimedOut', got: {}", message);
+            }
+            e => panic!("Expected Invocation error, got {:?}", e),
+        }
+    }
+
+    /// Test for STOPPED status handling (Requirement 12.2)
+    /// WHEN an invoke operation is stopped externally, THE Test_Suite SHALL verify STOPPED status is handled correctly
+    /// Note: This test validates the explicit STOPPED handling path (already exists but this confirms the behavior)
+    #[tokio::test]
+    async fn test_invoke_handler_replay_stopped_returns_invocation_error() {
+        let client = Arc::new(MockDurableServiceClient::new());
+        
+        // Create state with a pre-existing stopped invoke operation
+        let mut op = Operation::new("test-invoke-123", OperationType::Invoke);
+        op.status = OperationStatus::Stopped;
+        
+        let initial_state = InitialExecutionState::with_operations(vec![op]);
+        let state = Arc::new(ExecutionState::new(
+            "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+            "initial-token",
+            initial_state,
+            client,
+        ));
+        
+        let op_id = create_test_op_id();
+        let config = create_test_config();
+        let logger = create_test_logger();
+
+        let result: Result<String, DurableError> = invoke_handler(
+            "target-function",
+            "test-payload".to_string(),
+            &state,
+            &op_id,
+            &config,
+            &logger,
+        ).await;
+
+        // Should return an Invocation error with specific "stopped externally" message
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DurableError::Invocation { message, termination_reason } => {
+                assert!(message.contains("stopped externally"), "Expected message to contain 'stopped externally', got: {}", message);
+                assert_eq!(termination_reason, TerminationReason::InvocationError);
+            }
+            e => panic!("Expected Invocation error, got {:?}", e),
+        }
+    }
+
+    /// Test for replaying STARTED invoke (Requirement 12.3)
+    /// WHEN replaying a STARTED invoke, THE Test_Suite SHALL verify execution suspends
+    #[tokio::test]
+    async fn test_invoke_handler_replay_started_suspends() {
+        let client = Arc::new(
+            MockDurableServiceClient::new()
+                .with_checkpoint_response(Ok(CheckpointResponse::new("token-1")))
+        );
+        
+        // Create state with a pre-existing STARTED invoke operation (in-progress)
+        let mut op = Operation::new("test-invoke-123", OperationType::Invoke);
+        op.status = OperationStatus::Started;
+        
+        let initial_state = InitialExecutionState::with_operations(vec![op]);
+        let state = Arc::new(ExecutionState::new(
+            "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+            "initial-token",
+            initial_state,
+            client,
+        ));
+        
+        let op_id = create_test_op_id();
+        let config = create_test_config();
+        let logger = create_test_logger();
+
+        let result: Result<String, DurableError> = invoke_handler(
+            "target-function",
+            "test-payload".to_string(),
+            &state,
+            &op_id,
+            &config,
+            &logger,
+        ).await;
+
+        // Should suspend since the invoke is still in progress (STARTED status)
+        // The handler should recognize this is a replay of an in-progress invoke and suspend
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DurableError::Suspend { .. } => {
+                // Expected - the invoke is in progress, so we suspend waiting for completion
+            }
+            e => panic!("Expected Suspend error for in-progress invoke, got {:?}", e),
+        }
+    }
 }

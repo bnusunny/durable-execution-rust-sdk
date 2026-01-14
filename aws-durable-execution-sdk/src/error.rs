@@ -105,6 +105,38 @@ pub type CheckpointResult<T> = Result<T, DurableError>;
 ///
 /// This enum covers all possible error conditions that can occur
 /// during durable execution workflows.
+///
+/// # Examples
+///
+/// Creating common error types:
+///
+/// ```
+/// use aws_durable_execution_sdk::DurableError;
+///
+/// // Execution error (fails workflow without retry)
+/// let exec_err = DurableError::execution("Order validation failed");
+/// assert!(!exec_err.is_retriable());
+///
+/// // Validation error
+/// let val_err = DurableError::validation("Invalid input format");
+///
+/// // Retriable checkpoint error
+/// let cp_err = DurableError::checkpoint_retriable("Temporary network issue");
+/// assert!(cp_err.is_retriable());
+/// ```
+///
+/// Checking error types:
+///
+/// ```
+/// use aws_durable_execution_sdk::DurableError;
+///
+/// let err = DurableError::size_limit("Payload too large");
+/// assert!(err.is_size_limit());
+/// assert!(!err.is_throttling());
+///
+/// let throttle_err = DurableError::throttling("Rate limit exceeded");
+/// assert!(throttle_err.is_throttling());
+/// ```
 #[derive(Debug, Error)]
 pub enum DurableError {
     /// Execution error that returns FAILED status without Lambda retry.
@@ -534,6 +566,37 @@ pub struct AwsError {
 }
 
 /// Error object for serialization in Lambda responses.
+///
+/// # Examples
+///
+/// ```
+/// use aws_durable_execution_sdk::ErrorObject;
+///
+/// // Basic error object
+/// let err = ErrorObject::new("ValidationError", "Invalid input");
+/// assert_eq!(err.error_type, "ValidationError");
+/// assert_eq!(err.error_message, "Invalid input");
+/// assert!(err.stack_trace.is_none());
+///
+/// // With stack trace
+/// let err_with_trace = ErrorObject::with_stack_trace(
+///     "RuntimeError",
+///     "Something went wrong",
+///     "at main.rs:42"
+/// );
+/// assert!(err_with_trace.stack_trace.is_some());
+/// ```
+///
+/// Serialization:
+///
+/// ```
+/// use aws_durable_execution_sdk::ErrorObject;
+///
+/// let err = ErrorObject::new("TestError", "Test message");
+/// let json = serde_json::to_string(&err).unwrap();
+/// assert!(json.contains("ErrorType"));
+/// assert!(json.contains("ErrorMessage"));
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ErrorObject {
     /// The error type/name
@@ -675,6 +738,349 @@ impl From<Box<dyn std::error::Error>> for DurableError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
+
+    // ============================================================================
+    // Proptest Strategies
+    // ============================================================================
+
+    /// Strategy for generating non-empty strings (for error messages)
+    fn non_empty_string_strategy() -> impl Strategy<Value = String> {
+        "[a-zA-Z0-9_ ]{1,64}".prop_map(|s| s)
+    }
+
+    /// Strategy for generating optional non-empty strings
+    fn optional_string_strategy() -> impl Strategy<Value = Option<String>> {
+        prop_oneof![
+            Just(None),
+            non_empty_string_strategy().prop_map(Some),
+        ]
+    }
+
+    /// Strategy for generating optional usize values
+    fn optional_usize_strategy() -> impl Strategy<Value = Option<usize>> {
+        prop_oneof![
+            Just(None),
+            (1usize..10_000_000usize).prop_map(Some),
+        ]
+    }
+
+    /// Strategy for generating optional u64 values (for retry_after_ms)
+    fn optional_u64_strategy() -> impl Strategy<Value = Option<u64>> {
+        prop_oneof![
+            Just(None),
+            (1u64..100_000u64).prop_map(Some),
+        ]
+    }
+
+    /// Strategy for generating DurableError::Execution variants
+    fn execution_error_strategy() -> impl Strategy<Value = DurableError> {
+        non_empty_string_strategy().prop_map(|message| DurableError::Execution {
+            message,
+            termination_reason: TerminationReason::ExecutionError,
+        })
+    }
+
+    /// Strategy for generating DurableError::Invocation variants
+    fn invocation_error_strategy() -> impl Strategy<Value = DurableError> {
+        non_empty_string_strategy().prop_map(|message| DurableError::Invocation {
+            message,
+            termination_reason: TerminationReason::InvocationError,
+        })
+    }
+
+    /// Strategy for generating DurableError::Checkpoint variants
+    fn checkpoint_error_strategy() -> impl Strategy<Value = DurableError> {
+        (non_empty_string_strategy(), any::<bool>()).prop_map(|(message, is_retriable)| {
+            DurableError::Checkpoint {
+                message,
+                is_retriable,
+                aws_error: None,
+            }
+        })
+    }
+
+    /// Strategy for generating DurableError::Callback variants
+    fn callback_error_strategy() -> impl Strategy<Value = DurableError> {
+        (non_empty_string_strategy(), optional_string_strategy()).prop_map(
+            |(message, callback_id)| DurableError::Callback {
+                message,
+                callback_id,
+            },
+        )
+    }
+
+    /// Strategy for generating DurableError::NonDeterministic variants
+    fn non_deterministic_error_strategy() -> impl Strategy<Value = DurableError> {
+        (non_empty_string_strategy(), optional_string_strategy()).prop_map(
+            |(message, operation_id)| DurableError::NonDeterministic {
+                message,
+                operation_id,
+            },
+        )
+    }
+
+    /// Strategy for generating DurableError::Validation variants
+    fn validation_error_strategy() -> impl Strategy<Value = DurableError> {
+        non_empty_string_strategy().prop_map(|message| DurableError::Validation { message })
+    }
+
+    /// Strategy for generating DurableError::SerDes variants
+    fn serdes_error_strategy() -> impl Strategy<Value = DurableError> {
+        non_empty_string_strategy().prop_map(|message| DurableError::SerDes { message })
+    }
+
+    /// Strategy for generating DurableError::Suspend variants
+    fn suspend_error_strategy() -> impl Strategy<Value = DurableError> {
+        prop_oneof![
+            // None case - use prop_map to avoid Clone requirement
+            Just(()).prop_map(|_| DurableError::Suspend {
+                scheduled_timestamp: None
+            }),
+            (0.0f64..1e15f64).prop_map(|ts| DurableError::Suspend {
+                scheduled_timestamp: Some(ts)
+            }),
+        ]
+    }
+
+    /// Strategy for generating DurableError::OrphanedChild variants
+    fn orphaned_child_error_strategy() -> impl Strategy<Value = DurableError> {
+        (non_empty_string_strategy(), non_empty_string_strategy()).prop_map(
+            |(message, operation_id)| DurableError::OrphanedChild {
+                message,
+                operation_id,
+            },
+        )
+    }
+
+    /// Strategy for generating DurableError::UserCode variants
+    fn user_code_error_strategy() -> impl Strategy<Value = DurableError> {
+        (
+            non_empty_string_strategy(),
+            non_empty_string_strategy(),
+            optional_string_strategy(),
+        )
+            .prop_map(|(message, error_type, stack_trace)| DurableError::UserCode {
+                message,
+                error_type,
+                stack_trace,
+            })
+    }
+
+    /// Strategy for generating DurableError::SizeLimit variants
+    fn size_limit_error_strategy() -> impl Strategy<Value = DurableError> {
+        (
+            non_empty_string_strategy(),
+            optional_usize_strategy(),
+            optional_usize_strategy(),
+        )
+            .prop_map(|(message, actual_size, max_size)| DurableError::SizeLimit {
+                message,
+                actual_size,
+                max_size,
+            })
+    }
+
+    /// Strategy for generating DurableError::Throttling variants
+    fn throttling_error_strategy() -> impl Strategy<Value = DurableError> {
+        (non_empty_string_strategy(), optional_u64_strategy()).prop_map(
+            |(message, retry_after_ms)| DurableError::Throttling {
+                message,
+                retry_after_ms,
+            },
+        )
+    }
+
+    /// Strategy for generating DurableError::ResourceNotFound variants
+    fn resource_not_found_error_strategy() -> impl Strategy<Value = DurableError> {
+        (non_empty_string_strategy(), optional_string_strategy()).prop_map(
+            |(message, resource_id)| DurableError::ResourceNotFound {
+                message,
+                resource_id,
+            },
+        )
+    }
+
+    /// Strategy for generating any DurableError variant
+    fn durable_error_strategy() -> impl Strategy<Value = DurableError> {
+        prop_oneof![
+            execution_error_strategy(),
+            invocation_error_strategy(),
+            checkpoint_error_strategy(),
+            callback_error_strategy(),
+            non_deterministic_error_strategy(),
+            validation_error_strategy(),
+            serdes_error_strategy(),
+            suspend_error_strategy(),
+            orphaned_child_error_strategy(),
+            user_code_error_strategy(),
+            size_limit_error_strategy(),
+            throttling_error_strategy(),
+            resource_not_found_error_strategy(),
+        ]
+    }
+
+    // ============================================================================
+    // Property-Based Tests
+    // ============================================================================
+
+    proptest! {
+        /// Feature: rust-sdk-test-suite, Property 6: DurableError to ErrorObject Conversion
+        /// For any DurableError variant, converting to ErrorObject SHALL produce an ErrorObject
+        /// with non-empty error_type and error_message fields.
+        /// **Validates: Requirements 3.1, 3.2**
+        #[test]
+        fn prop_durable_error_to_error_object_produces_valid_fields(error in durable_error_strategy()) {
+            let error_object: ErrorObject = (&error).into();
+            
+            // Verify error_type is non-empty
+            prop_assert!(
+                !error_object.error_type.is_empty(),
+                "ErrorObject.error_type should be non-empty for {:?}",
+                error
+            );
+            
+            // Verify error_message is non-empty
+            prop_assert!(
+                !error_object.error_message.is_empty(),
+                "ErrorObject.error_message should be non-empty for {:?}",
+                error
+            );
+        }
+
+        /// Feature: rust-sdk-test-suite, Property 7: Error Type Classification Consistency (SizeLimit)
+        /// For any SizeLimit error, is_size_limit() SHALL return true and is_retriable() SHALL return false.
+        /// **Validates: Requirements 3.3**
+        #[test]
+        fn prop_size_limit_error_classification(error in size_limit_error_strategy()) {
+            prop_assert!(
+                error.is_size_limit(),
+                "SizeLimit error should return true for is_size_limit()"
+            );
+            prop_assert!(
+                !error.is_retriable(),
+                "SizeLimit error should return false for is_retriable()"
+            );
+            prop_assert!(
+                !error.is_throttling(),
+                "SizeLimit error should return false for is_throttling()"
+            );
+            prop_assert!(
+                !error.is_resource_not_found(),
+                "SizeLimit error should return false for is_resource_not_found()"
+            );
+        }
+
+        /// Feature: rust-sdk-test-suite, Property 7: Error Type Classification Consistency (Throttling)
+        /// For any Throttling error, is_throttling() SHALL return true.
+        /// **Validates: Requirements 3.4**
+        #[test]
+        fn prop_throttling_error_classification(error in throttling_error_strategy()) {
+            prop_assert!(
+                error.is_throttling(),
+                "Throttling error should return true for is_throttling()"
+            );
+            prop_assert!(
+                !error.is_size_limit(),
+                "Throttling error should return false for is_size_limit()"
+            );
+            prop_assert!(
+                !error.is_resource_not_found(),
+                "Throttling error should return false for is_resource_not_found()"
+            );
+        }
+
+        /// Feature: rust-sdk-test-suite, Property 7: Error Type Classification Consistency (ResourceNotFound)
+        /// For any ResourceNotFound error, is_resource_not_found() SHALL return true and is_retriable() SHALL return false.
+        /// **Validates: Requirements 3.5**
+        #[test]
+        fn prop_resource_not_found_error_classification(error in resource_not_found_error_strategy()) {
+            prop_assert!(
+                error.is_resource_not_found(),
+                "ResourceNotFound error should return true for is_resource_not_found()"
+            );
+            prop_assert!(
+                !error.is_retriable(),
+                "ResourceNotFound error should return false for is_retriable()"
+            );
+            prop_assert!(
+                !error.is_size_limit(),
+                "ResourceNotFound error should return false for is_size_limit()"
+            );
+            prop_assert!(
+                !error.is_throttling(),
+                "ResourceNotFound error should return false for is_throttling()"
+            );
+        }
+
+        /// Feature: rust-sdk-test-suite, Property 7: Error Type Classification Consistency (Retriable Checkpoint)
+        /// For any Checkpoint error with is_retriable=true, is_retriable() SHALL return true.
+        /// **Validates: Requirements 3.6**
+        #[test]
+        fn prop_retriable_checkpoint_error_classification(message in non_empty_string_strategy()) {
+            let error = DurableError::Checkpoint {
+                message,
+                is_retriable: true,
+                aws_error: None,
+            };
+            prop_assert!(
+                error.is_retriable(),
+                "Checkpoint error with is_retriable=true should return true for is_retriable()"
+            );
+        }
+
+        /// Feature: rust-sdk-test-suite, Property 7: Error Type Classification Consistency (Non-Retriable Checkpoint)
+        /// For any Checkpoint error with is_retriable=false, is_retriable() SHALL return false.
+        /// **Validates: Requirements 3.6**
+        #[test]
+        fn prop_non_retriable_checkpoint_error_classification(message in non_empty_string_strategy()) {
+            let error = DurableError::Checkpoint {
+                message,
+                is_retriable: false,
+                aws_error: None,
+            };
+            prop_assert!(
+                !error.is_retriable(),
+                "Checkpoint error with is_retriable=false should return false for is_retriable()"
+            );
+        }
+
+        /// Feature: rust-sdk-test-suite, Property 6: ErrorObject Field Validation
+        /// For any ErrorObject created from DurableError, the error_type field SHALL match
+        /// the expected type name for that error variant.
+        /// **Validates: Requirements 3.1**
+        #[test]
+        fn prop_error_object_type_matches_variant(error in durable_error_strategy()) {
+            let error_object: ErrorObject = (&error).into();
+            
+            let expected_type = match &error {
+                DurableError::Execution { .. } => "ExecutionError",
+                DurableError::Invocation { .. } => "InvocationError",
+                DurableError::Checkpoint { .. } => "CheckpointError",
+                DurableError::Callback { .. } => "CallbackError",
+                DurableError::NonDeterministic { .. } => "NonDeterministicExecutionError",
+                DurableError::Validation { .. } => "ValidationError",
+                DurableError::SerDes { .. } => "SerDesError",
+                DurableError::Suspend { .. } => "SuspendExecution",
+                DurableError::OrphanedChild { .. } => "OrphanedChildError",
+                DurableError::UserCode { error_type, .. } => error_type.as_str(),
+                DurableError::SizeLimit { .. } => "SizeLimitExceededError",
+                DurableError::Throttling { .. } => "ThrottlingError",
+                DurableError::ResourceNotFound { .. } => "ResourceNotFoundError",
+            };
+            
+            prop_assert_eq!(
+                error_object.error_type,
+                expected_type,
+                "ErrorObject.error_type should match expected type for {:?}",
+                error
+            );
+        }
+    }
+
+    // ============================================================================
+    // Unit Tests
+    // ============================================================================
 
     #[test]
     fn test_execution_error() {

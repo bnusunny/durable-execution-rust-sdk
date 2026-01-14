@@ -728,8 +728,6 @@ mod tests {
         };
         assert_eq!(format!("{}", err), "TestType: test error message");
     }
-}
-
 
     // ==================== Backward Compatibility Tests ====================
 
@@ -830,3 +828,265 @@ mod tests {
         }
         assert_eq!(process_str(&op_id), "OP-123-SUFFIX");
     }
+
+    // ==================== Property-Based Tests ====================
+
+    use proptest::prelude::*;
+
+    /// Strategy for generating non-empty strings (valid for OperationId and CallbackId)
+    fn non_empty_string_strategy() -> impl Strategy<Value = String> {
+        "[a-zA-Z0-9_-]{1,64}".prop_map(|s| s)
+    }
+
+    /// Strategy for generating valid ExecutionArn strings
+    fn valid_execution_arn_strategy() -> impl Strategy<Value = String> {
+        (
+            prop_oneof![
+                Just("aws"),
+                Just("aws-cn"),
+                Just("aws-us-gov"),
+                Just("aws-iso"),
+                Just("aws-iso-b"),
+            ],
+            prop_oneof![
+                Just("us-east-1"),
+                Just("us-west-2"),
+                Just("eu-west-1"),
+                Just("cn-north-1"),
+                Just("us-gov-west-1"),
+            ],
+            "[0-9]{12}",
+            "[a-zA-Z0-9_-]{1,32}",
+            "[a-zA-Z0-9]{8,32}",
+        )
+            .prop_map(|(partition, region, account, func, exec_id)| {
+                format!(
+                    "arn:{}:lambda:{}:{}:function:{}:durable:{}",
+                    partition, region, account, func, exec_id
+                )
+            })
+    }
+
+    /// Strategy for generating invalid ARN strings (missing required components)
+    fn invalid_arn_strategy() -> impl Strategy<Value = String> {
+        prop_oneof![
+            // Empty string
+            Just("".to_string()),
+            // Missing arn: prefix
+            "[a-zA-Z0-9]{10,30}".prop_map(|s| s),
+            // Has arn: but missing lambda
+            "[a-zA-Z0-9]{5,20}".prop_map(|s| format!("arn:aws:s3:us-east-1:123456789012:{}", s)),
+            // Has arn: and lambda but missing durable
+            "[a-zA-Z0-9]{5,20}".prop_map(|s| format!("arn:aws:lambda:us-east-1:123456789012:function:{}", s)),
+        ]
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(100))]
+
+        // ==================== OperationId Property Tests ====================
+
+        /// Feature: rust-sdk-test-suite, Property 8: OperationId Validation and Round-Trip
+        /// For any non-empty string, OperationId::new() SHALL succeed and round-trip through serde.
+        /// **Validates: Requirements 4.1**
+        #[test]
+        fn prop_operation_id_validation_and_roundtrip(s in non_empty_string_strategy()) {
+            // Validation should succeed for non-empty strings
+            let id = OperationId::new(&s).expect("non-empty string should be valid");
+            
+            // Round-trip through serde
+            let json = serde_json::to_string(&id).expect("serialization should succeed");
+            let deserialized: OperationId = serde_json::from_str(&json).expect("deserialization should succeed");
+            
+            // Should produce the same value
+            prop_assert_eq!(&id, &deserialized);
+            prop_assert_eq!(deserialized.as_str(), s.as_str());
+        }
+
+        /// Feature: rust-sdk-test-suite, Property 8: OperationId Empty String Validation
+        /// For any empty string, OperationId::new() SHALL return ValidationError.
+        /// **Validates: Requirements 4.4**
+        #[test]
+        fn prop_operation_id_empty_string_rejected(_dummy in Just(())) {
+            let result = OperationId::new("");
+            prop_assert!(result.is_err());
+            let err = result.unwrap_err();
+            prop_assert_eq!(err.type_name, "OperationId");
+            prop_assert!(err.message.contains("empty"));
+        }
+
+        /// Feature: rust-sdk-test-suite, Property 8: OperationId From/Into Round-Trip
+        /// For any string, creating via From and serializing should round-trip.
+        #[test]
+        fn prop_operation_id_from_roundtrip(s in ".*") {
+            let id = OperationId::from(s.clone());
+            
+            // Round-trip through serde
+            let json = serde_json::to_string(&id).expect("serialization should succeed");
+            let deserialized: OperationId = serde_json::from_str(&json).expect("deserialization should succeed");
+            
+            prop_assert_eq!(&id, &deserialized);
+            prop_assert_eq!(deserialized.as_str(), s.as_str());
+        }
+
+        // ==================== ExecutionArn Property Tests ====================
+
+        /// Feature: rust-sdk-test-suite, Property 9: ExecutionArn Validation and Round-Trip
+        /// For any valid ARN string, ExecutionArn::new() SHALL succeed and round-trip through serde.
+        /// **Validates: Requirements 4.2**
+        #[test]
+        fn prop_execution_arn_validation_and_roundtrip(arn_str in valid_execution_arn_strategy()) {
+            // Validation should succeed for valid ARN strings
+            let arn = ExecutionArn::new(&arn_str).expect("valid ARN should be accepted");
+            
+            // Round-trip through serde
+            let json = serde_json::to_string(&arn).expect("serialization should succeed");
+            let deserialized: ExecutionArn = serde_json::from_str(&json).expect("deserialization should succeed");
+            
+            // Should produce the same value
+            prop_assert_eq!(&arn, &deserialized);
+            prop_assert_eq!(deserialized.as_str(), arn_str.as_str());
+        }
+
+        /// Feature: rust-sdk-test-suite, Property 9: ExecutionArn Invalid String Validation
+        /// For any string not matching ARN pattern, ExecutionArn::new() SHALL return ValidationError.
+        /// **Validates: Requirements 4.5**
+        #[test]
+        fn prop_execution_arn_invalid_rejected(invalid_arn in invalid_arn_strategy()) {
+            let result = ExecutionArn::new(&invalid_arn);
+            prop_assert!(result.is_err(), "Invalid ARN '{}' should be rejected", invalid_arn);
+        }
+
+        /// Feature: rust-sdk-test-suite, Property 9: ExecutionArn From/Into Round-Trip
+        /// For any string, creating via From and serializing should round-trip.
+        #[test]
+        fn prop_execution_arn_from_roundtrip(s in ".*") {
+            let arn = ExecutionArn::from(s.clone());
+            
+            // Round-trip through serde
+            let json = serde_json::to_string(&arn).expect("serialization should succeed");
+            let deserialized: ExecutionArn = serde_json::from_str(&json).expect("deserialization should succeed");
+            
+            prop_assert_eq!(&arn, &deserialized);
+            prop_assert_eq!(deserialized.as_str(), s.as_str());
+        }
+
+        // ==================== CallbackId Property Tests ====================
+
+        /// Feature: rust-sdk-test-suite, Property 10: CallbackId Validation and Round-Trip
+        /// For any non-empty string, CallbackId::new() SHALL succeed and round-trip through serde.
+        /// **Validates: Requirements 4.3**
+        #[test]
+        fn prop_callback_id_validation_and_roundtrip(s in non_empty_string_strategy()) {
+            // Validation should succeed for non-empty strings
+            let id = CallbackId::new(&s).expect("non-empty string should be valid");
+            
+            // Round-trip through serde
+            let json = serde_json::to_string(&id).expect("serialization should succeed");
+            let deserialized: CallbackId = serde_json::from_str(&json).expect("deserialization should succeed");
+            
+            // Should produce the same value
+            prop_assert_eq!(&id, &deserialized);
+            prop_assert_eq!(deserialized.as_str(), s.as_str());
+        }
+
+        /// Feature: rust-sdk-test-suite, Property 10: CallbackId Empty String Validation
+        /// For any empty string, CallbackId::new() SHALL return ValidationError.
+        /// **Validates: Requirements 4.4 (applies to CallbackId as well)**
+        #[test]
+        fn prop_callback_id_empty_string_rejected(_dummy in Just(())) {
+            let result = CallbackId::new("");
+            prop_assert!(result.is_err());
+            let err = result.unwrap_err();
+            prop_assert_eq!(err.type_name, "CallbackId");
+            prop_assert!(err.message.contains("empty"));
+        }
+
+        /// Feature: rust-sdk-test-suite, Property 10: CallbackId From/Into Round-Trip
+        /// For any string, creating via From and serializing should round-trip.
+        #[test]
+        fn prop_callback_id_from_roundtrip(s in ".*") {
+            let id = CallbackId::from(s.clone());
+            
+            // Round-trip through serde
+            let json = serde_json::to_string(&id).expect("serialization should succeed");
+            let deserialized: CallbackId = serde_json::from_str(&json).expect("deserialization should succeed");
+            
+            prop_assert_eq!(&id, &deserialized);
+            prop_assert_eq!(deserialized.as_str(), s.as_str());
+        }
+
+        // ==================== HashMap Key Behavior Property Tests ====================
+
+        /// Feature: rust-sdk-test-suite, Property 11: OperationId HashMap Key Behavior
+        /// For any OperationId instance, inserting into a HashMap and retrieving by an equal key
+        /// SHALL return the same value.
+        /// **Validates: Requirements 4.6**
+        #[test]
+        fn prop_operation_id_hashmap_key(s in non_empty_string_strategy(), value in any::<i32>()) {
+            let id1 = OperationId::from(s.clone());
+            let id2 = OperationId::from(s.clone());
+            
+            let mut map: HashMap<OperationId, i32> = HashMap::new();
+            map.insert(id1, value);
+            
+            // Retrieving by equal key should return the same value
+            prop_assert_eq!(map.get(&id2), Some(&value));
+        }
+
+        /// Feature: rust-sdk-test-suite, Property 11: ExecutionArn HashMap Key Behavior
+        /// For any ExecutionArn instance, inserting into a HashMap and retrieving by an equal key
+        /// SHALL return the same value.
+        /// **Validates: Requirements 4.6**
+        #[test]
+        fn prop_execution_arn_hashmap_key(arn_str in valid_execution_arn_strategy(), value in any::<i32>()) {
+            let arn1 = ExecutionArn::from(arn_str.clone());
+            let arn2 = ExecutionArn::from(arn_str.clone());
+            
+            let mut map: HashMap<ExecutionArn, i32> = HashMap::new();
+            map.insert(arn1, value);
+            
+            // Retrieving by equal key should return the same value
+            prop_assert_eq!(map.get(&arn2), Some(&value));
+        }
+
+        /// Feature: rust-sdk-test-suite, Property 11: CallbackId HashMap Key Behavior
+        /// For any CallbackId instance, inserting into a HashMap and retrieving by an equal key
+        /// SHALL return the same value.
+        /// **Validates: Requirements 4.6**
+        #[test]
+        fn prop_callback_id_hashmap_key(s in non_empty_string_strategy(), value in any::<i32>()) {
+            let id1 = CallbackId::from(s.clone());
+            let id2 = CallbackId::from(s.clone());
+            
+            let mut map: HashMap<CallbackId, i32> = HashMap::new();
+            map.insert(id1, value);
+            
+            // Retrieving by equal key should return the same value
+            prop_assert_eq!(map.get(&id2), Some(&value));
+        }
+
+        /// Feature: rust-sdk-test-suite, Property 11: Different keys should not collide
+        /// For any two different strings, their newtypes should not be equal and should
+        /// not collide in HashMap lookups.
+        #[test]
+        fn prop_different_keys_no_collision(
+            s1 in non_empty_string_strategy(),
+            s2 in non_empty_string_strategy(),
+            value in any::<i32>()
+        ) {
+            prop_assume!(s1 != s2);
+            
+            let id1 = OperationId::from(s1);
+            let id2 = OperationId::from(s2);
+            
+            let mut map: HashMap<OperationId, i32> = HashMap::new();
+            map.insert(id1.clone(), value);
+            
+            // Different key should not find the value
+            prop_assert_eq!(map.get(&id2), None);
+            // Original key should still find the value
+            prop_assert_eq!(map.get(&id1), Some(&value));
+        }
+    }
+}

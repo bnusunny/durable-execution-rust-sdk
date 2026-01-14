@@ -689,6 +689,112 @@ mod tests {
         }
     }
 
+    // Gap Test 8.3: Replaying FAILED callback returns callback_id (error deferred to result())
+    #[tokio::test]
+    async fn test_callback_handler_replay_failed_returns_callback_id() {
+        let client = Arc::new(MockDurableServiceClient::new());
+        
+        // Create state with a FAILED callback operation that has callback_details
+        let mut op = Operation::new("test-callback-123", OperationType::Callback);
+        op.status = OperationStatus::Failed;
+        op.name = Some("test-callback".to_string());
+        op.callback_details = Some(CallbackDetails {
+            callback_id: Some("failed-callback-id".to_string()),
+            result: None,
+            error: Some(ErrorObject::new("CallbackError", "External system failed")),
+        });
+        op.error = Some(ErrorObject::new("CallbackError", "External system failed"));
+        
+        let initial_state = InitialExecutionState::with_operations(vec![op]);
+        let state = Arc::new(ExecutionState::new(
+            "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+            "initial-token",
+            initial_state,
+            client,
+        ));
+        
+        let op_id = create_test_op_id();
+        let config = create_test_config();
+        let logger = create_test_logger();
+
+        // The handler should return the Callback with callback_id even though it's FAILED
+        // The error is deferred to result()
+        let result: Result<Callback<String>, DurableError> = callback_handler(
+            &state,
+            &op_id,
+            &config,
+            &logger,
+        ).await;
+
+        assert!(result.is_ok(), "Handler should return Ok with callback_id for FAILED callback");
+        let callback = result.unwrap();
+        assert_eq!(callback.id(), "failed-callback-id");
+        
+        // Now calling result() should return the error
+        // Note: The callback_id in the error is the Callback struct's callback_id field
+        let result_err = callback.result().await;
+        assert!(result_err.is_err());
+        match result_err.unwrap_err() {
+            DurableError::Callback { message, callback_id } => {
+                assert!(message.contains("External system failed"));
+                // The callback_id in the error comes from the Callback struct
+                assert_eq!(callback_id, Some("failed-callback-id".to_string()));
+            }
+            e => panic!("Expected Callback error, got {:?}", e),
+        }
+    }
+
+    // Gap Test 8.4: Replaying TIMED_OUT callback returns callback_id (error deferred to result())
+    #[tokio::test]
+    async fn test_callback_handler_replay_timed_out_returns_callback_id() {
+        let client = Arc::new(MockDurableServiceClient::new());
+        
+        // Create state with a TIMED_OUT callback operation that has callback_details
+        let mut op = Operation::new("test-callback-123", OperationType::Callback);
+        op.status = OperationStatus::TimedOut;
+        op.name = Some("test-callback".to_string());
+        op.callback_details = Some(CallbackDetails {
+            callback_id: Some("timed-out-callback-id".to_string()),
+            result: None,
+            error: None,
+        });
+        
+        let initial_state = InitialExecutionState::with_operations(vec![op]);
+        let state = Arc::new(ExecutionState::new(
+            "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+            "initial-token",
+            initial_state,
+            client,
+        ));
+        
+        let op_id = create_test_op_id();
+        let config = create_test_config();
+        let logger = create_test_logger();
+
+        // The handler should return the Callback with callback_id even though it's TIMED_OUT
+        // The error is deferred to result()
+        let result: Result<Callback<String>, DurableError> = callback_handler(
+            &state,
+            &op_id,
+            &config,
+            &logger,
+        ).await;
+
+        assert!(result.is_ok(), "Handler should return Ok with callback_id for TIMED_OUT callback");
+        let callback = result.unwrap();
+        assert_eq!(callback.id(), "timed-out-callback-id");
+        
+        // Now calling result() should return the timeout error
+        let result_err = callback.result().await;
+        assert!(result_err.is_err());
+        match result_err.unwrap_err() {
+            DurableError::Callback { message, .. } => {
+                assert!(message.contains("timed out"));
+            }
+            e => panic!("Expected Callback error with timeout message, got {:?}", e),
+        }
+    }
+
     #[test]
     fn test_create_callback_start_update() {
         let op_id = OperationIdentifier::new("op-123", Some("parent-456".to_string()), Some("my-callback".to_string()));

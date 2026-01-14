@@ -19,6 +19,34 @@ use crate::traits::{DurableValue, StepFn};
 ///
 /// This struct provides information about the current step execution
 /// that can be used by the step function for logging or other purposes.
+///
+/// # Examples
+///
+/// Creating a basic step context:
+///
+/// ```
+/// use aws_durable_execution_sdk::handlers::StepContext;
+///
+/// let ctx = StepContext::new("op-123", "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc");
+/// assert_eq!(ctx.operation_id, "op-123");
+/// assert_eq!(ctx.attempt, 0);
+/// assert!(ctx.parent_id.is_none());
+/// ```
+///
+/// Using the builder pattern:
+///
+/// ```
+/// use aws_durable_execution_sdk::handlers::StepContext;
+///
+/// let ctx = StepContext::new("op-123", "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc")
+///     .with_parent_id("parent-456")
+///     .with_name("process-order")
+///     .with_attempt(2);
+///
+/// assert_eq!(ctx.parent_id, Some("parent-456".to_string()));
+/// assert_eq!(ctx.name, Some("process-order".to_string()));
+/// assert_eq!(ctx.attempt, 2);
+/// ```
 #[derive(Debug, Clone)]
 pub struct StepContext {
     /// The operation identifier for this step
@@ -97,6 +125,29 @@ impl StepContext {
     /// `Ok(Some(T))` if payload exists and can be deserialized,
     /// `Ok(None)` if no payload exists,
     /// `Err` if deserialization fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aws_durable_execution_sdk::handlers::StepContext;
+    /// use serde::Deserialize;
+    ///
+    /// #[derive(Deserialize, Debug, PartialEq)]
+    /// struct RetryState {
+    ///     counter: i32,
+    /// }
+    ///
+    /// // With a payload
+    /// let ctx = StepContext::new("op-123", "arn:test")
+    ///     .with_retry_payload(r#"{"counter": 5}"#);
+    /// let state: Option<RetryState> = ctx.get_retry_payload().unwrap();
+    /// assert_eq!(state, Some(RetryState { counter: 5 }));
+    ///
+    /// // Without a payload
+    /// let ctx_no_payload = StepContext::new("op-456", "arn:test");
+    /// let state: Option<RetryState> = ctx_no_payload.get_retry_payload().unwrap();
+    /// assert!(state.is_none());
+    /// ```
     ///
     /// # Requirements
     ///

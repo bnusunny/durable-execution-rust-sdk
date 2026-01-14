@@ -840,4 +840,521 @@ mod property_tests {
             }
         }
     }
+
+    /// **Feature: rust-sdk-test-suite, Property 5: Operation JSON Round-Trip**
+    /// **Validates: Requirements 2.6, 9.2**
+    ///
+    /// For any Operation instance with valid fields, serializing to JSON then
+    /// deserializing SHALL produce an equivalent Operation.
+    mod operation_round_trip {
+        use super::*;
+        use crate::operation::{
+            Operation, OperationType, OperationStatus, StepDetails, WaitDetails,
+            CallbackDetails, ChainedInvokeDetails, ContextDetails, ExecutionDetails,
+        };
+
+        /// Strategy for generating valid OperationType values.
+        fn operation_type_strategy() -> impl Strategy<Value = OperationType> {
+            prop_oneof![
+                Just(OperationType::Execution),
+                Just(OperationType::Step),
+                Just(OperationType::Wait),
+                Just(OperationType::Callback),
+                Just(OperationType::Invoke),
+                Just(OperationType::Context),
+            ]
+        }
+
+        /// Strategy for generating valid OperationStatus values.
+        fn operation_status_strategy() -> impl Strategy<Value = OperationStatus> {
+            prop_oneof![
+                Just(OperationStatus::Started),
+                Just(OperationStatus::Pending),
+                Just(OperationStatus::Ready),
+                Just(OperationStatus::Succeeded),
+                Just(OperationStatus::Failed),
+                Just(OperationStatus::Cancelled),
+                Just(OperationStatus::TimedOut),
+                Just(OperationStatus::Stopped),
+            ]
+        }
+
+        /// Strategy for generating valid operation ID strings.
+        fn operation_id_strategy() -> impl Strategy<Value = String> {
+            "[a-zA-Z][a-zA-Z0-9_-]{0,63}".prop_map(|s| s)
+        }
+
+        /// Strategy for generating optional strings.
+        fn optional_string_strategy() -> impl Strategy<Value = Option<String>> {
+            prop_oneof![
+                Just(None),
+                "[a-zA-Z0-9_-]{1,32}".prop_map(|s| Some(s)),
+            ]
+        }
+
+        /// Strategy for generating optional result payloads (JSON strings).
+        fn optional_result_strategy() -> impl Strategy<Value = Option<String>> {
+            prop_oneof![
+                Just(None),
+                Just(Some("null".to_string())),
+                Just(Some("42".to_string())),
+                Just(Some("\"test-result\"".to_string())),
+                Just(Some("{\"key\":\"value\"}".to_string())),
+                Just(Some("[1,2,3]".to_string())),
+            ]
+        }
+
+        /// Strategy for generating optional timestamps (positive i64 values).
+        fn optional_timestamp_strategy() -> impl Strategy<Value = Option<i64>> {
+            prop_oneof![
+                Just(None),
+                (1000000000000i64..2000000000000i64).prop_map(Some),
+            ]
+        }
+
+        /// Strategy for generating valid Operation instances with type-specific details.
+        fn operation_strategy() -> impl Strategy<Value = Operation> {
+            (
+                operation_id_strategy(),
+                operation_type_strategy(),
+                operation_status_strategy(),
+                optional_string_strategy(), // parent_id
+                optional_string_strategy(), // name
+                optional_string_strategy(), // sub_type
+                optional_timestamp_strategy(), // start_timestamp
+                optional_timestamp_strategy(), // end_timestamp
+            )
+                .prop_flat_map(|(id, op_type, status, parent_id, name, sub_type, start_ts, end_ts)| {
+                    // Generate type-specific details based on operation type
+                    let details_strategy = match op_type {
+                        OperationType::Step => optional_result_strategy()
+                            .prop_map(move |result| {
+                                let mut op = Operation::new(id.clone(), op_type);
+                                op.status = status;
+                                op.parent_id = parent_id.clone();
+                                op.name = name.clone();
+                                op.sub_type = sub_type.clone();
+                                op.start_timestamp = start_ts;
+                                op.end_timestamp = end_ts;
+                                op.step_details = Some(StepDetails {
+                                    result,
+                                    attempt: Some(0),
+                                    next_attempt_timestamp: None,
+                                    error: None,
+                                    payload: None,
+                                });
+                                op
+                            })
+                            .boxed(),
+                        OperationType::Wait => Just(())
+                            .prop_map(move |_| {
+                                let mut op = Operation::new(id.clone(), op_type);
+                                op.status = status;
+                                op.parent_id = parent_id.clone();
+                                op.name = name.clone();
+                                op.sub_type = sub_type.clone();
+                                op.start_timestamp = start_ts;
+                                op.end_timestamp = end_ts;
+                                op.wait_details = Some(WaitDetails {
+                                    scheduled_end_timestamp: Some(1234567890000),
+                                });
+                                op
+                            })
+                            .boxed(),
+                        OperationType::Callback => optional_result_strategy()
+                            .prop_map(move |result| {
+                                let mut op = Operation::new(id.clone(), op_type);
+                                op.status = status;
+                                op.parent_id = parent_id.clone();
+                                op.name = name.clone();
+                                op.sub_type = sub_type.clone();
+                                op.start_timestamp = start_ts;
+                                op.end_timestamp = end_ts;
+                                op.callback_details = Some(CallbackDetails {
+                                    callback_id: Some(format!("cb-{}", id.clone())),
+                                    result,
+                                    error: None,
+                                });
+                                op
+                            })
+                            .boxed(),
+                        OperationType::Invoke => optional_result_strategy()
+                            .prop_map(move |result| {
+                                let mut op = Operation::new(id.clone(), op_type);
+                                op.status = status;
+                                op.parent_id = parent_id.clone();
+                                op.name = name.clone();
+                                op.sub_type = sub_type.clone();
+                                op.start_timestamp = start_ts;
+                                op.end_timestamp = end_ts;
+                                op.chained_invoke_details = Some(ChainedInvokeDetails {
+                                    result,
+                                    error: None,
+                                });
+                                op
+                            })
+                            .boxed(),
+                        OperationType::Context => optional_result_strategy()
+                            .prop_map(move |result| {
+                                let mut op = Operation::new(id.clone(), op_type);
+                                op.status = status;
+                                op.parent_id = parent_id.clone();
+                                op.name = name.clone();
+                                op.sub_type = sub_type.clone();
+                                op.start_timestamp = start_ts;
+                                op.end_timestamp = end_ts;
+                                op.context_details = Some(ContextDetails {
+                                    result,
+                                    replay_children: Some(true),
+                                    error: None,
+                                });
+                                op
+                            })
+                            .boxed(),
+                        OperationType::Execution => optional_result_strategy()
+                            .prop_map(move |input| {
+                                let mut op = Operation::new(id.clone(), op_type);
+                                op.status = status;
+                                op.parent_id = parent_id.clone();
+                                op.name = name.clone();
+                                op.sub_type = sub_type.clone();
+                                op.start_timestamp = start_ts;
+                                op.end_timestamp = end_ts;
+                                op.execution_details = Some(ExecutionDetails {
+                                    input_payload: input,
+                                });
+                                op
+                            })
+                            .boxed(),
+                    };
+                    details_strategy
+                })
+        }
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(100))]
+
+            /// Property test: Operation JSON round-trip
+            /// **Feature: rust-sdk-test-suite, Property 5: Operation JSON Round-Trip**
+            /// **Validates: Requirements 2.6, 9.2**
+            ///
+            /// For any Operation instance with valid fields, serializing to JSON
+            /// then deserializing SHALL produce an equivalent Operation.
+            #[test]
+            fn prop_operation_json_round_trip(op in operation_strategy()) {
+                let json = serde_json::to_string(&op).unwrap();
+                let deserialized: Operation = serde_json::from_str(&json).unwrap();
+                
+                // Verify key fields are preserved
+                prop_assert_eq!(&op.operation_id, &deserialized.operation_id);
+                prop_assert_eq!(op.operation_type, deserialized.operation_type);
+                prop_assert_eq!(op.status, deserialized.status);
+                prop_assert_eq!(&op.parent_id, &deserialized.parent_id);
+                prop_assert_eq!(&op.name, &deserialized.name);
+                prop_assert_eq!(&op.sub_type, &deserialized.sub_type);
+                prop_assert_eq!(op.start_timestamp, deserialized.start_timestamp);
+                prop_assert_eq!(op.end_timestamp, deserialized.end_timestamp);
+                
+                // Verify type-specific details are preserved
+                match op.operation_type {
+                    OperationType::Step => {
+                        prop_assert!(deserialized.step_details.is_some());
+                        let orig = op.step_details.as_ref().unwrap();
+                        let deser = deserialized.step_details.as_ref().unwrap();
+                        prop_assert_eq!(&orig.result, &deser.result);
+                        prop_assert_eq!(orig.attempt, deser.attempt);
+                    }
+                    OperationType::Wait => {
+                        prop_assert!(deserialized.wait_details.is_some());
+                    }
+                    OperationType::Callback => {
+                        prop_assert!(deserialized.callback_details.is_some());
+                        let orig = op.callback_details.as_ref().unwrap();
+                        let deser = deserialized.callback_details.as_ref().unwrap();
+                        prop_assert_eq!(&orig.callback_id, &deser.callback_id);
+                        prop_assert_eq!(&orig.result, &deser.result);
+                    }
+                    OperationType::Invoke => {
+                        prop_assert!(deserialized.chained_invoke_details.is_some());
+                        let orig = op.chained_invoke_details.as_ref().unwrap();
+                        let deser = deserialized.chained_invoke_details.as_ref().unwrap();
+                        prop_assert_eq!(&orig.result, &deser.result);
+                    }
+                    OperationType::Context => {
+                        prop_assert!(deserialized.context_details.is_some());
+                        let orig = op.context_details.as_ref().unwrap();
+                        let deser = deserialized.context_details.as_ref().unwrap();
+                        prop_assert_eq!(&orig.result, &deser.result);
+                        prop_assert_eq!(orig.replay_children, deser.replay_children);
+                    }
+                    OperationType::Execution => {
+                        prop_assert!(deserialized.execution_details.is_some());
+                        let orig = op.execution_details.as_ref().unwrap();
+                        let deser = deserialized.execution_details.as_ref().unwrap();
+                        prop_assert_eq!(&orig.input_payload, &deser.input_payload);
+                    }
+                }
+            }
+        }
+    }
+
+    /// **Feature: rust-sdk-test-suite, Property 17: Timestamp Format Equivalence**
+    /// **Validates: Requirements 9.3**
+    ///
+    /// For any timestamp value (i64 milliseconds), deserializing from the integer
+    /// format or from an equivalent ISO 8601 string SHALL produce the same result.
+    mod timestamp_format_equivalence {
+        use super::*;
+        use crate::operation::Operation;
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(100))]
+
+            /// Property test: Timestamp integer format round-trip
+            /// **Feature: rust-sdk-test-suite, Property 17: Timestamp Format Equivalence**
+            /// **Validates: Requirements 9.3**
+            ///
+            /// For any timestamp value (i64 milliseconds), deserializing from integer
+            /// format SHALL preserve the value.
+            #[test]
+            fn prop_timestamp_integer_round_trip(timestamp in 1000000000000i64..2000000000000i64) {
+                // Create JSON with integer timestamp
+                let json = format!(
+                    r#"{{"Id":"test-op","Type":"STEP","Status":"STARTED","StartTimestamp":{}}}"#,
+                    timestamp
+                );
+                
+                let op: Operation = serde_json::from_str(&json).unwrap();
+                prop_assert_eq!(op.start_timestamp, Some(timestamp));
+            }
+
+            /// Property test: Timestamp ISO 8601 string format parsing
+            /// **Feature: rust-sdk-test-suite, Property 17: Timestamp Format Equivalence**
+            /// **Validates: Requirements 9.3**
+            ///
+            /// For any valid ISO 8601 datetime string, deserializing SHALL produce
+            /// a valid timestamp in milliseconds.
+            #[test]
+            fn prop_timestamp_iso8601_parsing(
+                year in 2020u32..2030u32,
+                month in 1u32..=12u32,
+                day in 1u32..=28u32,  // Use 28 to avoid month-end issues
+                hour in 0u32..24u32,
+                minute in 0u32..60u32,
+                second in 0u32..60u32,
+            ) {
+                // Create ISO 8601 string
+                let iso_string = format!(
+                    "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}+00:00",
+                    year, month, day, hour, minute, second
+                );
+                
+                let json = format!(
+                    r#"{{"Id":"test-op","Type":"STEP","Status":"STARTED","StartTimestamp":"{}"}}"#,
+                    iso_string
+                );
+                
+                let op: Operation = serde_json::from_str(&json).unwrap();
+                prop_assert!(op.start_timestamp.is_some());
+                
+                // Verify the timestamp is reasonable (after year 2020)
+                let ts = op.start_timestamp.unwrap();
+                prop_assert!(ts > 1577836800000); // 2020-01-01 00:00:00 UTC in millis
+            }
+
+            /// Property test: Floating point timestamp parsing
+            /// **Feature: rust-sdk-test-suite, Property 17: Timestamp Format Equivalence**
+            /// **Validates: Requirements 9.3**
+            ///
+            /// For any floating point timestamp (seconds with fractional milliseconds),
+            /// deserializing SHALL convert to milliseconds correctly.
+            #[test]
+            fn prop_timestamp_float_parsing(
+                seconds in 1577836800i64..1893456000i64,  // 2020-2030 range
+                millis in 0u32..1000u32,
+            ) {
+                // Create floating point timestamp (seconds.milliseconds)
+                let float_ts = seconds as f64 + (millis as f64 / 1000.0);
+                
+                let json = format!(
+                    r#"{{"Id":"test-op","Type":"STEP","Status":"STARTED","StartTimestamp":{}}}"#,
+                    float_ts
+                );
+                
+                let op: Operation = serde_json::from_str(&json).unwrap();
+                prop_assert!(op.start_timestamp.is_some());
+                
+                // The expected value in milliseconds
+                let expected_millis = seconds * 1000 + millis as i64;
+                let actual_millis = op.start_timestamp.unwrap();
+                
+                // Allow for small rounding differences due to floating point
+                let diff = (expected_millis - actual_millis).abs();
+                prop_assert!(diff <= 1, "Timestamp difference too large: expected {}, got {}, diff {}", 
+                    expected_millis, actual_millis, diff);
+            }
+        }
+    }
+
+    /// **Feature: rust-sdk-test-suite, Property 16: OperationUpdate Serialization Validity**
+    /// **Validates: Requirements 9.4**
+    ///
+    /// For any OperationUpdate instance, serialization SHALL produce valid JSON
+    /// matching the API schema.
+    mod operation_update_serialization {
+        use super::*;
+        use crate::operation::{OperationUpdate, OperationType, OperationAction};
+        use crate::error::ErrorObject;
+
+        /// Strategy for generating valid OperationAction values.
+        fn operation_action_strategy() -> impl Strategy<Value = OperationAction> {
+            prop_oneof![
+                Just(OperationAction::Start),
+                Just(OperationAction::Succeed),
+                Just(OperationAction::Fail),
+                Just(OperationAction::Cancel),
+                Just(OperationAction::Retry),
+            ]
+        }
+
+        /// Strategy for generating valid OperationType values.
+        fn operation_type_strategy() -> impl Strategy<Value = OperationType> {
+            prop_oneof![
+                Just(OperationType::Execution),
+                Just(OperationType::Step),
+                Just(OperationType::Wait),
+                Just(OperationType::Callback),
+                Just(OperationType::Invoke),
+                Just(OperationType::Context),
+            ]
+        }
+
+        /// Strategy for generating valid operation ID strings.
+        fn operation_id_strategy() -> impl Strategy<Value = String> {
+            "[a-zA-Z][a-zA-Z0-9_-]{0,63}".prop_map(|s| s)
+        }
+
+        /// Strategy for generating optional strings.
+        fn optional_string_strategy() -> impl Strategy<Value = Option<String>> {
+            prop_oneof![
+                Just(None),
+                "[a-zA-Z0-9_-]{1,32}".prop_map(|s| Some(s)),
+            ]
+        }
+
+        /// Strategy for generating optional result payloads.
+        fn optional_result_strategy() -> impl Strategy<Value = Option<String>> {
+            prop_oneof![
+                Just(None),
+                Just(Some("null".to_string())),
+                Just(Some("42".to_string())),
+                Just(Some("\"test\"".to_string())),
+            ]
+        }
+
+        /// Strategy for generating OperationUpdate instances.
+        fn operation_update_strategy() -> impl Strategy<Value = OperationUpdate> {
+            (
+                operation_id_strategy(),
+                operation_action_strategy(),
+                operation_type_strategy(),
+                optional_result_strategy(),
+                optional_string_strategy(), // parent_id
+                optional_string_strategy(), // name
+            )
+                .prop_map(|(id, action, op_type, result, parent_id, name)| {
+                    let mut update = match action {
+                        OperationAction::Start => {
+                            if op_type == OperationType::Wait {
+                                OperationUpdate::start_wait(&id, 60)
+                            } else {
+                                OperationUpdate::start(&id, op_type)
+                            }
+                        }
+                        OperationAction::Succeed => OperationUpdate::succeed(&id, op_type, result.clone()),
+                        OperationAction::Fail => {
+                            let err = ErrorObject::new("TestError", "Test error message");
+                            OperationUpdate::fail(&id, op_type, err)
+                        }
+                        OperationAction::Cancel => OperationUpdate::cancel(&id, op_type),
+                        OperationAction::Retry => OperationUpdate::retry(&id, op_type, result.clone(), None),
+                    };
+                    update.parent_id = parent_id;
+                    update.name = name;
+                    update
+                })
+        }
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(100))]
+
+            /// Property test: OperationUpdate serialization produces valid JSON
+            /// **Feature: rust-sdk-test-suite, Property 16: OperationUpdate Serialization Validity**
+            /// **Validates: Requirements 9.4**
+            ///
+            /// For any OperationUpdate instance, serialization SHALL produce valid JSON.
+            #[test]
+            fn prop_operation_update_serialization_valid(update in operation_update_strategy()) {
+                // Serialization should succeed
+                let json = serde_json::to_string(&update).unwrap();
+                
+                // JSON should be parseable
+                let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+                
+                // Required fields should be present
+                prop_assert!(parsed.get("Id").is_some(), "Missing Id field");
+                prop_assert!(parsed.get("Action").is_some(), "Missing Action field");
+                prop_assert!(parsed.get("Type").is_some(), "Missing Type field");
+                
+                // Id should match
+                prop_assert_eq!(
+                    parsed.get("Id").unwrap().as_str().unwrap(),
+                    &update.operation_id
+                );
+            }
+
+            /// Property test: OperationUpdate round-trip
+            /// **Feature: rust-sdk-test-suite, Property 16: OperationUpdate Serialization Validity**
+            /// **Validates: Requirements 9.4**
+            ///
+            /// For any OperationUpdate instance, serializing then deserializing
+            /// SHALL produce an equivalent OperationUpdate.
+            #[test]
+            fn prop_operation_update_round_trip(update in operation_update_strategy()) {
+                let json = serde_json::to_string(&update).unwrap();
+                let deserialized: OperationUpdate = serde_json::from_str(&json).unwrap();
+                
+                // Verify key fields are preserved
+                prop_assert_eq!(&update.operation_id, &deserialized.operation_id);
+                prop_assert_eq!(update.action, deserialized.action);
+                prop_assert_eq!(update.operation_type, deserialized.operation_type);
+                prop_assert_eq!(&update.result, &deserialized.result);
+                prop_assert_eq!(&update.parent_id, &deserialized.parent_id);
+                prop_assert_eq!(&update.name, &deserialized.name);
+            }
+
+            /// Property test: OperationUpdate with WaitOptions
+            /// **Feature: rust-sdk-test-suite, Property 16: OperationUpdate Serialization Validity**
+            /// **Validates: Requirements 9.4**
+            ///
+            /// For any WAIT operation with WaitOptions, serialization SHALL include
+            /// the WaitOptions field with correct structure.
+            #[test]
+            fn prop_wait_options_serialization(wait_seconds in 1u64..86400u64) {
+                let update = OperationUpdate::start_wait("test-wait", wait_seconds);
+                
+                let json = serde_json::to_string(&update).unwrap();
+                let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+                
+                // WaitOptions should be present
+                prop_assert!(parsed.get("WaitOptions").is_some(), "Missing WaitOptions field");
+                
+                let wait_opts = parsed.get("WaitOptions").unwrap();
+                prop_assert_eq!(
+                    wait_opts.get("WaitSeconds").unwrap().as_u64().unwrap(),
+                    wait_seconds
+                );
+            }
+        }
+    }
 }

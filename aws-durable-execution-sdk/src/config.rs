@@ -209,6 +209,29 @@ pub enum StepSemantics {
 }
 
 /// Configuration for step operations.
+///
+/// # Examples
+///
+/// Using default configuration:
+///
+/// ```
+/// use aws_durable_execution_sdk::StepConfig;
+///
+/// let config = StepConfig::default();
+/// // Default uses AtLeastOncePerRetry semantics
+/// ```
+///
+/// Configuring step semantics:
+///
+/// ```
+/// use aws_durable_execution_sdk::{StepConfig, StepSemantics};
+///
+/// // For non-idempotent operations, use AtMostOncePerRetry
+/// let config = StepConfig {
+///     step_semantics: StepSemantics::AtMostOncePerRetry,
+///     ..Default::default()
+/// };
+/// ```
 #[derive(Clone, Default)]
 pub struct StepConfig {
     /// Optional retry strategy for failed steps.
@@ -279,6 +302,31 @@ impl<P, R> std::fmt::Debug for InvokeConfig<P, R> {
 }
 
 /// Configuration for map operations.
+///
+/// # Examples
+///
+/// Basic map configuration with concurrency limit:
+///
+/// ```
+/// use aws_durable_execution_sdk::MapConfig;
+///
+/// let config = MapConfig {
+///     max_concurrency: Some(5),
+///     ..Default::default()
+/// };
+/// ```
+///
+/// Map with failure tolerance:
+///
+/// ```
+/// use aws_durable_execution_sdk::{MapConfig, CompletionConfig};
+///
+/// let config = MapConfig {
+///     max_concurrency: Some(10),
+///     completion_config: CompletionConfig::with_failure_tolerance(2),
+///     ..Default::default()
+/// };
+/// ```
 #[derive(Debug, Clone, Default)]
 pub struct MapConfig {
     /// Maximum number of concurrent executions.
@@ -509,6 +557,11 @@ impl std::fmt::Debug for dyn SerDesAny {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
+
+    // =========================================================================
+    // Unit Tests
+    // =========================================================================
 
     #[test]
     fn test_step_semantics_default() {
@@ -670,5 +723,236 @@ mod tests {
         let serialized = serde_json::to_string(&mode).unwrap();
         let deserialized: CheckpointingMode = serde_json::from_str(&serialized).unwrap();
         assert_eq!(mode, deserialized);
+    }
+
+    // =========================================================================
+    // Property-Based Tests
+    // =========================================================================
+
+    /// Strategy for generating valid StepSemantics values
+    fn step_semantics_strategy() -> impl Strategy<Value = StepSemantics> {
+        prop_oneof![
+            Just(StepSemantics::AtMostOncePerRetry),
+            Just(StepSemantics::AtLeastOncePerRetry),
+        ]
+    }
+
+    /// Strategy for generating valid CheckpointingMode values
+    fn checkpointing_mode_strategy() -> impl Strategy<Value = CheckpointingMode> {
+        prop_oneof![
+            Just(CheckpointingMode::Eager),
+            Just(CheckpointingMode::Batched),
+            Just(CheckpointingMode::Optimistic),
+        ]
+    }
+
+    proptest! {
+        // **Feature: rust-sdk-test-suite, Property: StepConfig validity**
+        // **Validates: Requirements 5.1**
+        /// Property: For any valid StepConfig instance, the configuration SHALL be usable without panics.
+        /// StepConfig with any StepSemantics value should be valid and usable.
+        #[test]
+        fn prop_step_config_validity(semantics in step_semantics_strategy()) {
+            let config = StepConfig {
+                retry_strategy: None,
+                step_semantics: semantics,
+                serdes: None,
+            };
+            
+            // Verify the config is usable - accessing fields should not panic
+            let _ = config.retry_strategy.is_none();
+            let _ = config.step_semantics;
+            let _ = config.serdes.is_none();
+            
+            // Verify Debug trait works
+            let debug_str = format!("{:?}", config);
+            prop_assert!(!debug_str.is_empty());
+        }
+
+        // **Feature: rust-sdk-test-suite, Property: CallbackConfig with positive timeout values**
+        // **Validates: Requirements 5.2**
+        /// Property: For any valid CallbackConfig with positive timeout values, the configuration SHALL be valid.
+        #[test]
+        fn prop_callback_config_positive_timeout(
+            timeout_secs in 1u64..=86400u64,
+            heartbeat_secs in 1u64..=86400u64
+        ) {
+            let config = CallbackConfig {
+                timeout: Duration::from_seconds(timeout_secs),
+                heartbeat_timeout: Duration::from_seconds(heartbeat_secs),
+                serdes: None,
+            };
+            
+            // Verify the config has the expected timeout values
+            prop_assert_eq!(config.timeout.to_seconds(), timeout_secs);
+            prop_assert_eq!(config.heartbeat_timeout.to_seconds(), heartbeat_secs);
+            
+            // Verify Debug trait works
+            let debug_str = format!("{:?}", config);
+            prop_assert!(!debug_str.is_empty());
+        }
+
+        // **Feature: rust-sdk-test-suite, Property 12: Duration conversion round-trip**
+        // **Validates: Requirements 5.3**
+        /// Property: For any Duration value, converting to seconds and back SHALL preserve the value.
+        #[test]
+        fn prop_duration_conversion_roundtrip(seconds in 0u64..=u64::MAX / 2) {
+            let original = Duration::from_seconds(seconds);
+            let extracted = original.to_seconds();
+            let reconstructed = Duration::from_seconds(extracted);
+            
+            prop_assert_eq!(original, reconstructed);
+            prop_assert_eq!(original.to_seconds(), reconstructed.to_seconds());
+        }
+
+        // **Feature: rust-sdk-test-suite, Property: RetryStrategy consistency**
+        // **Validates: Requirements 5.4**
+        /// Property: For any CompletionConfig, the configuration SHALL produce consistent behavior.
+        /// Since RetryStrategy is a sealed trait, we test CompletionConfig which is the main
+        /// configurable retry-related type.
+        #[test]
+        fn prop_completion_config_consistency(
+            min_successful in proptest::option::of(0usize..100),
+            tolerated_count in proptest::option::of(0usize..100),
+            tolerated_pct in proptest::option::of(0.0f64..=1.0f64)
+        ) {
+            let config = CompletionConfig {
+                min_successful,
+                tolerated_failure_count: tolerated_count,
+                tolerated_failure_percentage: tolerated_pct,
+            };
+            
+            // Verify the config has the expected values
+            prop_assert_eq!(config.min_successful, min_successful);
+            prop_assert_eq!(config.tolerated_failure_count, tolerated_count);
+            prop_assert_eq!(config.tolerated_failure_percentage, tolerated_pct);
+            
+            // Verify serialization round-trip
+            let serialized = serde_json::to_string(&config).unwrap();
+            let deserialized: CompletionConfig = serde_json::from_str(&serialized).unwrap();
+            
+            prop_assert_eq!(config.min_successful, deserialized.min_successful);
+            prop_assert_eq!(config.tolerated_failure_count, deserialized.tolerated_failure_count);
+            // For f64, we need to handle NaN specially
+            match (config.tolerated_failure_percentage, deserialized.tolerated_failure_percentage) {
+                (Some(a), Some(b)) => prop_assert!((a - b).abs() < f64::EPSILON),
+                (None, None) => {},
+                _ => prop_assert!(false, "tolerated_failure_percentage mismatch"),
+            }
+        }
+
+        // **Feature: rust-sdk-test-suite, Property: CheckpointingMode serialization round-trip**
+        // **Validates: Requirements 5.1**
+        /// Property: For any CheckpointingMode value, serializing then deserializing SHALL produce the same value.
+        #[test]
+        fn prop_checkpointing_mode_roundtrip(mode in checkpointing_mode_strategy()) {
+            let serialized = serde_json::to_string(&mode).unwrap();
+            let deserialized: CheckpointingMode = serde_json::from_str(&serialized).unwrap();
+            prop_assert_eq!(mode, deserialized);
+        }
+
+        // **Feature: rust-sdk-test-suite, Property: CheckpointingMode classification consistency**
+        // **Validates: Requirements 5.1**
+        /// Property: For any CheckpointingMode, exactly one of is_eager/is_batched/is_optimistic SHALL be true.
+        #[test]
+        fn prop_checkpointing_mode_classification(mode in checkpointing_mode_strategy()) {
+            let eager = mode.is_eager();
+            let batched = mode.is_batched();
+            let optimistic = mode.is_optimistic();
+            
+            // Exactly one should be true
+            let count = [eager, batched, optimistic].iter().filter(|&&x| x).count();
+            prop_assert_eq!(count, 1, "Exactly one classification should be true");
+            
+            // Verify consistency with the enum variant
+            match mode {
+                CheckpointingMode::Eager => prop_assert!(eager),
+                CheckpointingMode::Batched => prop_assert!(batched),
+                CheckpointingMode::Optimistic => prop_assert!(optimistic),
+            }
+        }
+
+        // **Feature: rust-sdk-test-suite, Property: StepSemantics serialization round-trip**
+        // **Validates: Requirements 5.1**
+        /// Property: For any StepSemantics value, serializing then deserializing SHALL produce the same value.
+        #[test]
+        fn prop_step_semantics_roundtrip(semantics in step_semantics_strategy()) {
+            let serialized = serde_json::to_string(&semantics).unwrap();
+            let deserialized: StepSemantics = serde_json::from_str(&serialized).unwrap();
+            prop_assert_eq!(semantics, deserialized);
+        }
+
+        // **Feature: rust-sdk-test-suite, Property: ItemBatcher validity**
+        // **Validates: Requirements 5.1**
+        /// Property: For any ItemBatcher with positive values, the configuration SHALL be valid.
+        #[test]
+        fn prop_item_batcher_validity(
+            max_items in 1usize..=10000,
+            max_bytes in 1usize..=10_000_000
+        ) {
+            let batcher = ItemBatcher::new(max_items, max_bytes);
+            
+            prop_assert_eq!(batcher.max_items_per_batch, max_items);
+            prop_assert_eq!(batcher.max_bytes_per_batch, max_bytes);
+            
+            // Verify Debug trait works
+            let debug_str = format!("{:?}", batcher);
+            prop_assert!(!debug_str.is_empty());
+        }
+
+        // **Feature: rust-sdk-test-suite, Property: ChildConfig builder pattern consistency**
+        // **Validates: Requirements 5.1**
+        /// Property: For any ChildConfig, the builder pattern SHALL produce consistent results.
+        #[test]
+        fn prop_child_config_builder_consistency(replay_children in proptest::bool::ANY) {
+            let config = ChildConfig::new().set_replay_children(replay_children);
+            
+            prop_assert_eq!(config.replay_children, replay_children);
+            
+            // Verify Debug trait works
+            let debug_str = format!("{:?}", config);
+            prop_assert!(!debug_str.is_empty());
+        }
+
+        // **Feature: rust-sdk-test-suite, Property: MapConfig validity**
+        // **Validates: Requirements 5.1**
+        /// Property: For any MapConfig with valid values, the configuration SHALL be usable.
+        #[test]
+        fn prop_map_config_validity(
+            max_concurrency in proptest::option::of(1usize..=1000)
+        ) {
+            let config = MapConfig {
+                max_concurrency,
+                item_batcher: None,
+                completion_config: CompletionConfig::default(),
+                serdes: None,
+            };
+            
+            prop_assert_eq!(config.max_concurrency, max_concurrency);
+            
+            // Verify Debug trait works
+            let debug_str = format!("{:?}", config);
+            prop_assert!(!debug_str.is_empty());
+        }
+
+        // **Feature: rust-sdk-test-suite, Property: ParallelConfig validity**
+        // **Validates: Requirements 5.1**
+        /// Property: For any ParallelConfig with valid values, the configuration SHALL be usable.
+        #[test]
+        fn prop_parallel_config_validity(
+            max_concurrency in proptest::option::of(1usize..=1000)
+        ) {
+            let config = ParallelConfig {
+                max_concurrency,
+                completion_config: CompletionConfig::default(),
+                serdes: None,
+            };
+            
+            prop_assert_eq!(config.max_concurrency, max_concurrency);
+            
+            // Verify Debug trait works
+            let debug_str = format!("{:?}", config);
+            prop_assert!(!debug_str.is_empty());
+        }
     }
 }

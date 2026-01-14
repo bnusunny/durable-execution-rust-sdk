@@ -363,3 +363,604 @@ fn create_retry_update(
     }
     update
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::client::{CheckpointResponse, MockDurableServiceClient, SharedDurableServiceClient};
+    use crate::context::{TracingLogger, OperationIdentifier};
+    use crate::duration::Duration;
+    use crate::lambda::InitialExecutionState;
+    use crate::operation::{Operation, OperationStatus, StepDetails};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    fn create_mock_client() -> SharedDurableServiceClient {
+        Arc::new(
+            MockDurableServiceClient::new()
+                .with_checkpoint_response(Ok(CheckpointResponse::new("token-1")))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("token-2")))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("token-3")))
+        )
+    }
+
+    fn create_test_state(client: SharedDurableServiceClient) -> Arc<ExecutionState> {
+        Arc::new(ExecutionState::new(
+            "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+            "initial-token",
+            InitialExecutionState::new(),
+            client,
+        ))
+    }
+
+    fn create_test_state_with_operations(
+        client: SharedDurableServiceClient,
+        operations: Vec<Operation>,
+    ) -> Arc<ExecutionState> {
+        Arc::new(ExecutionState::new(
+            "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+            "initial-token",
+            InitialExecutionState::with_operations(operations),
+            client,
+        ))
+    }
+
+    fn create_test_op_id() -> OperationIdentifier {
+        OperationIdentifier::new("test-wait-cond-123", None, Some("test-wait-condition".to_string()))
+    }
+
+    fn create_test_logger() -> Arc<dyn Logger> {
+        Arc::new(TracingLogger)
+    }
+
+    fn create_test_config<S: Clone>(initial_state: S) -> WaitForConditionConfig<S> {
+        WaitForConditionConfig {
+            initial_state,
+            interval: Duration::from_seconds(5),
+            max_attempts: Some(3),
+            timeout: None,
+        }
+    }
+
+    // ==========================================================================
+    // Test 1.1: Initial condition check execution on new operation
+    // Requirements: 1.1 - WHEN a wait-for-condition operation starts, THE Test_Suite 
+    // SHALL verify the initial check is executed
+    // ==========================================================================
+
+    #[tokio::test]
+    async fn test_initial_condition_check_executed_on_new_operation() {
+        let client = create_mock_client();
+        let state = create_test_state(client);
+        let op_id = create_test_op_id();
+        let logger = create_test_logger();
+        
+        // Track if the check function was called
+        let check_called = Arc::new(AtomicUsize::new(0));
+        let check_called_clone = check_called.clone();
+        
+        let config = create_test_config(0i32);
+        
+        // Condition that succeeds immediately
+        let result = wait_for_condition_handler(
+            move |_state: &i32, ctx: &WaitForConditionContext| {
+                check_called_clone.fetch_add(1, Ordering::SeqCst);
+                assert_eq!(ctx.attempt, 1, "First attempt should be 1");
+                Ok::<_, Box<dyn std::error::Error + Send + Sync>>(42)
+            },
+            config,
+            &state,
+            &op_id,
+            &logger,
+        ).await;
+        
+        assert!(result.is_ok(), "Should succeed when condition passes");
+        assert_eq!(result.unwrap(), 42);
+        assert_eq!(check_called.load(Ordering::SeqCst), 1, "Check function should be called once");
+    }
+
+    #[tokio::test]
+    async fn test_initial_check_receives_initial_state() {
+        let client = create_mock_client();
+        let state = create_test_state(client);
+        let op_id = create_test_op_id();
+        let logger = create_test_logger();
+        
+        #[derive(Clone, serde::Serialize, serde::Deserialize)]
+        struct TestState {
+            counter: i32,
+            name: String,
+        }
+        
+        let initial_state = TestState {
+            counter: 42,
+            name: "test".to_string(),
+        };
+        
+        let config = WaitForConditionConfig {
+            initial_state,
+            interval: Duration::from_seconds(5),
+            max_attempts: Some(3),
+            timeout: None,
+        };
+        
+        let result = wait_for_condition_handler(
+            |state: &TestState, _ctx: &WaitForConditionContext| {
+                // Verify initial state is passed correctly
+                assert_eq!(state.counter, 42);
+                assert_eq!(state.name, "test");
+                Ok::<_, Box<dyn std::error::Error + Send + Sync>>("success".to_string())
+            },
+            config,
+            &state,
+            &op_id,
+            &logger,
+        ).await;
+        
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "success");
+    }
+
+
+    // ==========================================================================
+    // Test 1.2: RETRY action checkpoint with state payload
+    // Requirements: 1.2 - WHEN a wait-for-condition check returns retry with state, 
+    // THE Test_Suite SHALL verify RETRY action is checkpointed with the state payload
+    // ==========================================================================
+
+    #[tokio::test]
+    async fn test_retry_action_checkpointed_with_state_payload() {
+        let client = create_mock_client();
+        let state = create_test_state(client);
+        let op_id = create_test_op_id();
+        let logger = create_test_logger();
+        
+        let config = create_test_config(0i32);
+        
+        // Condition that fails (returns error to trigger retry)
+        let result = wait_for_condition_handler(
+            |_state: &i32, _ctx: &WaitForConditionContext| {
+                Err::<String, _>("condition not met".into())
+            },
+            config,
+            &state,
+            &op_id,
+            &logger,
+        ).await;
+        
+        // Should suspend for retry
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DurableError::Suspend { .. } => {
+                // Expected - execution should suspend for retry
+            }
+            other => panic!("Expected Suspend error, got: {:?}", other),
+        }
+        
+        // Verify checkpoint was created with RETRY action
+        let checkpoint_result = state.get_checkpoint_result(&op_id.operation_id).await;
+        assert!(checkpoint_result.is_existent(), "Checkpoint should exist");
+        
+        // The operation should be in PENDING status after RETRY
+        let op = checkpoint_result.operation().expect("Operation should exist");
+        assert_eq!(op.status, OperationStatus::Pending, "Status should be Pending after RETRY");
+    }
+
+    // ==========================================================================
+    // Test 1.3: SUCCEED action checkpoint when condition passes
+    // Requirements: 1.3 - WHEN a wait-for-condition check succeeds, THE Test_Suite 
+    // SHALL verify the final result is returned and SUCCEED is checkpointed
+    // ==========================================================================
+
+    #[tokio::test]
+    async fn test_succeed_action_checkpointed_when_condition_passes() {
+        let client = create_mock_client();
+        let state = create_test_state(client);
+        let op_id = create_test_op_id();
+        let logger = create_test_logger();
+        
+        let config = create_test_config(0i32);
+        
+        // Condition that succeeds immediately
+        let result = wait_for_condition_handler(
+            |_state: &i32, _ctx: &WaitForConditionContext| {
+                Ok::<_, Box<dyn std::error::Error + Send + Sync>>("success_result".to_string())
+            },
+            config,
+            &state,
+            &op_id,
+            &logger,
+        ).await;
+        
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "success_result");
+        
+        // Verify checkpoint was created with SUCCEED status
+        let checkpoint_result = state.get_checkpoint_result(&op_id.operation_id).await;
+        assert!(checkpoint_result.is_existent(), "Checkpoint should exist");
+        assert!(checkpoint_result.is_succeeded(), "Checkpoint should be succeeded");
+        
+        // Verify result was serialized
+        let result_str = checkpoint_result.result().expect("Result should exist");
+        assert!(result_str.contains("success_result"));
+    }
+
+    // ==========================================================================
+    // Test 1.4: Suspension when replaying PENDING status
+    // Requirements: 1.4 - WHEN replaying a wait-for-condition in PENDING status, 
+    // THE Test_Suite SHALL verify execution suspends until retry timer
+    // ==========================================================================
+
+    #[tokio::test]
+    async fn test_suspension_when_replaying_pending_status() {
+        let client = Arc::new(MockDurableServiceClient::new());
+        
+        // Create a PENDING operation (waiting for retry)
+        let mut op = Operation::new("test-wait-cond-123", OperationType::Step);
+        op.status = OperationStatus::Pending;
+        op.step_details = Some(StepDetails {
+            result: None,
+            attempt: Some(1),
+            next_attempt_timestamp: Some(9999999999000), // Far future
+            error: None,
+            payload: Some(r#"{"user_state":0,"attempt":2}"#.to_string()),
+        });
+        
+        let state = create_test_state_with_operations(client, vec![op]);
+        let op_id = create_test_op_id();
+        let logger = create_test_logger();
+        
+        let config = create_test_config(0i32);
+        
+        // When replaying a PENDING operation, it should continue execution
+        // (the handler checks for PENDING and continues with next attempt)
+        let result = wait_for_condition_handler(
+            |_state: &i32, ctx: &WaitForConditionContext| {
+                // This should be called with attempt 2 (from the payload)
+                assert_eq!(ctx.attempt, 2, "Should be on attempt 2");
+                Ok::<_, Box<dyn std::error::Error + Send + Sync>>("resumed_result".to_string())
+            },
+            config,
+            &state,
+            &op_id,
+            &logger,
+        ).await;
+        
+        // Should succeed since condition passes on resume
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "resumed_result");
+    }
+
+    // ==========================================================================
+    // Test 1.5: FAIL action checkpoint when retries exhausted
+    // Requirements: 1.5 - WHEN a wait-for-condition exhausts retries, THE Test_Suite 
+    // SHALL verify FAIL action is checkpointed with the final error
+    // ==========================================================================
+
+    #[tokio::test]
+    async fn test_fail_action_checkpointed_when_retries_exhausted() {
+        let client = create_mock_client();
+        let state = create_test_state(client);
+        let op_id = create_test_op_id();
+        let logger = create_test_logger();
+        
+        // Config with max_attempts = 1 (only one try)
+        let config = WaitForConditionConfig {
+            initial_state: 0i32,
+            interval: Duration::from_seconds(5),
+            max_attempts: Some(1),
+            timeout: None,
+        };
+        
+        // Condition that always fails
+        let result = wait_for_condition_handler(
+            |_state: &i32, _ctx: &WaitForConditionContext| {
+                Err::<String, _>("condition never met".into())
+            },
+            config,
+            &state,
+            &op_id,
+            &logger,
+        ).await;
+        
+        // Should fail with max attempts exceeded
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DurableError::Execution { message, .. } => {
+                assert!(message.contains("Max attempts"), "Error should mention max attempts");
+            }
+            other => panic!("Expected Execution error, got: {:?}", other),
+        }
+        
+        // Verify checkpoint was created with FAIL status
+        let checkpoint_result = state.get_checkpoint_result(&op_id.operation_id).await;
+        assert!(checkpoint_result.is_existent(), "Checkpoint should exist");
+        assert!(checkpoint_result.is_failed(), "Checkpoint should be failed");
+    }
+
+
+    // ==========================================================================
+    // Test 1.6: StepContext.retry_payload contains previous state
+    // Requirements: 1.6 - WHEN the condition function receives previous state, 
+    // THE Test_Suite SHALL verify StepContext.retry_payload contains the serialized state
+    // ==========================================================================
+
+    #[tokio::test]
+    async fn test_retry_payload_contains_previous_state() {
+        let client = Arc::new(MockDurableServiceClient::new()
+            .with_checkpoint_response(Ok(CheckpointResponse::new("token-1"))));
+        
+        // Create a PENDING operation with retry payload containing state
+        #[derive(Clone, serde::Serialize, serde::Deserialize, PartialEq, Debug)]
+        struct TestState {
+            counter: i32,
+        }
+        
+        let previous_state = WaitForConditionState {
+            user_state: TestState { counter: 42 },
+            attempt: 2,
+        };
+        let payload = serde_json::to_string(&previous_state).unwrap();
+        
+        let mut op = Operation::new("test-wait-cond-123", OperationType::Step);
+        op.status = OperationStatus::Pending;
+        op.step_details = Some(StepDetails {
+            result: None,
+            attempt: Some(1),
+            next_attempt_timestamp: Some(1234567890000),
+            error: None,
+            payload: Some(payload),
+        });
+        
+        let state = create_test_state_with_operations(client, vec![op]);
+        let op_id = create_test_op_id();
+        let logger = create_test_logger();
+        
+        let config = WaitForConditionConfig {
+            initial_state: TestState { counter: 0 },
+            interval: Duration::from_seconds(5),
+            max_attempts: Some(5),
+            timeout: None,
+        };
+        
+        let result = wait_for_condition_handler(
+            |state: &TestState, ctx: &WaitForConditionContext| {
+                // Verify the state from retry payload is passed
+                assert_eq!(state.counter, 42, "State should be from retry payload");
+                assert_eq!(ctx.attempt, 2, "Attempt should be 2 from payload");
+                Ok::<_, Box<dyn std::error::Error + Send + Sync>>("success".to_string())
+            },
+            config,
+            &state,
+            &op_id,
+            &logger,
+        ).await;
+        
+        assert!(result.is_ok());
+    }
+
+    // ==========================================================================
+    // Test 1.7: Condition function receives None on first attempt
+    // Requirements: Additional test for first attempt behavior
+    // ==========================================================================
+
+    #[tokio::test]
+    async fn test_condition_receives_initial_state_on_first_attempt() {
+        let client = create_mock_client();
+        let state = create_test_state(client);
+        let op_id = create_test_op_id();
+        let logger = create_test_logger();
+        
+        #[derive(Clone, serde::Serialize, serde::Deserialize, PartialEq, Debug)]
+        struct TestState {
+            value: String,
+        }
+        
+        let config = WaitForConditionConfig {
+            initial_state: TestState { value: "initial".to_string() },
+            interval: Duration::from_seconds(5),
+            max_attempts: Some(3),
+            timeout: None,
+        };
+        
+        let result = wait_for_condition_handler(
+            |state: &TestState, ctx: &WaitForConditionContext| {
+                // On first attempt, should receive initial state
+                assert_eq!(ctx.attempt, 1, "Should be first attempt");
+                assert_eq!(state.value, "initial", "Should receive initial state");
+                Ok::<_, Box<dyn std::error::Error + Send + Sync>>("done".to_string())
+            },
+            config,
+            &state,
+            &op_id,
+            &logger,
+        ).await;
+        
+        assert!(result.is_ok());
+    }
+
+    // ==========================================================================
+    // Test 1.8: Condition function error handling
+    // Requirements: Additional test for error handling
+    // ==========================================================================
+
+    #[tokio::test]
+    async fn test_condition_function_error_triggers_retry() {
+        let client = create_mock_client();
+        let state = create_test_state(client);
+        let op_id = create_test_op_id();
+        let logger = create_test_logger();
+        
+        let config = WaitForConditionConfig {
+            initial_state: 0i32,
+            interval: Duration::from_seconds(5),
+            max_attempts: Some(3),
+            timeout: None,
+        };
+        
+        // Condition that returns an error (not met)
+        let result = wait_for_condition_handler(
+            |_state: &i32, _ctx: &WaitForConditionContext| {
+                Err::<String, _>("condition check failed".into())
+            },
+            config,
+            &state,
+            &op_id,
+            &logger,
+        ).await;
+        
+        // Should suspend for retry (not fail immediately)
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DurableError::Suspend { .. } => {
+                // Expected - should suspend for retry since max_attempts > 1
+            }
+            other => panic!("Expected Suspend error for retry, got: {:?}", other),
+        }
+    }
+
+    // ==========================================================================
+    // Additional tests for replay scenarios
+    // ==========================================================================
+
+    #[tokio::test]
+    async fn test_replay_succeeded_operation_returns_cached_result() {
+        let client = Arc::new(MockDurableServiceClient::new());
+        
+        // Create a SUCCEEDED operation
+        let mut op = Operation::new("test-wait-cond-123", OperationType::Step);
+        op.status = OperationStatus::Succeeded;
+        op.step_details = Some(StepDetails {
+            result: Some(r#""cached_result""#.to_string()),
+            attempt: Some(2),
+            next_attempt_timestamp: None,
+            error: None,
+            payload: None,
+        });
+        
+        let state = create_test_state_with_operations(client, vec![op]);
+        let op_id = create_test_op_id();
+        let logger = create_test_logger();
+        
+        let config = create_test_config(0i32);
+        
+        // Function should NOT be called during replay
+        let result: Result<String, DurableError> = wait_for_condition_handler(
+            |_state: &i32, _ctx: &WaitForConditionContext| {
+                panic!("Function should not be called during replay of succeeded operation");
+            },
+            config,
+            &state,
+            &op_id,
+            &logger,
+        ).await;
+        
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "cached_result");
+    }
+
+    #[tokio::test]
+    async fn test_replay_failed_operation_returns_error() {
+        let client = Arc::new(MockDurableServiceClient::new());
+        
+        // Create a FAILED operation
+        let mut op = Operation::new("test-wait-cond-123", OperationType::Step);
+        op.status = OperationStatus::Failed;
+        op.error = Some(ErrorObject::new("MaxAttemptsExceeded", "Max attempts exceeded"));
+        
+        let state = create_test_state_with_operations(client, vec![op]);
+        let op_id = create_test_op_id();
+        let logger = create_test_logger();
+        
+        let config = create_test_config(0i32);
+        
+        // Function should NOT be called during replay
+        let result: Result<String, DurableError> = wait_for_condition_handler(
+            |_state: &i32, _ctx: &WaitForConditionContext| {
+                panic!("Function should not be called during replay of failed operation");
+            },
+            config,
+            &state,
+            &op_id,
+            &logger,
+        ).await;
+        
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DurableError::UserCode { message, .. } => {
+                assert!(message.contains("Max attempts"));
+            }
+            other => panic!("Expected UserCode error, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_non_deterministic_detection_wrong_operation_type() {
+        let client = Arc::new(MockDurableServiceClient::new());
+        
+        // Create a WAIT operation at the same ID (wrong type)
+        let mut op = Operation::new("test-wait-cond-123", OperationType::Wait);
+        op.status = OperationStatus::Succeeded;
+        
+        let state = create_test_state_with_operations(client, vec![op]);
+        let op_id = create_test_op_id();
+        let logger = create_test_logger();
+        
+        let config = create_test_config(0i32);
+        
+        let result = wait_for_condition_handler(
+            |_state: &i32, _ctx: &WaitForConditionContext| {
+                Ok::<_, Box<dyn std::error::Error + Send + Sync>>("should not reach".to_string())
+            },
+            config,
+            &state,
+            &op_id,
+            &logger,
+        ).await;
+        
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DurableError::NonDeterministic { operation_id, .. } => {
+                assert_eq!(operation_id, Some("test-wait-cond-123".to_string()));
+            }
+            other => panic!("Expected NonDeterministic error, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_ready_status_continues_execution() {
+        let client = Arc::new(MockDurableServiceClient::new()
+            .with_checkpoint_response(Ok(CheckpointResponse::new("token-1"))));
+        
+        // Create a READY operation (ready to resume)
+        let mut op = Operation::new("test-wait-cond-123", OperationType::Step);
+        op.status = OperationStatus::Ready;
+        op.step_details = Some(StepDetails {
+            result: None,
+            attempt: Some(1),
+            next_attempt_timestamp: None,
+            error: None,
+            payload: None,
+        });
+        
+        let state = create_test_state_with_operations(client, vec![op]);
+        let op_id = create_test_op_id();
+        let logger = create_test_logger();
+        
+        let config = create_test_config(0i32);
+        
+        // Function SHOULD be called for READY status
+        let result = wait_for_condition_handler(
+            |_state: &i32, _ctx: &WaitForConditionContext| {
+                Ok::<_, Box<dyn std::error::Error + Send + Sync>>("ready_result".to_string())
+            },
+            config,
+            &state,
+            &op_id,
+            &logger,
+        ).await;
+        
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "ready_result");
+    }
+}

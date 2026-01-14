@@ -1016,6 +1016,7 @@ mod tests {
 #[cfg(test)]
 mod property_tests {
     use super::*;
+    use std::collections::HashSet;
     use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
     use async_trait::async_trait;
     use proptest::prelude::*;
@@ -1241,6 +1242,443 @@ mod property_tests {
                 Ok(())
             });
             result?;
+        }
+    }
+
+    // ============================================================================
+    // Property Tests for Batch Ordering (Properties 13, 14, 15)
+    // Feature: rust-sdk-test-suite
+    // ============================================================================
+
+    /// Strategy for generating valid operation IDs
+    fn operation_id_strategy() -> impl Strategy<Value = String> {
+        "[a-z]{1,8}-[0-9]{1,4}".prop_map(|s| s)
+    }
+
+    /// Strategy for generating operation types
+    fn operation_type_strategy() -> impl Strategy<Value = OperationType> {
+        prop_oneof![
+            Just(OperationType::Execution),
+            Just(OperationType::Step),
+            Just(OperationType::Wait),
+            Just(OperationType::Callback),
+            Just(OperationType::Invoke),
+            Just(OperationType::Context),
+        ]
+    }
+
+    /// Strategy for generating operation actions
+    fn operation_action_strategy() -> impl Strategy<Value = OperationAction> {
+        prop_oneof![
+            Just(OperationAction::Start),
+            Just(OperationAction::Succeed),
+            Just(OperationAction::Fail),
+        ]
+    }
+
+    /// Creates a checkpoint request with the given parameters
+    fn create_checkpoint_request(
+        id: &str,
+        op_type: OperationType,
+        action: OperationAction,
+        parent_id: Option<String>,
+    ) -> CheckpointRequest {
+        let mut update = match action {
+            OperationAction::Start => OperationUpdate::start(id, op_type),
+            OperationAction::Succeed => OperationUpdate::succeed(id, op_type, Some("result".to_string())),
+            OperationAction::Fail => OperationUpdate::fail(id, op_type, crate::error::ErrorObject::new("Error", "message")),
+            _ => OperationUpdate::start(id, op_type),
+        };
+        update.parent_id = parent_id;
+        CheckpointRequest::async_request(update)
+    }
+
+    /// Strategy for generating a batch with parent-child relationships
+    /// Generates a CONTEXT START and some child operations that reference it
+    fn parent_child_batch_strategy() -> impl Strategy<Value = Vec<CheckpointRequest>> {
+        (
+            operation_id_strategy(),  // parent context id
+            prop::collection::vec(operation_id_strategy(), 1..5),  // child ids
+            prop::collection::vec(operation_type_strategy(), 1..5),  // child types (will be filtered)
+        ).prop_map(|(parent_id, child_ids, child_types)| {
+            let mut batch = Vec::new();
+            
+            // Add children first (in random order, they should be sorted after parent)
+            for (child_id, child_type) in child_ids.iter().zip(child_types.iter()) {
+                // Skip if child_type is Execution (can't have parent)
+                if *child_type != OperationType::Execution {
+                    batch.push(create_checkpoint_request(
+                        child_id,
+                        *child_type,
+                        OperationAction::Start,
+                        Some(parent_id.clone()),
+                    ));
+                }
+            }
+            
+            // Add parent CONTEXT START (should be sorted to come first)
+            batch.push(create_checkpoint_request(
+                &parent_id,
+                OperationType::Context,
+                OperationAction::Start,
+                None,
+            ));
+            
+            batch
+        })
+    }
+
+    /// Strategy for generating a batch with EXECUTION completion
+    /// Generates some operations and an EXECUTION SUCCEED/FAIL that should be last
+    fn execution_completion_batch_strategy() -> impl Strategy<Value = Vec<CheckpointRequest>> {
+        (
+            operation_id_strategy(),  // execution id
+            prop::collection::vec(
+                (operation_id_strategy(), operation_type_strategy()),
+                1..5
+            ),  // other operations
+            prop::bool::ANY,  // succeed or fail
+        ).prop_map(|(exec_id, other_ops, succeed)| {
+            let mut batch = Vec::new();
+            
+            // Add EXECUTION completion first (should be sorted to come last)
+            let exec_action = if succeed { OperationAction::Succeed } else { OperationAction::Fail };
+            batch.push(create_checkpoint_request(
+                &exec_id,
+                OperationType::Execution,
+                exec_action,
+                None,
+            ));
+            
+            // Add other operations
+            for (op_id, op_type) in other_ops {
+                // Skip Execution type to avoid conflicts
+                if op_type != OperationType::Execution {
+                    batch.push(create_checkpoint_request(
+                        &op_id,
+                        op_type,
+                        OperationAction::Start,
+                        None,
+                    ));
+                }
+            }
+            
+            batch
+        })
+    }
+
+    /// Strategy for generating a batch with potential duplicate operation IDs
+    /// (START and completion for same operation)
+    fn same_operation_batch_strategy() -> impl Strategy<Value = Vec<CheckpointRequest>> {
+        (
+            operation_id_strategy(),
+            prop_oneof![
+                Just(OperationType::Step),
+                Just(OperationType::Context),
+            ],
+            prop::bool::ANY,  // succeed or fail
+        ).prop_map(|(op_id, op_type, succeed)| {
+            let mut batch = Vec::new();
+            
+            // Add completion first (should be sorted after START)
+            let completion_action = if succeed { OperationAction::Succeed } else { OperationAction::Fail };
+            batch.push(create_checkpoint_request(
+                &op_id,
+                op_type,
+                completion_action,
+                None,
+            ));
+            
+            // Add START (should be sorted to come first)
+            batch.push(create_checkpoint_request(
+                &op_id,
+                op_type,
+                OperationAction::Start,
+                None,
+            ));
+            
+            batch
+        })
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(100))]
+
+        /// Property 13: Parent-before-child ordering
+        /// For any batch of operation updates, child operations SHALL appear after their parent CONTEXT start
+        /// Feature: rust-sdk-test-suite, Property 13: Parent-before-child ordering
+        /// Validates: Requirements 8.1
+        #[test]
+        fn prop_parent_context_start_before_children(batch in parent_child_batch_strategy()) {
+            // Skip empty batches
+            if batch.is_empty() {
+                return Ok(());
+            }
+            
+            let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+            
+            // Find the parent CONTEXT START position
+            let parent_pos = sorted.iter().position(|r| {
+                r.operation.operation_type == OperationType::Context
+                    && r.operation.action == OperationAction::Start
+                    && r.operation.parent_id.is_none()
+            });
+            
+            // If there's a parent CONTEXT START, all children must come after it
+            if let Some(parent_idx) = parent_pos {
+                let parent_id = &sorted[parent_idx].operation.operation_id;
+                
+                for (idx, req) in sorted.iter().enumerate() {
+                    if let Some(ref req_parent_id) = req.operation.parent_id {
+                        if req_parent_id == parent_id {
+                            prop_assert!(
+                                idx > parent_idx,
+                                "Child operation {} at index {} should come after parent {} at index {}",
+                                req.operation.operation_id,
+                                idx,
+                                parent_id,
+                                parent_idx
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        /// Property 14: Execution-last ordering
+        /// For any batch containing EXECUTION completion, the EXECUTION update SHALL be last
+        /// Feature: rust-sdk-test-suite, Property 14: Execution-last ordering
+        /// Validates: Requirements 8.2
+        #[test]
+        fn prop_execution_completion_is_last(batch in execution_completion_batch_strategy()) {
+            // Skip empty batches
+            if batch.is_empty() {
+                return Ok(());
+            }
+            
+            let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+            
+            // Find EXECUTION completion (SUCCEED or FAIL)
+            let exec_completion_pos = sorted.iter().position(|r| {
+                r.operation.operation_type == OperationType::Execution
+                    && matches!(r.operation.action, OperationAction::Succeed | OperationAction::Fail)
+            });
+            
+            // If there's an EXECUTION completion, it must be last
+            if let Some(exec_idx) = exec_completion_pos {
+                prop_assert_eq!(
+                    exec_idx,
+                    sorted.len() - 1,
+                    "EXECUTION completion should be at index {} (last), but found at index {}",
+                    sorted.len() - 1,
+                    exec_idx
+                );
+            }
+        }
+
+        /// Property 15: Operation ID uniqueness (with exception for START+completion)
+        /// For any batch, each operation_id SHALL appear at most once, except for STEP/CONTEXT
+        /// operations which may have both START and completion in the same batch
+        /// Feature: rust-sdk-test-suite, Property 15: Operation ID uniqueness
+        /// Validates: Requirements 8.3
+        #[test]
+        fn prop_operation_id_uniqueness_with_start_completion_exception(
+            batch in same_operation_batch_strategy()
+        ) {
+            // Skip empty batches
+            if batch.is_empty() {
+                return Ok(());
+            }
+            
+            let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+            
+            // Track operation_id occurrences with their actions
+            let mut seen: std::collections::HashMap<String, Vec<OperationAction>> = std::collections::HashMap::new();
+            
+            for req in &sorted {
+                seen.entry(req.operation.operation_id.clone())
+                    .or_default()
+                    .push(req.operation.action);
+            }
+            
+            // Verify uniqueness rules
+            for (op_id, actions) in &seen {
+                if actions.len() > 1 {
+                    // Multiple occurrences are only allowed for START + completion
+                    let has_start = actions.contains(&OperationAction::Start);
+                    let has_completion = actions.iter().any(|a| {
+                        matches!(a, OperationAction::Succeed | OperationAction::Fail | OperationAction::Retry)
+                    });
+                    
+                    prop_assert!(
+                        has_start && has_completion && actions.len() == 2,
+                        "Operation {} appears {} times with actions {:?}. \
+                         Multiple occurrences only allowed for START + completion pair.",
+                        op_id,
+                        actions.len(),
+                        actions
+                    );
+                }
+            }
+        }
+
+        /// Property 15 (continued): For same operation, START must come before completion
+        /// Feature: rust-sdk-test-suite, Property 15: START before completion ordering
+        /// Validates: Requirements 8.3
+        #[test]
+        fn prop_start_before_completion_for_same_operation(
+            batch in same_operation_batch_strategy()
+        ) {
+            // Skip empty batches
+            if batch.is_empty() {
+                return Ok(());
+            }
+            
+            let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+            
+            // Find START and completion positions for each operation
+            let mut start_positions: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+            let mut completion_positions: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+            
+            for (idx, req) in sorted.iter().enumerate() {
+                let op_id = &req.operation.operation_id;
+                match req.operation.action {
+                    OperationAction::Start => {
+                        start_positions.insert(op_id.clone(), idx);
+                    }
+                    OperationAction::Succeed | OperationAction::Fail | OperationAction::Retry => {
+                        completion_positions.insert(op_id.clone(), idx);
+                    }
+                    _ => {}
+                }
+            }
+            
+            // Verify START comes before completion for each operation
+            for (op_id, start_idx) in &start_positions {
+                if let Some(completion_idx) = completion_positions.get(op_id) {
+                    prop_assert!(
+                        start_idx < completion_idx,
+                        "For operation {}, START at index {} should come before completion at index {}",
+                        op_id,
+                        start_idx,
+                        completion_idx
+                    );
+                }
+            }
+        }
+    }
+
+    // ============================================================================
+    // Property Test for Batch Round-Trip Preservation
+    // Feature: rust-sdk-test-suite
+    // ============================================================================
+
+    /// Strategy for generating a random batch of operations
+    fn random_batch_strategy() -> impl Strategy<Value = Vec<CheckpointRequest>> {
+        prop::collection::vec(
+            (
+                operation_id_strategy(),
+                operation_type_strategy(),
+                operation_action_strategy(),
+            ),
+            1..10
+        ).prop_map(|ops| {
+            ops.into_iter()
+                .filter(|(_, op_type, _)| *op_type != OperationType::Execution)  // Avoid execution complications
+                .map(|(id, op_type, action)| {
+                    create_checkpoint_request(&id, op_type, action, None)
+                })
+                .collect()
+        })
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(100))]
+
+        /// Property: Batch sorting preserves all operations
+        /// For any valid operation update sequence, sorting SHALL preserve all operations
+        /// Feature: rust-sdk-test-suite, Property: Batch preservation
+        /// Validates: Requirements 8.4
+        #[test]
+        fn prop_batch_sorting_preserves_all_operations(batch in random_batch_strategy()) {
+            // Skip empty batches
+            if batch.is_empty() {
+                return Ok(());
+            }
+            
+            // Collect original operation IDs and actions
+            let original_ops: HashSet<(String, String)> = batch.iter()
+                .map(|r| (r.operation.operation_id.clone(), format!("{:?}", r.operation.action)))
+                .collect();
+            
+            let sorted = CheckpointBatcher::sort_checkpoint_batch(batch);
+            
+            // Collect sorted operation IDs and actions
+            let sorted_ops: HashSet<(String, String)> = sorted.iter()
+                .map(|r| (r.operation.operation_id.clone(), format!("{:?}", r.operation.action)))
+                .collect();
+            
+            // Verify all operations are preserved
+            prop_assert_eq!(
+                original_ops.len(),
+                sorted_ops.len(),
+                "Sorting changed the number of operations: original {}, sorted {}",
+                original_ops.len(),
+                sorted_ops.len()
+            );
+            
+            prop_assert_eq!(
+                original_ops,
+                sorted_ops,
+                "Sorting changed the set of operations"
+            );
+        }
+
+        /// Property: Sorting is idempotent
+        /// Sorting an already sorted batch should produce the same result
+        /// Feature: rust-sdk-test-suite, Property: Sorting idempotence
+        #[test]
+        fn prop_sorting_is_idempotent(batch in random_batch_strategy()) {
+            // Skip empty batches
+            if batch.is_empty() {
+                return Ok(());
+            }
+            
+            let sorted_once = CheckpointBatcher::sort_checkpoint_batch(batch);
+            
+            // Clone the sorted batch for second sort
+            let sorted_once_clone: Vec<CheckpointRequest> = sorted_once.iter()
+                .map(|r| CheckpointRequest::async_request(r.operation.clone()))
+                .collect();
+            
+            let sorted_twice = CheckpointBatcher::sort_checkpoint_batch(sorted_once_clone);
+            
+            // Verify the order is the same
+            prop_assert_eq!(
+                sorted_once.len(),
+                sorted_twice.len(),
+                "Double sorting changed the number of operations"
+            );
+            
+            for (idx, (first, second)) in sorted_once.iter().zip(sorted_twice.iter()).enumerate() {
+                prop_assert_eq!(
+                    &first.operation.operation_id,
+                    &second.operation.operation_id,
+                    "Operation ID mismatch at index {}: {} vs {}",
+                    idx,
+                    &first.operation.operation_id,
+                    &second.operation.operation_id
+                );
+                prop_assert_eq!(
+                    first.operation.action,
+                    second.operation.action,
+                    "Action mismatch at index {} for operation {}: {:?} vs {:?}",
+                    idx,
+                    &first.operation.operation_id,
+                    first.operation.action,
+                    second.operation.action
+                );
+            }
         }
     }
 }

@@ -18,6 +18,27 @@ use crate::error::{DurableError, ErrorObject};
 /// This struct uses atomic counters to safely track the number of
 /// successful, failed, and completed tasks across concurrent executions.
 ///
+/// # Examples
+///
+/// ```
+/// use aws_durable_execution_sdk::concurrency::ExecutionCounters;
+///
+/// let counters = ExecutionCounters::new(5);
+/// assert_eq!(counters.total_tasks(), 5);
+/// assert_eq!(counters.success_count(), 0);
+/// assert_eq!(counters.failure_count(), 0);
+///
+/// // Record some completions
+/// counters.complete_task();
+/// counters.complete_task();
+/// counters.fail_task();
+///
+/// assert_eq!(counters.success_count(), 2);
+/// assert_eq!(counters.failure_count(), 1);
+/// assert_eq!(counters.completed_count(), 3);
+/// assert_eq!(counters.pending_count(), 2);
+/// ```
+///
 /// # Memory Ordering
 ///
 /// The counters use `Ordering::Relaxed` for increments (only need atomicity)
@@ -339,6 +360,28 @@ impl std::fmt::Display for BatchItemStatus {
 ///
 /// Contains the status, optional result value, and optional error
 /// for each item processed in a map or parallel operation.
+///
+/// # Examples
+///
+/// ```
+/// use aws_durable_execution_sdk::concurrency::{BatchItem, BatchItemStatus};
+/// use aws_durable_execution_sdk::ErrorObject;
+///
+/// // Succeeded item
+/// let success = BatchItem::succeeded(0, 42);
+/// assert!(success.is_succeeded());
+/// assert_eq!(success.get_result(), Some(&42));
+///
+/// // Failed item
+/// let error = ErrorObject::new("TestError", "Something went wrong");
+/// let failure = BatchItem::<i32>::failed(1, error);
+/// assert!(failure.is_failed());
+/// assert!(failure.get_error().is_some());
+///
+/// // Pending item
+/// let pending = BatchItem::<i32>::pending(2);
+/// assert_eq!(pending.status, BatchItemStatus::Pending);
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BatchItem<T> {
     /// Index of this item in the original collection
@@ -426,6 +469,26 @@ impl<T> BatchItem<T> {
 /// Result of a batch operation (map or parallel).
 ///
 /// Contains results for all items and the reason for completion.
+///
+/// # Examples
+///
+/// ```
+/// use aws_durable_execution_sdk::concurrency::{BatchResult, BatchItem, CompletionReason};
+///
+/// // Create a batch result with some items
+/// let items = vec![
+///     BatchItem::succeeded(0, "first"),
+///     BatchItem::succeeded(1, "second"),
+///     BatchItem::failed(2, aws_durable_execution_sdk::ErrorObject::new("Error", "Failed")),
+/// ];
+/// let result = BatchResult::new(items, CompletionReason::AllCompleted);
+///
+/// assert_eq!(result.success_count(), 2);
+/// assert_eq!(result.failure_count(), 1);
+/// assert_eq!(result.total_count(), 3);
+/// assert!(!result.all_succeeded());
+/// assert!(result.has_failures());
+/// ```
 ///
 /// # Requirements
 ///

@@ -60,6 +60,7 @@ async fn process_order(event: OrderEvent, ctx: DurableContext) -> Result<OrderRe
 | `step()` / `step_named()` | Execute and checkpoint a unit of work |
 | `wait()` | Pause execution for a duration (suspends Lambda) |
 | `create_callback()` | Wait for external systems to signal completion |
+| `wait_for_callback()` | Create callback and notify external system in one replay-safe call |
 | `invoke()` | Call other durable Lambda functions |
 | `map()` | Process collections in parallel with concurrency limits |
 | `parallel()` | Execute multiple independent operations concurrently |
@@ -96,6 +97,25 @@ let results = ctx.map(
     },
     Some(MapConfig {
         max_concurrency: Some(3),
+        ..Default::default()
+    }),
+).await?;
+```
+
+### Item Batching
+
+Reduce checkpoint overhead for large collections using `ItemBatcher`:
+
+```rust
+use aws_durable_execution_sdk::{MapConfig, ItemBatcher};
+
+let results = ctx.map(
+    large_item_list,
+    |child_ctx, item, _index| async move {
+        child_ctx.step(|_| Ok(process(item)), None).await
+    },
+    Some(MapConfig {
+        item_batcher: Some(ItemBatcher::new(100, 256 * 1024)), // 100 items or 256KB per batch
         ..Default::default()
     }),
 ).await?;
@@ -150,15 +170,26 @@ Wait for external systems to signal your workflow:
 ```rust
 use aws_durable_execution_sdk::CallbackConfig;
 
+// Option 1: wait_for_callback - combines callback creation with notification (recommended)
+let approval: ApprovalResponse = ctx.wait_for_callback(
+    |callback_id| async move {
+        // Notify external system with the callback ID
+        // This is executed within a durable step for replay safety
+        notify_approver(&callback_id).await
+    },
+    Some(CallbackConfig {
+        timeout: Duration::from_hours(24),
+        ..Default::default()
+    }),
+).await?;
+
+// Option 2: Manual callback creation for more control
 let callback = ctx.create_callback::<ApprovalResponse>(Some(CallbackConfig {
     timeout: Duration::from_hours(24),
     ..Default::default()
 })).await?;
 
-// Share callback.callback_id with external system
 notify_approver(&callback.callback_id).await?;
-
-// Suspends until callback is received
 let approval = callback.result().await?;
 ```
 
@@ -215,6 +246,26 @@ if error.is_retriable() {
 }
 ```
 
+## Logging
+
+The SDK provides a simplified logging API with automatic context:
+
+```rust
+// Basic logging - context is automatically included
+ctx.log_info("Processing order started");
+ctx.log_debug("Validating input parameters");
+ctx.log_warn("Retry attempt 2 of 5");
+ctx.log_error("Payment processing failed");
+
+// Logging with extra fields for filtering
+ctx.log_info_with("Processing order", &[
+    ("order_id", "ORD-12345"),
+    ("amount", "99.99"),
+]);
+```
+
+All log messages automatically include `durable_execution_arn`, `operation_id`, `parent_id`, and `is_replay` for correlation. See [TRACING.md](aws-durable-execution-sdk/docs/TRACING.md) for detailed tracing configuration and best practices.
+
 ## Determinism Requirements
 
 Durable workflows must be deterministic — same input must produce the same sequence of operations. Common pitfalls:
@@ -268,6 +319,7 @@ cargo build --example simple_workflow
 - [API Documentation](aws-durable-execution-sdk/src/lib.rs) — Comprehensive rustdoc with examples
 - [Determinism Guide](aws-durable-execution-sdk/docs/DETERMINISM.md) — Writing replay-safe workflows
 - [Limits Reference](aws-durable-execution-sdk/docs/LIMITS.md) — Execution constraints
+- [Tracing Guide](aws-durable-execution-sdk/docs/TRACING.md) — Logging configuration and best practices
 
 ## License
 

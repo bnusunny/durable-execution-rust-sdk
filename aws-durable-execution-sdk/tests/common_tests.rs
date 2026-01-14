@@ -4,6 +4,7 @@
 
 mod common;
 
+use std::sync::Arc;
 use common::*;
 use aws_durable_execution_sdk::client::DurableServiceClient;
 use aws_durable_execution_sdk::operation::{OperationStatus, OperationType, OperationUpdate};
@@ -291,6 +292,288 @@ proptest! {
         for update in &batch {
             let json = serde_json::to_string(update).unwrap();
             prop_assert!(!json.is_empty());
+        }
+    }
+}
+
+// =============================================================================
+// Tracing Span Property Tests
+// =============================================================================
+
+use aws_durable_execution_sdk::context::{create_operation_span, OperationIdentifier};
+use tracing::field::Visit;
+use tracing::span::Attributes;
+use tracing::Subscriber;
+use tracing_subscriber::layer::SubscriberExt;
+use std::collections::HashMap;
+
+/// A test visitor that captures span fields for verification.
+#[derive(Debug, Default)]
+struct FieldCapture {
+    fields: HashMap<String, String>,
+}
+
+impl Visit for FieldCapture {
+    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+        self.fields.insert(field.name().to_string(), format!("{:?}", value));
+    }
+
+    fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
+        self.fields.insert(field.name().to_string(), value.to_string());
+    }
+}
+
+/// A test layer that captures span attributes for verification.
+struct TestLayer {
+    captured_fields: Arc<std::sync::Mutex<HashMap<String, String>>>,
+}
+
+impl<S: Subscriber> tracing_subscriber::Layer<S> for TestLayer {
+    fn on_new_span(&self, attrs: &Attributes<'_>, _id: &tracing::span::Id, _ctx: tracing_subscriber::layer::Context<'_, S>) {
+        let mut capture = FieldCapture::default();
+        attrs.record(&mut capture);
+        let mut fields = self.captured_fields.lock().unwrap();
+        fields.extend(capture.fields);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(100))]
+
+    /// Property 7: Tracing Span Fields
+    /// Validates: Requirements 3.2, 3.3, 3.4, 3.5
+    ///
+    /// This test verifies that create_operation_span includes all required fields:
+    /// - operation_id (Requirement 3.2)
+    /// - operation_type (Requirement 3.3)
+    /// - parent_id when available (Requirement 3.4)
+    /// - durable_execution_arn (Requirement 3.5)
+    #[test]
+    fn test_tracing_span_includes_required_fields(
+        operation_type in prop_oneof![
+            Just("step"),
+            Just("wait"),
+            Just("callback"),
+            Just("invoke"),
+            Just("map"),
+            Just("parallel"),
+        ],
+        operation_id in operation_id_strategy(),
+        parent_id in optional_string_strategy(),
+        name in optional_string_strategy(),
+        durable_execution_arn in execution_arn_strategy(),
+    ) {
+        // Create the operation identifier
+        let op_id = OperationIdentifier::new(
+            operation_id.clone(),
+            parent_id.clone(),
+            name.clone(),
+        );
+
+        // Set up a test subscriber to capture span fields
+        let captured_fields = Arc::new(std::sync::Mutex::new(HashMap::new()));
+        let test_layer = TestLayer {
+            captured_fields: captured_fields.clone(),
+        };
+        let subscriber = tracing_subscriber::registry().with(test_layer);
+
+        // Create the span within the test subscriber context
+        tracing::subscriber::with_default(subscriber, || {
+            let span = create_operation_span(operation_type, &op_id, &durable_execution_arn);
+            let _guard = span.enter();
+        });
+
+        // Verify the captured fields
+        let fields = captured_fields.lock().unwrap();
+
+        // Requirement 3.2: operation_id must be present
+        prop_assert!(
+            fields.contains_key("operation_id"),
+            "Span must include operation_id field (Requirement 3.2)"
+        );
+        prop_assert_eq!(
+            fields.get("operation_id").unwrap(),
+            &operation_id,
+            "operation_id must match the provided value"
+        );
+
+        // Requirement 3.3: operation_type must be present
+        prop_assert!(
+            fields.contains_key("operation_type"),
+            "Span must include operation_type field (Requirement 3.3)"
+        );
+        prop_assert_eq!(
+            fields.get("operation_type").unwrap(),
+            operation_type,
+            "operation_type must match the provided value"
+        );
+
+        // Requirement 3.4: parent_id must be present when available
+        prop_assert!(
+            fields.contains_key("parent_id"),
+            "Span must include parent_id field (Requirement 3.4)"
+        );
+        if let Some(ref pid) = parent_id {
+            // When parent_id is Some, it should be recorded as Some("value")
+            let expected = format!("Some(\"{}\")", pid);
+            prop_assert_eq!(
+                fields.get("parent_id").unwrap(),
+                &expected,
+                "parent_id must match the provided value when present"
+            );
+        } else {
+            // When parent_id is None, it should be recorded as None
+            prop_assert_eq!(
+                fields.get("parent_id").unwrap(),
+                "None",
+                "parent_id must be None when not provided"
+            );
+        }
+
+        // Requirement 3.5: durable_execution_arn must be present
+        prop_assert!(
+            fields.contains_key("durable_execution_arn"),
+            "Span must include durable_execution_arn field (Requirement 3.5)"
+        );
+        prop_assert_eq!(
+            fields.get("durable_execution_arn").unwrap(),
+            &durable_execution_arn,
+            "durable_execution_arn must match the provided value"
+        );
+    }
+}
+
+
+// =============================================================================
+// TracingLogger Extra Field Passthrough Property Tests
+// =============================================================================
+
+use aws_durable_execution_sdk::context::{LogInfo, Logger, TracingLogger};
+use tracing::Event;
+
+/// A test layer that captures event fields for verification.
+struct EventCaptureLayer {
+    captured_fields: Arc<std::sync::Mutex<HashMap<String, String>>>,
+}
+
+impl<S: Subscriber> tracing_subscriber::Layer<S> for EventCaptureLayer {
+    fn on_event(&self, event: &Event<'_>, _ctx: tracing_subscriber::layer::Context<'_, S>) {
+        let mut capture = FieldCapture::default();
+        event.record(&mut capture);
+        let mut fields = self.captured_fields.lock().unwrap();
+        fields.extend(capture.fields);
+    }
+}
+
+/// Strategy for generating extra field key-value pairs.
+/// Keys are alphanumeric identifiers, values can be any non-empty string.
+fn extra_field_strategy() -> impl Strategy<Value = (String, String)> {
+    (
+        "[a-zA-Z][a-zA-Z0-9_]{0,15}",  // key: valid identifier
+        "[a-zA-Z0-9_\\-\\.]{1,32}",     // value: simple string without special chars
+    )
+}
+
+/// Strategy for generating a list of extra fields.
+fn extra_fields_strategy() -> impl Strategy<Value = Vec<(String, String)>> {
+    prop::collection::vec(extra_field_strategy(), 0..5)
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(100))]
+
+    /// Property 11: TracingLogger Extra Field Passthrough
+    /// Validates: Requirements 5.1, 5.2
+    ///
+    /// This test verifies that when LogInfo contains extra fields, the TracingLogger
+    /// includes them in the tracing output as key-value pairs.
+    ///
+    /// - Requirement 5.1: WHEN LogInfo contains extra fields, THE TracingLogger SHALL include them in the tracing output
+    /// - Requirement 5.2: THE extra fields SHALL be formatted as key-value pairs in the tracing event
+    #[test]
+    fn test_tracing_logger_extra_field_passthrough(
+        message in "[a-zA-Z0-9 ]{1,50}",
+        durable_execution_arn in optional_string_strategy(),
+        operation_id in optional_string_strategy(),
+        parent_id in optional_string_strategy(),
+        is_replay in proptest::bool::ANY,
+        extra_fields in extra_fields_strategy(),
+        log_level in prop_oneof![
+            Just("debug"),
+            Just("info"),
+            Just("warn"),
+            Just("error"),
+        ],
+    ) {
+        // Build LogInfo with extra fields
+        let mut log_info = LogInfo::default();
+        log_info.is_replay = is_replay;
+        
+        if let Some(ref arn) = durable_execution_arn {
+            log_info.durable_execution_arn = Some(arn.clone());
+        }
+        if let Some(ref op_id) = operation_id {
+            log_info.operation_id = Some(op_id.clone());
+        }
+        if let Some(ref pid) = parent_id {
+            log_info.parent_id = Some(pid.clone());
+        }
+        
+        // Add extra fields
+        for (key, value) in &extra_fields {
+            log_info.extra.push((key.clone(), value.clone()));
+        }
+
+        // Set up a test subscriber to capture event fields
+        let captured_fields = Arc::new(std::sync::Mutex::new(HashMap::new()));
+        let test_layer = EventCaptureLayer {
+            captured_fields: captured_fields.clone(),
+        };
+        let subscriber = tracing_subscriber::registry().with(test_layer);
+
+        // Create the logger and log a message
+        let logger = TracingLogger;
+        
+        tracing::subscriber::with_default(subscriber, || {
+            match log_level {
+                "debug" => logger.debug(&message, &log_info),
+                "info" => logger.info(&message, &log_info),
+                "warn" => logger.warn(&message, &log_info),
+                "error" => logger.error(&message, &log_info),
+                _ => unreachable!(),
+            }
+        });
+
+        // Verify the captured fields
+        let fields = captured_fields.lock().unwrap();
+
+        // Requirement 5.1 & 5.2: Extra fields must be present in the output
+        // The extra field is formatted as "key1=value1, key2=value2, ..."
+        prop_assert!(
+            fields.contains_key("extra"),
+            "TracingLogger must include 'extra' field in output (Requirement 5.1)"
+        );
+
+        let extra_output = fields.get("extra").unwrap();
+
+        // Verify each extra field is present in the formatted output
+        for (key, value) in &extra_fields {
+            let expected_pair = format!("{}={}", key, value);
+            prop_assert!(
+                extra_output.contains(&expected_pair),
+                "Extra field '{}' must be present in output as key=value pair (Requirement 5.2). Got: {}",
+                expected_pair,
+                extra_output
+            );
+        }
+
+        // If no extra fields, the output should be empty
+        if extra_fields.is_empty() {
+            prop_assert!(
+                extra_output.is_empty(),
+                "Extra field output should be empty when no extra fields provided. Got: {}",
+                extra_output
+            );
         }
     }
 }

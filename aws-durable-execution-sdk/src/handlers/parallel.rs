@@ -9,7 +9,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::concurrency::{BatchResult, CompletionReason, ConcurrentExecutor};
 use crate::config::ParallelConfig;
-use crate::context::{DurableContext, Logger, LogInfo, OperationIdentifier};
+use crate::context::{create_operation_span, DurableContext, Logger, LogInfo, OperationIdentifier};
 use crate::error::{DurableError, ErrorObject};
 use crate::handlers::child::child_handler;
 use crate::operation::{OperationType, OperationUpdate};
@@ -55,6 +55,11 @@ where
     F: FnOnce(DurableContext) -> Fut + Send + 'static,
     Fut: std::future::Future<Output = Result<T, DurableError>> + Send + 'static,
 {
+    // Create tracing span for this operation
+    // Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6
+    let span = create_operation_span("parallel", op_id, state.durable_execution_arn());
+    let _guard = span.enter();
+
     let mut log_info = LogInfo::new(state.durable_execution_arn())
         .with_operation_id(&op_id.operation_id);
     if let Some(ref parent_id) = op_id.parent_id {
@@ -70,6 +75,7 @@ where
         // Check for non-deterministic execution
         if let Some(op_type) = checkpoint_result.operation_type() {
             if op_type != OperationType::Context {
+                span.record("status", "non_deterministic");
                 return Err(DurableError::NonDeterministic {
                     message: format!(
                         "Expected Context operation but found {:?} at operation_id {}",
@@ -93,6 +99,7 @@ where
                     })?;
                 
                 state.track_replay(&op_id.operation_id).await;
+                span.record("status", "replayed_succeeded");
                 return Ok(result);
             }
         }
@@ -102,6 +109,7 @@ where
             logger.debug(&format!("Replaying failed parallel operation: {}", op_id), &log_info);
             
             state.track_replay(&op_id.operation_id).await;
+            span.record("status", "replayed_failed");
             
             if let Some(error) = checkpoint_result.error() {
                 return Err(DurableError::UserCode {
@@ -117,6 +125,7 @@ where
         // Handle other terminal states
         if checkpoint_result.is_terminal() {
             state.track_replay(&op_id.operation_id).await;
+            span.record("status", "replayed_terminal");
             
             let status = checkpoint_result.status().unwrap();
             return Err(DurableError::execution(format!("Parallel operation was {}", status)));
@@ -139,6 +148,7 @@ where
         let succeed_update = create_succeed_update(op_id, Some(serialized));
         state.create_checkpoint(succeed_update, true).await?;
         
+        span.record("status", "succeeded_empty");
         return Ok(result);
     }
 
@@ -222,6 +232,9 @@ where
         
         // Mark parent as done
         state.mark_parent_done(&op_id.operation_id).await;
+        span.record("status", "succeeded");
+    } else {
+        span.record("status", "suspended");
     }
 
     Ok(batch_result)

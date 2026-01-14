@@ -1168,10 +1168,15 @@ mod property_tests {
             ///
             /// For any floating point timestamp (seconds with fractional milliseconds),
             /// deserializing SHALL convert to milliseconds correctly.
+            /// 
+            /// Note: This test uses millis in 1..1000 range (not 0) because when millis=0,
+            /// the float value (e.g., 1577836800.0) may be serialized without a decimal point
+            /// and parsed as an integer by serde_json, which is correct behavior for integer
+            /// timestamps (already in milliseconds).
             #[test]
             fn prop_timestamp_float_parsing(
                 seconds in 1577836800i64..1893456000i64,  // 2020-2030 range
-                millis in 0u32..1000u32,
+                millis in 1u32..1000u32,  // Start from 1 to ensure fractional part
             ) {
                 // Create floating point timestamp (seconds.milliseconds)
                 let float_ts = seconds as f64 + (millis as f64 / 1000.0);

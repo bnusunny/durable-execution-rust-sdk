@@ -8,7 +8,7 @@ use std::sync::Arc;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::config::{StepConfig, StepSemantics};
-use crate::context::{Logger, LogInfo, OperationIdentifier};
+use crate::context::{create_operation_span, Logger, LogInfo, OperationIdentifier};
 use crate::error::{DurableError, ErrorObject, StepResult, TerminationReason};
 use crate::operation::{OperationType, OperationUpdate};
 use crate::serdes::{JsonSerDes, SerDes, SerDesContext};
@@ -206,6 +206,11 @@ where
     T: DurableValue,
     F: StepFn<T>,
 {
+    // Create tracing span for this operation
+    // Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6
+    let span = create_operation_span("step", op_id, state.durable_execution_arn());
+    let _guard = span.enter();
+
     let mut log_info = LogInfo::new(state.durable_execution_arn())
         .with_operation_id(&op_id.operation_id);
     if let Some(ref parent_id) = op_id.parent_id {
@@ -227,6 +232,8 @@ where
     let retry_payload = checkpoint_result.retry_payload().map(|s| s.to_string());
     
     if let Some(result) = handle_replay::<T>(&checkpoint_result, state, op_id, logger).await? {
+        // Record status on completion during replay
+        span.record("status", "replayed");
         return Ok(result);
     }
 
@@ -249,14 +256,23 @@ where
     let serdes_ctx = step_ctx.serdes_context();
 
     // Execute based on semantics
-    match config.step_semantics {
+    let result = match config.step_semantics {
         StepSemantics::AtMostOncePerRetry => {
             execute_at_most_once(func, state, op_id, &step_ctx, &serdes, &serdes_ctx, config, logger, skip_start_checkpoint).await
         }
         StepSemantics::AtLeastOncePerRetry => {
             execute_at_least_once(func, state, op_id, &step_ctx, &serdes, &serdes_ctx, config, logger).await
         }
-    }
+    };
+
+    // Record status on completion
+    // Requirements: 3.6
+    match &result {
+        Ok(_) => span.record("status", "succeeded"),
+        Err(_) => span.record("status", "failed"),
+    };
+
+    result
 }
 
 /// Handles replay by checking if the operation was previously checkpointed.

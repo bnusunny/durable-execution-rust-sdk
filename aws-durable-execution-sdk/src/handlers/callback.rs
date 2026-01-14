@@ -9,7 +9,7 @@ use std::sync::Arc;
 use serde::de::DeserializeOwned;
 
 use crate::config::CallbackConfig;
-use crate::context::{Logger, LogInfo, OperationIdentifier};
+use crate::context::{create_operation_span, Logger, LogInfo, OperationIdentifier};
 use crate::error::DurableError;
 use crate::operation::{OperationType, OperationUpdate};
 use crate::serdes::{JsonSerDes, SerDes, SerDesContext};
@@ -197,6 +197,11 @@ pub async fn callback_handler<T>(
 where
     T: serde::Serialize + DeserializeOwned,
 {
+    // Create tracing span for this operation
+    // Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6
+    let span = create_operation_span("callback", op_id, state.durable_execution_arn());
+    let _guard = span.enter();
+
     let mut log_info = LogInfo::new(state.durable_execution_arn())
         .with_operation_id(&op_id.operation_id);
     if let Some(ref parent_id) = op_id.parent_id {
@@ -212,6 +217,7 @@ where
         // Check for non-deterministic execution
         if let Some(op_type) = checkpoint_result.operation_type() {
             if op_type != OperationType::Callback {
+                span.record("status", "non_deterministic");
                 return Err(DurableError::NonDeterministic {
                     message: format!(
                         "Expected Callback operation but found {:?} at operation_id {}",
@@ -228,6 +234,7 @@ where
             .unwrap_or_else(|| op_id.name.clone().unwrap_or_else(|| op_id.operation_id.clone()));
         
         logger.debug(&format!("Returning existing callback: {}", callback_id), &log_info);
+        span.record("status", "replayed");
         
         return Ok(Callback::new(
             callback_id,
@@ -251,6 +258,7 @@ where
         .and_then(|op| op.callback_details.as_ref())
         .and_then(|details| details.callback_id.clone())
         .ok_or_else(|| {
+            span.record("status", "failed");
             DurableError::Callback {
                 message: format!(
                     "Service did not return callback_id in checkpoint response for operation {}",
@@ -261,6 +269,7 @@ where
         })?;
 
     logger.debug(&format!("Callback created with ID: {}", callback_id), &log_info);
+    span.record("status", "created");
 
     Ok(Callback::new(
         callback_id,

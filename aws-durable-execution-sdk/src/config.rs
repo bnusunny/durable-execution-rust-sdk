@@ -538,6 +538,86 @@ impl ItemBatcher {
             max_bytes_per_batch,
         }
     }
+
+    /// Batches items according to configuration, respecting both item count and byte limits.
+    ///
+    /// This method groups items into batches where each batch:
+    /// - Contains at most `max_items_per_batch` items
+    /// - Has an estimated total size of at most `max_bytes_per_batch` bytes
+    ///
+    /// Item size is estimated using JSON serialization via `serde_json`.
+    ///
+    /// # Arguments
+    ///
+    /// * `items` - The slice of items to batch
+    ///
+    /// # Returns
+    ///
+    /// A vector of `(start_index, batch)` tuples where:
+    /// - `start_index` is the index of the first item in the batch from the original slice
+    /// - `batch` is a vector of cloned items in that batch
+    ///
+    /// # Requirements
+    ///
+    /// - 2.1: THE ItemBatcher SHALL support configuring maximum items per batch
+    /// - 2.2: THE ItemBatcher SHALL support configuring maximum bytes per batch
+    /// - 2.3: WHEN ItemBatcher is configured, THE map operation SHALL group items into batches before processing
+    /// - 2.6: WHEN batch size limits are exceeded, THE ItemBatcher SHALL split items into multiple batches
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use aws_durable_execution_sdk::ItemBatcher;
+    ///
+    /// let batcher = ItemBatcher::new(2, 1024);
+    /// let items = vec!["a", "b", "c", "d", "e"];
+    /// let batches = batcher.batch(&items);
+    ///
+    /// // Items are grouped into batches of at most 2 items each
+    /// assert_eq!(batches.len(), 3);
+    /// assert_eq!(batches[0], (0, vec!["a", "b"]));
+    /// assert_eq!(batches[1], (2, vec!["c", "d"]));
+    /// assert_eq!(batches[2], (4, vec!["e"]));
+    /// ```
+    pub fn batch<T: Serialize + Clone>(&self, items: &[T]) -> Vec<(usize, Vec<T>)> {
+        if items.is_empty() {
+            return Vec::new();
+        }
+
+        let mut batches = Vec::new();
+        let mut current_batch = Vec::new();
+        let mut current_bytes = 0usize;
+        let mut batch_start_index = 0;
+
+        for (i, item) in items.iter().enumerate() {
+            // Estimate item size using JSON serialization
+            let item_bytes = serde_json::to_string(item)
+                .map(|s| s.len())
+                .unwrap_or(0);
+
+            // Check if adding this item would exceed limits
+            let would_exceed_items = current_batch.len() >= self.max_items_per_batch;
+            let would_exceed_bytes = current_bytes + item_bytes > self.max_bytes_per_batch
+                && !current_batch.is_empty();
+
+            if would_exceed_items || would_exceed_bytes {
+                // Finalize current batch and start a new one
+                batches.push((batch_start_index, std::mem::take(&mut current_batch)));
+                current_bytes = 0;
+                batch_start_index = i;
+            }
+
+            current_batch.push(item.clone());
+            current_bytes += item_bytes;
+        }
+
+        // Don't forget the last batch
+        if !current_batch.is_empty() {
+            batches.push((batch_start_index, current_batch));
+        }
+
+        batches
+    }
 }
 
 /// Type-erased SerDes trait for storing in config structs.
@@ -953,6 +1033,102 @@ mod tests {
             // Verify Debug trait works
             let debug_str = format!("{:?}", config);
             prop_assert!(!debug_str.is_empty());
+        }
+
+        // **Feature: sdk-ergonomics-improvements, Property 5: ItemBatcher Configuration Respected**
+        // **Validates: Requirements 2.1, 2.2**
+        /// Property: For any ItemBatcher configuration with max_items_per_batch and max_bytes_per_batch,
+        /// the batch method SHALL produce batches where each batch has at most max_items_per_batch items
+        /// AND at most max_bytes_per_batch bytes (estimated).
+        #[test]
+        fn prop_item_batcher_configuration_respected(
+            max_items in 1usize..=50,
+            max_bytes in 100usize..=10000,
+            item_count in 0usize..=200
+        ) {
+            let batcher = ItemBatcher::new(max_items, max_bytes);
+            
+            // Generate items of varying sizes (strings of different lengths)
+            let items: Vec<String> = (0..item_count)
+                .map(|i| format!("item_{:04}", i))
+                .collect();
+            
+            let batches = batcher.batch(&items);
+            
+            // Verify each batch respects the item count limit
+            for (_, batch) in &batches {
+                prop_assert!(
+                    batch.len() <= max_items,
+                    "Batch has {} items but max is {}",
+                    batch.len(),
+                    max_items
+                );
+            }
+            
+            // Verify each batch respects the byte limit (with tolerance for single large items)
+            for (_, batch) in &batches {
+                let batch_bytes: usize = batch.iter()
+                    .map(|item| serde_json::to_string(item).map(|s| s.len()).unwrap_or(0))
+                    .sum();
+                
+                // A batch may exceed max_bytes only if it contains a single item
+                // (we can't split a single item)
+                if batch.len() > 1 {
+                    prop_assert!(
+                        batch_bytes <= max_bytes,
+                        "Batch has {} bytes but max is {} (batch has {} items)",
+                        batch_bytes,
+                        max_bytes,
+                        batch.len()
+                    );
+                }
+            }
+        }
+
+        // **Feature: sdk-ergonomics-improvements, Property 6: ItemBatcher Ordering Preservation**
+        // **Validates: Requirements 2.3, 2.4, 2.6, 2.7**
+        /// Property: For any list of items, after batching with ItemBatcher, concatenating all batches
+        /// in order SHALL produce a list equal to the original input list.
+        #[test]
+        fn prop_item_batcher_ordering_preservation(
+            max_items in 1usize..=50,
+            max_bytes in 100usize..=10000,
+            item_count in 0usize..=200
+        ) {
+            let batcher = ItemBatcher::new(max_items, max_bytes);
+            
+            // Generate items with unique identifiers to verify ordering
+            let items: Vec<String> = (0..item_count)
+                .map(|i| format!("item_{:04}", i))
+                .collect();
+            
+            let batches = batcher.batch(&items);
+            
+            // Concatenate all batches in order
+            let reconstructed: Vec<String> = batches
+                .into_iter()
+                .flat_map(|(_, batch)| batch)
+                .collect();
+            
+            // Verify the reconstructed list equals the original
+            prop_assert_eq!(
+                items.len(),
+                reconstructed.len(),
+                "Reconstructed list has different length: expected {}, got {}",
+                items.len(),
+                reconstructed.len()
+            );
+            
+            for (i, (original, reconstructed_item)) in items.iter().zip(reconstructed.iter()).enumerate() {
+                prop_assert_eq!(
+                    original,
+                    reconstructed_item,
+                    "Item at index {} differs: expected '{}', got '{}'",
+                    i,
+                    original,
+                    reconstructed_item
+                );
+            }
         }
     }
 }

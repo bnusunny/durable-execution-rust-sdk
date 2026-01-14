@@ -8,7 +8,7 @@ use std::sync::Arc;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::config::InvokeConfig;
-use crate::context::{Logger, LogInfo, OperationIdentifier};
+use crate::context::{create_operation_span, Logger, LogInfo, OperationIdentifier};
 use crate::error::{DurableError, ErrorObject, TerminationReason};
 use crate::operation::{OperationType, OperationUpdate};
 use crate::serdes::{JsonSerDes, SerDes, SerDesContext};
@@ -54,6 +54,11 @@ where
     P: Serialize + DeserializeOwned + Send,
     R: Serialize + DeserializeOwned + Send,
 {
+    // Create tracing span for this operation
+    // Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6
+    let span = create_operation_span("invoke", op_id, state.durable_execution_arn());
+    let _guard = span.enter();
+
     let mut log_info = LogInfo::new(state.durable_execution_arn())
         .with_operation_id(&op_id.operation_id);
     if let Some(ref parent_id) = op_id.parent_id {
@@ -69,6 +74,7 @@ where
         // Check for non-deterministic execution
         if let Some(op_type) = checkpoint_result.operation_type() {
             if op_type != OperationType::Invoke {
+                span.record("status", "non_deterministic");
                 return Err(DurableError::NonDeterministic {
                     message: format!(
                         "Expected Invoke operation but found {:?} at operation_id {}",
@@ -92,6 +98,7 @@ where
                     })?;
                 
                 state.track_replay(&op_id.operation_id).await;
+                span.record("status", "replayed_succeeded");
                 return Ok(result);
             }
         }
@@ -101,6 +108,7 @@ where
             logger.debug(&format!("Replaying failed invoke: {}", op_id), &log_info);
             
             state.track_replay(&op_id.operation_id).await;
+            span.record("status", "replayed_failed");
             
             if let Some(error) = checkpoint_result.error() {
                 return Err(DurableError::Invocation {
@@ -117,6 +125,7 @@ where
             logger.debug(&format!("Replaying stopped invoke: {}", op_id), &log_info);
             
             state.track_replay(&op_id.operation_id).await;
+            span.record("status", "replayed_stopped");
             
             return Err(DurableError::Invocation {
                 message: "Invoke was stopped externally".to_string(),
@@ -127,6 +136,7 @@ where
         // Handle other terminal states
         if checkpoint_result.is_terminal() {
             state.track_replay(&op_id.operation_id).await;
+            span.record("status", "replayed_terminal");
             
             let status = checkpoint_result.status().unwrap();
             return Err(DurableError::Invocation {
@@ -156,6 +166,7 @@ where
     
     // The actual invocation is handled by the Lambda durable execution service
     // We suspend here and wait for the result to be checkpointed
+    span.record("status", "suspended");
     Err(DurableError::Suspend {
         scheduled_timestamp: None,
     })

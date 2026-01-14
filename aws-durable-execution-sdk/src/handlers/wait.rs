@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use crate::context::{Logger, LogInfo, OperationIdentifier};
+use crate::context::{create_operation_span, Logger, LogInfo, OperationIdentifier};
 use crate::duration::Duration;
 use crate::error::DurableError;
 use crate::operation::{OperationType, OperationUpdate};
@@ -45,6 +45,11 @@ pub async fn wait_handler(
     op_id: &OperationIdentifier,
     logger: &Arc<dyn Logger>,
 ) -> Result<(), DurableError> {
+    // Create tracing span for this operation
+    // Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6
+    let span = create_operation_span("wait", op_id, state.durable_execution_arn());
+    let _guard = span.enter();
+
     let mut log_info = LogInfo::new(state.durable_execution_arn())
         .with_operation_id(&op_id.operation_id);
     if let Some(ref parent_id) = op_id.parent_id {
@@ -56,6 +61,7 @@ pub async fn wait_handler(
     // Validate duration (Requirement 5.4)
     let wait_seconds = duration.to_seconds();
     if wait_seconds < MIN_WAIT_SECONDS {
+        span.record("status", "validation_failed");
         return Err(DurableError::Validation {
             message: format!(
                 "Wait duration must be at least {} second(s), got {} seconds",
@@ -71,6 +77,7 @@ pub async fn wait_handler(
         // Check for non-deterministic execution
         if let Some(op_type) = checkpoint_result.operation_type() {
             if op_type != OperationType::Wait {
+                span.record("status", "non_deterministic");
                 return Err(DurableError::NonDeterministic {
                     message: format!(
                         "Expected Wait operation but found {:?} at operation_id {}",
@@ -85,6 +92,7 @@ pub async fn wait_handler(
         if checkpoint_result.is_succeeded() {
             logger.debug(&format!("Wait already completed: {}", op_id), &log_info);
             state.track_replay(&op_id.operation_id).await;
+            span.record("status", "replayed_succeeded");
             return Ok(());
         }
 
@@ -93,12 +101,14 @@ pub async fn wait_handler(
         if checkpoint_result.is_cancelled() {
             logger.debug(&format!("Wait was cancelled: {}", op_id), &log_info);
             state.track_replay(&op_id.operation_id).await;
+            span.record("status", "replayed_cancelled");
             return Ok(());
         }
 
         // If the wait was started but not yet succeeded, suspend and let the service handle timing
         if checkpoint_result.is_existent() && !checkpoint_result.is_terminal() {
             logger.debug(&format!("Wait still in progress: {}", op_id), &log_info);
+            span.record("status", "suspended");
             return Err(DurableError::Suspend {
                 scheduled_timestamp: None,
             });
@@ -113,6 +123,7 @@ pub async fn wait_handler(
 
     // Suspend execution (Requirement 5.2)
     // The service will handle the timing and resume the execution when the wait is complete
+    span.record("status", "suspended");
     Err(DurableError::Suspend {
         scheduled_timestamp: None,
     })

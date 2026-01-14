@@ -98,6 +98,40 @@ impl MockDurableServiceClient {
         self
     }
 
+    /// Adds a checkpoint response that returns a callback_id for callback operations.
+    /// This is a special response that dynamically includes the callback_id based on
+    /// the operation_id from the checkpoint request.
+    pub fn with_checkpoint_response_with_callback(
+        self,
+        token: &str,
+        callback_id: &str,
+    ) -> Self {
+        // Store the callback_id to be used when generating the response
+        let callback_id = callback_id.to_string();
+        let token = token.to_string();
+        
+        // We create a special marker that the checkpoint method will recognize
+        // and replace with the actual operation_id from the request
+        self.checkpoint_responses.lock().unwrap().push(Ok(CheckpointResponse {
+            checkpoint_token: token,
+            new_execution_state: Some(NewExecutionState {
+                operations: vec![{
+                    // Use a special marker that will be replaced with the actual operation_id
+                    let mut op = Operation::new("__CALLBACK_PLACEHOLDER__", OperationType::Callback);
+                    op.status = OperationStatus::Started;
+                    op.callback_details = Some(CallbackDetails {
+                        callback_id: Some(callback_id),
+                        result: None,
+                        error: None,
+                    });
+                    op
+                }],
+                next_marker: None,
+            }),
+        }));
+        self
+    }
+
     /// Returns all checkpoint calls made to this mock.
     pub fn get_checkpoint_calls(&self) -> Vec<CheckpointCall> {
         self.checkpoint_calls.lock().unwrap().clone()
@@ -137,7 +171,23 @@ impl DurableServiceClient for MockDurableServiceClient {
                 new_execution_state: None,
             })
         } else {
-            responses.remove(0)
+            let mut response = responses.remove(0)?;
+            
+            // Handle callback placeholder replacement
+            // If the response contains a callback operation with placeholder ID,
+            // replace it with the actual operation_id from the request
+            if let Some(ref mut new_state) = response.new_execution_state {
+                for op in &mut new_state.operations {
+                    if op.operation_id == "__CALLBACK_PLACEHOLDER__" {
+                        // Find the callback operation in the request
+                        if let Some(callback_op) = operations.iter().find(|o| o.operation_type == OperationType::Callback) {
+                            op.operation_id = callback_op.operation_id.clone();
+                        }
+                    }
+                }
+            }
+            
+            Ok(response)
         }
     }
 

@@ -9,7 +9,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::concurrency::{BatchResult, CompletionReason, ConcurrentExecutor};
 use crate::config::{ItemBatcher, MapConfig};
-use crate::context::{DurableContext, Logger, LogInfo, OperationIdentifier};
+use crate::context::{create_operation_span, DurableContext, Logger, LogInfo, OperationIdentifier};
 use crate::error::{DurableError, ErrorObject};
 use crate::handlers::child::child_handler;
 use crate::operation::{OperationType, OperationUpdate};
@@ -60,6 +60,11 @@ where
     F: Fn(DurableContext, T, usize) -> Fut + Send + Sync + Clone + 'static,
     Fut: std::future::Future<Output = Result<U, DurableError>> + Send + 'static,
 {
+    // Create tracing span for this operation
+    // Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6
+    let span = create_operation_span("map", op_id, state.durable_execution_arn());
+    let _guard = span.enter();
+
     let mut log_info = LogInfo::new(state.durable_execution_arn())
         .with_operation_id(&op_id.operation_id);
     if let Some(ref parent_id) = op_id.parent_id {
@@ -75,6 +80,7 @@ where
         // Check for non-deterministic execution
         if let Some(op_type) = checkpoint_result.operation_type() {
             if op_type != OperationType::Context {
+                span.record("status", "non_deterministic");
                 return Err(DurableError::NonDeterministic {
                     message: format!(
                         "Expected Context operation but found {:?} at operation_id {}",
@@ -98,6 +104,7 @@ where
                     })?;
                 
                 state.track_replay(&op_id.operation_id).await;
+                span.record("status", "replayed_succeeded");
                 return Ok(result);
             }
         }
@@ -107,6 +114,7 @@ where
             logger.debug(&format!("Replaying failed map operation: {}", op_id), &log_info);
             
             state.track_replay(&op_id.operation_id).await;
+            span.record("status", "replayed_failed");
             
             if let Some(error) = checkpoint_result.error() {
                 return Err(DurableError::UserCode {
@@ -122,6 +130,7 @@ where
         // Handle other terminal states
         if checkpoint_result.is_terminal() {
             state.track_replay(&op_id.operation_id).await;
+            span.record("status", "replayed_terminal");
             
             let status = checkpoint_result.status().unwrap();
             return Err(DurableError::execution(format!("Map operation was {}", status)));
@@ -144,6 +153,7 @@ where
         let succeed_update = create_succeed_update(op_id, Some(serialized));
         state.create_checkpoint(succeed_update, true).await?;
         
+        span.record("status", "succeeded_empty");
         return Ok(result);
     }
 
@@ -247,30 +257,24 @@ where
         
         // Mark parent as done
         state.mark_parent_done(&op_id.operation_id).await;
+        span.record("status", "succeeded");
+    } else {
+        span.record("status", "suspended");
     }
 
     Ok(batch_result)
 }
 
 /// Batches items according to the ItemBatcher configuration.
-fn batch_items<T: Clone>(items: &[T], batcher: &ItemBatcher) -> Vec<(usize, Vec<T>)> {
-    let mut batches = Vec::new();
-    let mut current_batch = Vec::new();
-    let mut batch_start_index = 0;
-
-    for (i, item) in items.iter().enumerate() {
-        if current_batch.len() >= batcher.max_items_per_batch {
-            batches.push((batch_start_index, std::mem::take(&mut current_batch)));
-            batch_start_index = i;
-        }
-        current_batch.push(item.clone());
-    }
-
-    if !current_batch.is_empty() {
-        batches.push((batch_start_index, current_batch));
-    }
-
-    batches
+///
+/// This function delegates to `ItemBatcher::batch()` which respects both
+/// item count and byte size limits.
+///
+/// # Requirements
+///
+/// - 2.4: THE map operation SHALL process each batch as a single child context operation
+fn batch_items<T: Serialize + Clone>(items: &[T], batcher: &ItemBatcher) -> Vec<(usize, Vec<T>)> {
+    batcher.batch(items)
 }
 
 /// Creates a Start operation update for map operation.

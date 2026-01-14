@@ -637,10 +637,68 @@
 //! }
 //! ```
 //!
-//! ## Logging
+//! ## Logging and Tracing
 //!
 //! The SDK integrates with the `tracing` crate for structured logging. All operations
 //! automatically include execution context (ARN, operation ID, parent ID) in log messages.
+//!
+//! For detailed guidance on configuring tracing for Lambda, log correlation, and best practices,
+//! see the [TRACING.md](../docs/TRACING.md) documentation.
+//!
+//! ### Simplified Logging API
+//!
+//! The [`DurableContext`] provides convenience methods for logging with automatic context:
+//!
+//! ```rust,ignore
+//! use aws_durable_execution_sdk::{DurableContext, DurableError};
+//!
+//! async fn my_workflow(ctx: DurableContext) -> Result<(), DurableError> {
+//!     // Basic logging - context is automatically included
+//!     ctx.log_info("Starting order processing");
+//!     ctx.log_debug("Validating input parameters");
+//!     ctx.log_warn("Retry attempt 2 of 5");
+//!     ctx.log_error("Failed to process payment");
+//!     
+//!     // Logging with extra fields for filtering
+//!     ctx.log_info_with("Processing order", &[
+//!         ("order_id", "ORD-12345"),
+//!         ("customer_id", "CUST-789"),
+//!     ]);
+//!     
+//!     ctx.log_error_with("Payment failed", &[
+//!         ("error_code", "INSUFFICIENT_FUNDS"),
+//!         ("amount", "150.00"),
+//!     ]);
+//!     
+//!     Ok(())
+//! }
+//! ```
+//!
+//! All logging methods automatically include:
+//! - `durable_execution_arn`: The execution ARN for correlation
+//! - `parent_id`: The parent operation ID (for nested operations)
+//! - `is_replay`: Whether the operation is being replayed
+//!
+//! ### Extra Fields in Log Output
+//!
+//! Extra fields passed to `log_*_with` methods are included in the tracing output
+//! as key-value pairs, making them queryable in log aggregation systems like CloudWatch:
+//!
+//! ```rust,ignore
+//! // This log message...
+//! ctx.log_info_with("Order event", &[
+//!     ("event_type", "ORDER_CREATED"),
+//!     ("order_id", "ORD-123"),
+//! ]);
+//!
+//! // ...produces JSON output like:
+//! // {
+//! //   "message": "Order event",
+//! //   "durable_execution_arn": "arn:aws:...",
+//! //   "extra": "event_type=ORDER_CREATED, order_id=ORD-123",
+//! //   ...
+//! // }
+//! ```
 //!
 //! ### Replay-Aware Logging
 //!
@@ -666,28 +724,23 @@
 //!
 //! ### Custom Logger
 //!
-//! You can also provide a custom logger by implementing the [`Logger`] trait:
+//! You can also provide a custom logger using the factory functions:
 //!
-//! ```rust,ignore
-//! use aws_durable_execution_sdk::{Logger, LogInfo};
+//! ```rust
+//! use aws_durable_execution_sdk::{custom_logger, simple_custom_logger, LogInfo};
 //!
-//! struct MyLogger;
+//! // Simple custom logger with a single function for all levels
+//! let logger = simple_custom_logger(|level, msg, info| {
+//!     println!("[{}] {}: {:?}", level, msg, info);
+//! });
 //!
-//! impl Logger for MyLogger {
-//!     fn debug(&self, message: &str, info: &LogInfo) {
-//!         // info.is_replay indicates if this is during replay
-//!         println!("[DEBUG] {}: {:?}", message, info);
-//!     }
-//!     fn info(&self, message: &str, info: &LogInfo) {
-//!         println!("[INFO] {}: {:?}", message, info);
-//!     }
-//!     fn warn(&self, message: &str, info: &LogInfo) {
-//!         println!("[WARN] {}: {:?}", message, info);
-//!     }
-//!     fn error(&self, message: &str, info: &LogInfo) {
-//!         println!("[ERROR] {}: {:?}", message, info);
-//!     }
-//! }
+//! // Full custom logger with separate functions for each level
+//! let logger = custom_logger(
+//!     |msg, info| println!("[DEBUG] {}", msg),  // debug
+//!     |msg, info| println!("[INFO] {}", msg),   // info
+//!     |msg, info| println!("[WARN] {}", msg),   // warn
+//!     |msg, info| println!("[ERROR] {}", msg),  // error
+//! );
 //! ```
 //!
 //! ## Duration Type

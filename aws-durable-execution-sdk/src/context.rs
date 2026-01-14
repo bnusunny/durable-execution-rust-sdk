@@ -342,13 +342,64 @@ impl LogInfo {
     }
 }
 
+/// Creates a tracing span for a durable operation.
+///
+/// This function creates a structured tracing span that includes all relevant
+/// context for observability and debugging. The span can be used to trace
+/// execution flow and correlate logs across operations.
+///
+/// # Arguments
+///
+/// * `operation_type` - The type of operation (e.g., "step", "wait", "callback", "invoke", "map", "parallel")
+/// * `op_id` - The operation identifier containing operation_id, parent_id, and name
+/// * `durable_execution_arn` - The ARN of the durable execution
+///
+/// # Returns
+///
+/// A `tracing::Span` that can be entered during operation execution.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// let span = create_operation_span("step", &op_id, state.durable_execution_arn());
+/// let _guard = span.enter();
+/// // ... operation execution ...
+/// ```
+///
+/// # Requirements
+///
+/// - 3.2: THE tracing span SHALL include the operation_id as a structured field
+/// - 3.3: THE tracing span SHALL include the operation_type as a structured field
+/// - 3.4: THE tracing span SHALL include the parent_id as a structured field when available
+/// - 3.5: THE tracing span SHALL include the durable_execution_arn as a structured field
+pub fn create_operation_span(
+    operation_type: &str,
+    op_id: &OperationIdentifier,
+    durable_execution_arn: &str,
+) -> tracing::Span {
+    tracing::info_span!(
+        "durable_operation",
+        operation_type = %operation_type,
+        operation_id = %op_id.operation_id,
+        parent_id = ?op_id.parent_id,
+        name = ?op_id.name,
+        durable_execution_arn = %durable_execution_arn,
+        status = tracing::field::Empty,
+    )
+}
+
 /// Default logger implementation using the `tracing` crate.
 ///
 /// This logger includes the `is_replay` flag in all log messages to help
 /// distinguish between fresh executions and replayed operations.
 ///
+/// Extra fields from `LogInfo` are included in the tracing output as a formatted
+/// string of key-value pairs, making them queryable in log aggregation systems.
+///
 /// # Requirements
 ///
+/// - 5.1: WHEN LogInfo contains extra fields, THE TracingLogger SHALL include them in the tracing output
+/// - 5.2: THE extra fields SHALL be formatted as key-value pairs in the tracing event
 /// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
 #[derive(Debug, Clone, Default)]
 pub struct TracingLogger;
@@ -356,46 +407,76 @@ pub struct TracingLogger;
 // Implement Sealed for TracingLogger to allow it to implement Logger
 impl Sealed for TracingLogger {}
 
+impl TracingLogger {
+    /// Formats extra fields as a string of key-value pairs.
+    ///
+    /// Returns an empty string if there are no extra fields, otherwise returns
+    /// a comma-separated list of "key=value" pairs.
+    ///
+    /// # Requirements
+    ///
+    /// - 5.2: THE extra fields SHALL be formatted as key-value pairs in the tracing event
+    fn format_extra_fields(extra: &[(String, String)]) -> String {
+        if extra.is_empty() {
+            String::new()
+        } else {
+            extra
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join(", ")
+        }
+    }
+}
+
 impl Logger for TracingLogger {
     fn debug(&self, message: &str, info: &LogInfo) {
+        let extra_fields = Self::format_extra_fields(&info.extra);
         tracing::debug!(
             durable_execution_arn = ?info.durable_execution_arn,
             operation_id = ?info.operation_id,
             parent_id = ?info.parent_id,
             is_replay = info.is_replay,
+            extra = %extra_fields,
             "{}",
             message
         );
     }
 
     fn info(&self, message: &str, info: &LogInfo) {
+        let extra_fields = Self::format_extra_fields(&info.extra);
         tracing::info!(
             durable_execution_arn = ?info.durable_execution_arn,
             operation_id = ?info.operation_id,
             parent_id = ?info.parent_id,
             is_replay = info.is_replay,
+            extra = %extra_fields,
             "{}",
             message
         );
     }
 
     fn warn(&self, message: &str, info: &LogInfo) {
+        let extra_fields = Self::format_extra_fields(&info.extra);
         tracing::warn!(
             durable_execution_arn = ?info.durable_execution_arn,
             operation_id = ?info.operation_id,
             parent_id = ?info.parent_id,
             is_replay = info.is_replay,
+            extra = %extra_fields,
             "{}",
             message
         );
     }
 
     fn error(&self, message: &str, info: &LogInfo) {
+        let extra_fields = Self::format_extra_fields(&info.extra);
         tracing::error!(
             durable_execution_arn = ?info.durable_execution_arn,
             operation_id = ?info.operation_id,
             parent_id = ?info.parent_id,
             is_replay = info.is_replay,
+            extra = %extra_fields,
             "{}",
             message
         );
@@ -953,7 +1034,7 @@ impl DurableContext {
     /// # Requirements
     ///
     /// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
-    pub fn log_info(&self) -> LogInfo {
+    pub fn create_log_info(&self) -> LogInfo {
         let mut info = LogInfo::new(self.durable_execution_arn());
         if let Some(ref parent_id) = self.parent_id {
             info = info.with_parent_id(parent_id);
@@ -972,8 +1053,8 @@ impl DurableContext {
     /// # Requirements
     ///
     /// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
-    pub fn log_info_with_operation(&self, operation_id: &str) -> LogInfo {
-        self.log_info().with_operation_id(operation_id)
+    pub fn create_log_info_with_operation(&self, operation_id: &str) -> LogInfo {
+        self.create_log_info().with_operation_id(operation_id)
     }
 
     /// Creates log info with explicit replay status.
@@ -990,12 +1071,229 @@ impl DurableContext {
     /// # Requirements
     ///
     /// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
-    pub fn log_info_with_replay(&self, operation_id: &str, is_replay: bool) -> LogInfo {
+    pub fn create_log_info_with_replay(&self, operation_id: &str, is_replay: bool) -> LogInfo {
         let mut info = LogInfo::new(self.durable_execution_arn());
         if let Some(ref parent_id) = self.parent_id {
             info = info.with_parent_id(parent_id);
         }
         info.with_operation_id(operation_id).with_replay(is_replay)
+    }
+
+    // ========================================================================
+    // Simplified Logging API
+    // ========================================================================
+
+    /// Logs a message at INFO level with automatic context.
+    ///
+    /// This method automatically includes the durable_execution_arn and parent_id
+    /// in the log output without requiring the caller to specify them.
+    ///
+    /// # Arguments
+    ///
+    /// * `message` - The message to log
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// ctx.log_info("Processing order started");
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// - 4.1: THE DurableContext SHALL provide a log_info method that logs at INFO level with automatic context
+    /// - 4.5: THE logging methods SHALL automatically include durable_execution_arn, operation_id, and parent_id
+    pub fn log_info(&self, message: &str) {
+        self.log_with_level(LogLevel::Info, message, &[]);
+    }
+
+    /// Logs a message at INFO level with extra fields.
+    ///
+    /// This method automatically includes the durable_execution_arn and parent_id
+    /// in the log output, plus any additional fields specified.
+    ///
+    /// # Arguments
+    ///
+    /// * `message` - The message to log
+    /// * `fields` - Additional key-value pairs to include in the log
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// ctx.log_info_with("Processing order", &[("order_id", "123"), ("amount", "99.99")]);
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// - 4.1: THE DurableContext SHALL provide a log_info method that logs at INFO level with automatic context
+    /// - 4.6: THE logging methods SHALL support additional structured fields via a builder pattern or variadic arguments
+    pub fn log_info_with(&self, message: &str, fields: &[(&str, &str)]) {
+        self.log_with_level(LogLevel::Info, message, fields);
+    }
+
+    /// Logs a message at DEBUG level with automatic context.
+    ///
+    /// This method automatically includes the durable_execution_arn and parent_id
+    /// in the log output without requiring the caller to specify them.
+    ///
+    /// # Arguments
+    ///
+    /// * `message` - The message to log
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// ctx.log_debug("Entering validation step");
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// - 4.2: THE DurableContext SHALL provide a log_debug method that logs at DEBUG level with automatic context
+    /// - 4.5: THE logging methods SHALL automatically include durable_execution_arn, operation_id, and parent_id
+    pub fn log_debug(&self, message: &str) {
+        self.log_with_level(LogLevel::Debug, message, &[]);
+    }
+
+    /// Logs a message at DEBUG level with extra fields.
+    ///
+    /// This method automatically includes the durable_execution_arn and parent_id
+    /// in the log output, plus any additional fields specified.
+    ///
+    /// # Arguments
+    ///
+    /// * `message` - The message to log
+    /// * `fields` - Additional key-value pairs to include in the log
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// ctx.log_debug_with("Variable state", &[("x", "42"), ("y", "100")]);
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// - 4.2: THE DurableContext SHALL provide a log_debug method that logs at DEBUG level with automatic context
+    /// - 4.6: THE logging methods SHALL support additional structured fields via a builder pattern or variadic arguments
+    pub fn log_debug_with(&self, message: &str, fields: &[(&str, &str)]) {
+        self.log_with_level(LogLevel::Debug, message, fields);
+    }
+
+    /// Logs a message at WARN level with automatic context.
+    ///
+    /// This method automatically includes the durable_execution_arn and parent_id
+    /// in the log output without requiring the caller to specify them.
+    ///
+    /// # Arguments
+    ///
+    /// * `message` - The message to log
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// ctx.log_warn("Retry attempt 3 of 5");
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// - 4.3: THE DurableContext SHALL provide a log_warn method that logs at WARN level with automatic context
+    /// - 4.5: THE logging methods SHALL automatically include durable_execution_arn, operation_id, and parent_id
+    pub fn log_warn(&self, message: &str) {
+        self.log_with_level(LogLevel::Warn, message, &[]);
+    }
+
+    /// Logs a message at WARN level with extra fields.
+    ///
+    /// This method automatically includes the durable_execution_arn and parent_id
+    /// in the log output, plus any additional fields specified.
+    ///
+    /// # Arguments
+    ///
+    /// * `message` - The message to log
+    /// * `fields` - Additional key-value pairs to include in the log
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// ctx.log_warn_with("Rate limit approaching", &[("current", "95"), ("limit", "100")]);
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// - 4.3: THE DurableContext SHALL provide a log_warn method that logs at WARN level with automatic context
+    /// - 4.6: THE logging methods SHALL support additional structured fields via a builder pattern or variadic arguments
+    pub fn log_warn_with(&self, message: &str, fields: &[(&str, &str)]) {
+        self.log_with_level(LogLevel::Warn, message, fields);
+    }
+
+    /// Logs a message at ERROR level with automatic context.
+    ///
+    /// This method automatically includes the durable_execution_arn and parent_id
+    /// in the log output without requiring the caller to specify them.
+    ///
+    /// # Arguments
+    ///
+    /// * `message` - The message to log
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// ctx.log_error("Failed to process payment");
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// - 4.4: THE DurableContext SHALL provide a log_error method that logs at ERROR level with automatic context
+    /// - 4.5: THE logging methods SHALL automatically include durable_execution_arn, operation_id, and parent_id
+    pub fn log_error(&self, message: &str) {
+        self.log_with_level(LogLevel::Error, message, &[]);
+    }
+
+    /// Logs a message at ERROR level with extra fields.
+    ///
+    /// This method automatically includes the durable_execution_arn and parent_id
+    /// in the log output, plus any additional fields specified.
+    ///
+    /// # Arguments
+    ///
+    /// * `message` - The message to log
+    /// * `fields` - Additional key-value pairs to include in the log
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// ctx.log_error_with("Payment failed", &[("error_code", "INSUFFICIENT_FUNDS"), ("amount", "150.00")]);
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// - 4.4: THE DurableContext SHALL provide a log_error method that logs at ERROR level with automatic context
+    /// - 4.6: THE logging methods SHALL support additional structured fields via a builder pattern or variadic arguments
+    pub fn log_error_with(&self, message: &str, fields: &[(&str, &str)]) {
+        self.log_with_level(LogLevel::Error, message, fields);
+    }
+
+    /// Internal helper method to log at a specific level with optional extra fields.
+    ///
+    /// This method creates a LogInfo with automatic context (durable_execution_arn, parent_id)
+    /// and any additional fields, then delegates to the configured logger.
+    ///
+    /// # Arguments
+    ///
+    /// * `level` - The log level
+    /// * `message` - The message to log
+    /// * `extra` - Additional key-value pairs to include
+    fn log_with_level(&self, level: LogLevel, message: &str, extra: &[(&str, &str)]) {
+        let mut log_info = self.create_log_info();
+        
+        for (key, value) in extra {
+            log_info = log_info.with_extra(*key, *value);
+        }
+        
+        match level {
+            LogLevel::Debug => self.logger.debug(message, &log_info),
+            LogLevel::Info => self.logger.info(message, &log_info),
+            LogLevel::Warn => self.logger.warn(message, &log_info),
+            LogLevel::Error => self.logger.error(message, &log_info),
+        }
     }
 
     /// Returns the original user input from the EXECUTION operation.
@@ -1870,6 +2168,8 @@ impl DurableContext {
     ///
     /// This is a convenience method that combines callback creation with
     /// a submitter function that sends the callback ID to an external system.
+    /// The submitter execution is checkpointed within a child context to ensure
+    /// replay safety - the submitter will not be re-executed during replay.
     ///
     /// # Arguments
     ///
@@ -1897,6 +2197,10 @@ impl DurableContext {
     ///
     /// # Requirements
     ///
+    /// - 1.1: WHEN wait_for_callback is called, THE SDK SHALL create a callback and execute the submitter function within a durable step
+    /// - 1.2: THE wait_for_callback method SHALL checkpoint the submitter execution to ensure replay safety
+    /// - 1.3: IF the submitter function fails, THEN THE SDK SHALL propagate the error with appropriate context
+    /// - 1.4: THE wait_for_callback method SHALL support configurable callback timeout and heartbeat timeout
     /// - 1.9: THE DurableContext SHALL provide a `wait_for_callback` method that combines callback creation with a submitter function
     /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn wait_for_callback<T, F, Fut>(
@@ -1906,30 +2210,57 @@ impl DurableContext {
     ) -> DurableResult<T>
     where
         T: serde::Serialize + serde::de::DeserializeOwned + Send + Sync,
-        F: FnOnce(String) -> Fut + Send,
-        Fut: std::future::Future<Output = Result<(), Box<dyn std::error::Error + Send + Sync>>> + Send,
+        F: FnOnce(String) -> Fut + Send + 'static,
+        Fut: std::future::Future<Output = Result<(), Box<dyn std::error::Error + Send + Sync>>> + Send + 'static,
     {
-        // Create the callback first
+        // Create the callback first with the provided configuration (Requirement 1.4)
         let callback: crate::handlers::Callback<T> = self.create_callback(config).await?;
         let callback_id = callback.callback_id.clone();
-        let callback_id_for_step = callback_id.clone();
         
-        // Submit the callback ID to the external system as a step
-        self.step_named(
-            "submit_callback",
-            move |_step_ctx| {
-                // Return the callback_id - the actual submission happens outside the step
-                Ok(callback_id_for_step)
+        // Generate operation ID for the child context that will execute the submitter
+        let op_id = self.next_operation_identifier(Some("wait_for_callback_submitter".to_string()));
+        
+        // Execute the submitter within a child context for proper checkpointing (Requirements 1.1, 1.2)
+        // The child context ensures the submitter execution is tracked and not re-executed during replay
+        let child_config = crate::config::ChildConfig::default();
+        
+        crate::handlers::child_handler(
+            |child_ctx| {
+                let callback_id = callback_id.clone();
+                async move {
+                    // Use a step to checkpoint that we're about to execute the submitter
+                    // This step returns () on success, indicating submission completed
+                    child_ctx.step_named(
+                        "execute_submitter",
+                        move |_| {
+                            // The step just marks that we're executing the submitter
+                            // The actual async submitter call happens after this checkpoint
+                            Ok(())
+                        },
+                        None,
+                    ).await?;
+                    
+                    // Now execute the actual submitter
+                    // If we're replaying and the step above succeeded, we won't reach here
+                    // because the child context will return the checkpointed result
+                    submitter(callback_id).await.map_err(|e| crate::error::DurableError::UserCode {
+                        message: e.to_string(),
+                        error_type: "SubmitterError".to_string(),
+                        stack_trace: None,
+                    })?;
+                    
+                    Ok(())
+                }
             },
-            None,
+            &self.state,
+            &op_id,
+            self,
+            &child_config,
+            &self.logger,
         ).await?;
         
-        // Actually call the submitter
-        submitter(callback_id).await.map_err(|e| crate::error::DurableError::UserCode {
-            message: e.to_string(),
-            error_type: "SubmitterError".to_string(),
-            stack_trace: None,
-        })?;
+        // Track replay after child context completion
+        self.state.track_replay(&op_id.operation_id).await;
         
         // Wait for the callback result
         callback.result().await
@@ -2562,35 +2893,35 @@ mod durable_context_tests {
     }
 
     #[test]
-    fn test_durable_context_log_info() {
+    fn test_durable_context_create_log_info() {
         let state = create_test_state();
         let ctx = DurableContext::new(state);
         
-        let info = ctx.log_info();
+        let info = ctx.create_log_info();
         
         assert_eq!(info.durable_execution_arn, Some("arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123".to_string()));
         assert!(info.parent_id.is_none());
     }
 
     #[test]
-    fn test_durable_context_log_info_with_parent() {
+    fn test_durable_context_create_log_info_with_parent() {
         let state = create_test_state();
         let ctx = DurableContext::new(state);
         
         let parent_op_id = ctx.next_operation_id();
         let child_ctx = ctx.create_child_context(&parent_op_id);
         
-        let info = child_ctx.log_info();
+        let info = child_ctx.create_log_info();
         
         assert_eq!(info.parent_id, Some(parent_op_id));
     }
 
     #[test]
-    fn test_durable_context_log_info_with_operation() {
+    fn test_durable_context_create_log_info_with_operation() {
         let state = create_test_state();
         let ctx = DurableContext::new(state);
         
-        let info = ctx.log_info_with_operation("op-123");
+        let info = ctx.create_log_info_with_operation("op-123");
         
         assert_eq!(info.operation_id, Some("op-123".to_string()));
     }
@@ -2816,11 +3147,11 @@ mod durable_context_tests {
     }
 
     #[test]
-    fn test_durable_context_log_info_with_replay_method() {
+    fn test_durable_context_create_log_info_with_replay_method() {
         let state = create_test_state();
         let ctx = DurableContext::new(state);
         
-        let info = ctx.log_info_with_replay("op-123", true);
+        let info = ctx.create_log_info_with_replay("op-123", true);
         
         assert_eq!(info.operation_id, Some("op-123".to_string()));
         assert!(info.is_replay);
@@ -2865,6 +3196,262 @@ mod durable_context_tests {
         // This test verifies at compile time that DurableContext is Send + Sync
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<DurableContext>();
+    }
+
+    // ========================================================================
+    // Simplified Logging API Tests
+    // ========================================================================
+
+    #[test]
+    fn test_log_info_method() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Mutex;
+        
+        let info_count = Arc::new(AtomicUsize::new(0));
+        let captured_info = Arc::new(Mutex::new(None::<LogInfo>));
+        
+        let captured_info_clone = captured_info.clone();
+        let inner = Arc::new(custom_logger(
+            |_, _| {},
+            {
+                let count = info_count.clone();
+                move |_, info: &LogInfo| {
+                    count.fetch_add(1, Ordering::SeqCst);
+                    *captured_info_clone.lock().unwrap() = Some(info.clone());
+                }
+            },
+            |_, _| {},
+            |_, _| {},
+        ));
+        
+        let state = create_test_state();
+        let ctx = DurableContext::new(state).with_logger(inner);
+        
+        ctx.log_info("Test message");
+        
+        assert_eq!(info_count.load(Ordering::SeqCst), 1);
+        
+        let captured = captured_info.lock().unwrap();
+        let info = captured.as_ref().unwrap();
+        assert_eq!(info.durable_execution_arn, Some("arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123".to_string()));
+    }
+
+    #[test]
+    fn test_log_debug_method() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        
+        let debug_count = Arc::new(AtomicUsize::new(0));
+        
+        let inner = Arc::new(custom_logger(
+            {
+                let count = debug_count.clone();
+                move |_, _| { count.fetch_add(1, Ordering::SeqCst); }
+            },
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+        ));
+        
+        let state = create_test_state();
+        let ctx = DurableContext::new(state).with_logger(inner);
+        
+        ctx.log_debug("Debug message");
+        
+        assert_eq!(debug_count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn test_log_warn_method() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        
+        let warn_count = Arc::new(AtomicUsize::new(0));
+        
+        let inner = Arc::new(custom_logger(
+            |_, _| {},
+            |_, _| {},
+            {
+                let count = warn_count.clone();
+                move |_, _| { count.fetch_add(1, Ordering::SeqCst); }
+            },
+            |_, _| {},
+        ));
+        
+        let state = create_test_state();
+        let ctx = DurableContext::new(state).with_logger(inner);
+        
+        ctx.log_warn("Warning message");
+        
+        assert_eq!(warn_count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn test_log_error_method() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        
+        let error_count = Arc::new(AtomicUsize::new(0));
+        
+        let inner = Arc::new(custom_logger(
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            {
+                let count = error_count.clone();
+                move |_, _| { count.fetch_add(1, Ordering::SeqCst); }
+            },
+        ));
+        
+        let state = create_test_state();
+        let ctx = DurableContext::new(state).with_logger(inner);
+        
+        ctx.log_error("Error message");
+        
+        assert_eq!(error_count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn test_log_info_with_extra_fields() {
+        use std::sync::Mutex;
+        
+        let captured_info = Arc::new(Mutex::new(None::<LogInfo>));
+        
+        let captured_info_clone = captured_info.clone();
+        let inner = Arc::new(custom_logger(
+            |_, _| {},
+            move |_, info: &LogInfo| {
+                *captured_info_clone.lock().unwrap() = Some(info.clone());
+            },
+            |_, _| {},
+            |_, _| {},
+        ));
+        
+        let state = create_test_state();
+        let ctx = DurableContext::new(state).with_logger(inner);
+        
+        ctx.log_info_with("Test message", &[("order_id", "123"), ("amount", "99.99")]);
+        
+        let captured = captured_info.lock().unwrap();
+        let info = captured.as_ref().unwrap();
+        
+        // Verify extra fields are present
+        assert_eq!(info.extra.len(), 2);
+        assert!(info.extra.contains(&("order_id".to_string(), "123".to_string())));
+        assert!(info.extra.contains(&("amount".to_string(), "99.99".to_string())));
+    }
+
+    #[test]
+    fn test_log_debug_with_extra_fields() {
+        use std::sync::Mutex;
+        
+        let captured_info = Arc::new(Mutex::new(None::<LogInfo>));
+        
+        let captured_info_clone = captured_info.clone();
+        let inner = Arc::new(custom_logger(
+            move |_, info: &LogInfo| {
+                *captured_info_clone.lock().unwrap() = Some(info.clone());
+            },
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+        ));
+        
+        let state = create_test_state();
+        let ctx = DurableContext::new(state).with_logger(inner);
+        
+        ctx.log_debug_with("Debug message", &[("key", "value")]);
+        
+        let captured = captured_info.lock().unwrap();
+        let info = captured.as_ref().unwrap();
+        
+        assert_eq!(info.extra.len(), 1);
+        assert!(info.extra.contains(&("key".to_string(), "value".to_string())));
+    }
+
+    #[test]
+    fn test_log_warn_with_extra_fields() {
+        use std::sync::Mutex;
+        
+        let captured_info = Arc::new(Mutex::new(None::<LogInfo>));
+        
+        let captured_info_clone = captured_info.clone();
+        let inner = Arc::new(custom_logger(
+            |_, _| {},
+            |_, _| {},
+            move |_, info: &LogInfo| {
+                *captured_info_clone.lock().unwrap() = Some(info.clone());
+            },
+            |_, _| {},
+        ));
+        
+        let state = create_test_state();
+        let ctx = DurableContext::new(state).with_logger(inner);
+        
+        ctx.log_warn_with("Warning message", &[("retry", "3")]);
+        
+        let captured = captured_info.lock().unwrap();
+        let info = captured.as_ref().unwrap();
+        
+        assert_eq!(info.extra.len(), 1);
+        assert!(info.extra.contains(&("retry".to_string(), "3".to_string())));
+    }
+
+    #[test]
+    fn test_log_error_with_extra_fields() {
+        use std::sync::Mutex;
+        
+        let captured_info = Arc::new(Mutex::new(None::<LogInfo>));
+        
+        let captured_info_clone = captured_info.clone();
+        let inner = Arc::new(custom_logger(
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            move |_, info: &LogInfo| {
+                *captured_info_clone.lock().unwrap() = Some(info.clone());
+            },
+        ));
+        
+        let state = create_test_state();
+        let ctx = DurableContext::new(state).with_logger(inner);
+        
+        ctx.log_error_with("Error message", &[("error_code", "E001"), ("details", "Something went wrong")]);
+        
+        let captured = captured_info.lock().unwrap();
+        let info = captured.as_ref().unwrap();
+        
+        assert_eq!(info.extra.len(), 2);
+        assert!(info.extra.contains(&("error_code".to_string(), "E001".to_string())));
+        assert!(info.extra.contains(&("details".to_string(), "Something went wrong".to_string())));
+    }
+
+    #[test]
+    fn test_log_methods_include_parent_id_in_child_context() {
+        use std::sync::Mutex;
+        
+        let captured_info = Arc::new(Mutex::new(None::<LogInfo>));
+        
+        let captured_info_clone = captured_info.clone();
+        let inner: Arc<dyn Logger> = Arc::new(custom_logger(
+            |_, _| {},
+            move |_, info: &LogInfo| {
+                *captured_info_clone.lock().unwrap() = Some(info.clone());
+            },
+            |_, _| {},
+            |_, _| {},
+        ));
+        
+        let state = create_test_state();
+        let ctx = DurableContext::new(state).with_logger(inner.clone());
+        
+        let parent_op_id = ctx.next_operation_id();
+        let child_ctx = ctx.create_child_context(&parent_op_id).with_logger(inner);
+        
+        child_ctx.log_info("Child context message");
+        
+        let captured = captured_info.lock().unwrap();
+        let info = captured.as_ref().unwrap();
+        
+        // Verify parent_id is included
+        assert_eq!(info.parent_id, Some(parent_op_id));
     }
 }
 
@@ -3097,6 +3684,352 @@ mod property_tests {
         }
     }
 
+    // Property 9: Logging Methods Automatic Context
+    // *For any* call to log_info, log_debug, log_warn, or log_error on DurableContext,
+    // the resulting log message SHALL include durable_execution_arn and parent_id
+    // (when available) without the caller needing to specify them.
+    // **Validates: Requirements 4.5**
+    mod logging_automatic_context_tests {
+        use super::*;
+        use std::sync::{Arc, Mutex};
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(100))]
+
+            /// Feature: sdk-ergonomics-improvements, Property 9: Logging Methods Automatic Context
+            /// Validates: Requirements 4.5
+            #[test]
+            fn prop_logging_automatic_context(
+                message in "[a-zA-Z0-9 ]{1,100}",
+                log_level in 0u8..4u8,
+            ) {
+                use crate::client::MockDurableServiceClient;
+                use crate::lambda::InitialExecutionState;
+                
+                let captured_info = Arc::new(Mutex::new(None::<LogInfo>));
+                let captured_info_clone = captured_info.clone();
+                
+                // Create a logger that captures the LogInfo
+                let inner = Arc::new(custom_logger(
+                    {
+                        let captured = captured_info_clone.clone();
+                        move |_, info: &LogInfo| {
+                            *captured.lock().unwrap() = Some(info.clone());
+                        }
+                    },
+                    {
+                        let captured = captured_info_clone.clone();
+                        move |_, info: &LogInfo| {
+                            *captured.lock().unwrap() = Some(info.clone());
+                        }
+                    },
+                    {
+                        let captured = captured_info_clone.clone();
+                        move |_, info: &LogInfo| {
+                            *captured.lock().unwrap() = Some(info.clone());
+                        }
+                    },
+                    {
+                        let captured = captured_info_clone.clone();
+                        move |_, info: &LogInfo| {
+                            *captured.lock().unwrap() = Some(info.clone());
+                        }
+                    },
+                ));
+                
+                let client: crate::client::SharedDurableServiceClient = Arc::new(MockDurableServiceClient::new());
+                let state = Arc::new(ExecutionState::new(
+                    "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+                    "token-123",
+                    InitialExecutionState::new(),
+                    client,
+                ));
+                let ctx = DurableContext::new(state).with_logger(inner);
+                
+                // Call the appropriate log method based on log_level
+                match log_level {
+                    0 => ctx.log_debug(&message),
+                    1 => ctx.log_info(&message),
+                    2 => ctx.log_warn(&message),
+                    _ => ctx.log_error(&message),
+                }
+                
+                // Verify the captured LogInfo has the automatic context
+                let captured = captured_info.lock().unwrap();
+                let info = captured.as_ref().expect("LogInfo should be captured");
+                
+                // durable_execution_arn must always be present
+                prop_assert!(
+                    info.durable_execution_arn.is_some(),
+                    "durable_execution_arn must be automatically included"
+                );
+                prop_assert_eq!(
+                    info.durable_execution_arn.as_ref().unwrap(),
+                    "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+                    "durable_execution_arn must match the context's ARN"
+                );
+            }
+
+            /// Feature: sdk-ergonomics-improvements, Property 9: Logging Methods Automatic Context (Child Context)
+            /// Validates: Requirements 4.5
+            #[test]
+            fn prop_logging_automatic_context_child(
+                message in "[a-zA-Z0-9 ]{1,100}",
+                log_level in 0u8..4u8,
+            ) {
+                use crate::client::MockDurableServiceClient;
+                use crate::lambda::InitialExecutionState;
+                
+                let captured_info = Arc::new(Mutex::new(None::<LogInfo>));
+                let captured_info_clone = captured_info.clone();
+                
+                // Create a logger that captures the LogInfo
+                let inner: Arc<dyn Logger> = Arc::new(custom_logger(
+                    {
+                        let captured = captured_info_clone.clone();
+                        move |_, info: &LogInfo| {
+                            *captured.lock().unwrap() = Some(info.clone());
+                        }
+                    },
+                    {
+                        let captured = captured_info_clone.clone();
+                        move |_, info: &LogInfo| {
+                            *captured.lock().unwrap() = Some(info.clone());
+                        }
+                    },
+                    {
+                        let captured = captured_info_clone.clone();
+                        move |_, info: &LogInfo| {
+                            *captured.lock().unwrap() = Some(info.clone());
+                        }
+                    },
+                    {
+                        let captured = captured_info_clone.clone();
+                        move |_, info: &LogInfo| {
+                            *captured.lock().unwrap() = Some(info.clone());
+                        }
+                    },
+                ));
+                
+                let client: crate::client::SharedDurableServiceClient = Arc::new(MockDurableServiceClient::new());
+                let state = Arc::new(ExecutionState::new(
+                    "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+                    "token-123",
+                    InitialExecutionState::new(),
+                    client,
+                ));
+                let ctx = DurableContext::new(state).with_logger(inner.clone());
+                
+                // Create a child context
+                let parent_op_id = ctx.next_operation_id();
+                let child_ctx = ctx.create_child_context(&parent_op_id).with_logger(inner);
+                
+                // Call the appropriate log method based on log_level
+                match log_level {
+                    0 => child_ctx.log_debug(&message),
+                    1 => child_ctx.log_info(&message),
+                    2 => child_ctx.log_warn(&message),
+                    _ => child_ctx.log_error(&message),
+                }
+                
+                // Verify the captured LogInfo has the automatic context including parent_id
+                let captured = captured_info.lock().unwrap();
+                let info = captured.as_ref().expect("LogInfo should be captured");
+                
+                // durable_execution_arn must always be present
+                prop_assert!(
+                    info.durable_execution_arn.is_some(),
+                    "durable_execution_arn must be automatically included in child context"
+                );
+                
+                // parent_id must be present in child context
+                prop_assert!(
+                    info.parent_id.is_some(),
+                    "parent_id must be automatically included in child context"
+                );
+                prop_assert_eq!(
+                    info.parent_id.as_ref().unwrap(),
+                    &parent_op_id,
+                    "parent_id must match the parent operation ID"
+                );
+            }
+        }
+    }
+
+    // Property 10: Logging Methods Extra Fields
+    // *For any* call to log_info_with, log_debug_with, log_warn_with, or log_error_with
+    // with extra fields, those fields SHALL appear in the resulting log output.
+    // **Validates: Requirements 4.6**
+    mod logging_extra_fields_tests {
+        use super::*;
+        use std::sync::{Arc, Mutex};
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(100))]
+
+            /// Feature: sdk-ergonomics-improvements, Property 10: Logging Methods Extra Fields
+            /// Validates: Requirements 4.6
+            #[test]
+            fn prop_logging_extra_fields(
+                message in "[a-zA-Z0-9 ]{1,100}",
+                log_level in 0u8..4u8,
+                key1 in "[a-zA-Z_][a-zA-Z0-9_]{0,20}",
+                value1 in "[a-zA-Z0-9]{1,50}",
+                key2 in "[a-zA-Z_][a-zA-Z0-9_]{0,20}",
+                value2 in "[a-zA-Z0-9]{1,50}",
+            ) {
+                use crate::client::MockDurableServiceClient;
+                use crate::lambda::InitialExecutionState;
+                
+                let captured_info = Arc::new(Mutex::new(None::<LogInfo>));
+                let captured_info_clone = captured_info.clone();
+                
+                // Create a logger that captures the LogInfo
+                let inner = Arc::new(custom_logger(
+                    {
+                        let captured = captured_info_clone.clone();
+                        move |_, info: &LogInfo| {
+                            *captured.lock().unwrap() = Some(info.clone());
+                        }
+                    },
+                    {
+                        let captured = captured_info_clone.clone();
+                        move |_, info: &LogInfo| {
+                            *captured.lock().unwrap() = Some(info.clone());
+                        }
+                    },
+                    {
+                        let captured = captured_info_clone.clone();
+                        move |_, info: &LogInfo| {
+                            *captured.lock().unwrap() = Some(info.clone());
+                        }
+                    },
+                    {
+                        let captured = captured_info_clone.clone();
+                        move |_, info: &LogInfo| {
+                            *captured.lock().unwrap() = Some(info.clone());
+                        }
+                    },
+                ));
+                
+                let client: crate::client::SharedDurableServiceClient = Arc::new(MockDurableServiceClient::new());
+                let state = Arc::new(ExecutionState::new(
+                    "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+                    "token-123",
+                    InitialExecutionState::new(),
+                    client,
+                ));
+                let ctx = DurableContext::new(state).with_logger(inner);
+                
+                // Create extra fields
+                let fields: Vec<(&str, &str)> = vec![(&key1, &value1), (&key2, &value2)];
+                
+                // Call the appropriate log method based on log_level
+                match log_level {
+                    0 => ctx.log_debug_with(&message, &fields),
+                    1 => ctx.log_info_with(&message, &fields),
+                    2 => ctx.log_warn_with(&message, &fields),
+                    _ => ctx.log_error_with(&message, &fields),
+                }
+                
+                // Verify the captured LogInfo has the extra fields
+                let captured = captured_info.lock().unwrap();
+                let info = captured.as_ref().expect("LogInfo should be captured");
+                
+                // Extra fields must be present
+                prop_assert_eq!(
+                    info.extra.len(),
+                    2,
+                    "Extra fields must be included in the log output"
+                );
+                
+                // Verify each field is present
+                prop_assert!(
+                    info.extra.contains(&(key1.clone(), value1.clone())),
+                    "First extra field must be present: {}={}", key1, value1
+                );
+                prop_assert!(
+                    info.extra.contains(&(key2.clone(), value2.clone())),
+                    "Second extra field must be present: {}={}", key2, value2
+                );
+            }
+
+            /// Feature: sdk-ergonomics-improvements, Property 10: Logging Methods Extra Fields (Empty)
+            /// Validates: Requirements 4.6
+            #[test]
+            fn prop_logging_extra_fields_empty(
+                message in "[a-zA-Z0-9 ]{1,100}",
+                log_level in 0u8..4u8,
+            ) {
+                use crate::client::MockDurableServiceClient;
+                use crate::lambda::InitialExecutionState;
+                
+                let captured_info = Arc::new(Mutex::new(None::<LogInfo>));
+                let captured_info_clone = captured_info.clone();
+                
+                // Create a logger that captures the LogInfo
+                let inner = Arc::new(custom_logger(
+                    {
+                        let captured = captured_info_clone.clone();
+                        move |_, info: &LogInfo| {
+                            *captured.lock().unwrap() = Some(info.clone());
+                        }
+                    },
+                    {
+                        let captured = captured_info_clone.clone();
+                        move |_, info: &LogInfo| {
+                            *captured.lock().unwrap() = Some(info.clone());
+                        }
+                    },
+                    {
+                        let captured = captured_info_clone.clone();
+                        move |_, info: &LogInfo| {
+                            *captured.lock().unwrap() = Some(info.clone());
+                        }
+                    },
+                    {
+                        let captured = captured_info_clone.clone();
+                        move |_, info: &LogInfo| {
+                            *captured.lock().unwrap() = Some(info.clone());
+                        }
+                    },
+                ));
+                
+                let client: crate::client::SharedDurableServiceClient = Arc::new(MockDurableServiceClient::new());
+                let state = Arc::new(ExecutionState::new(
+                    "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+                    "token-123",
+                    InitialExecutionState::new(),
+                    client,
+                ));
+                let ctx = DurableContext::new(state).with_logger(inner);
+                
+                // Call the appropriate log method with empty fields
+                let empty_fields: &[(&str, &str)] = &[];
+                match log_level {
+                    0 => ctx.log_debug_with(&message, empty_fields),
+                    1 => ctx.log_info_with(&message, empty_fields),
+                    2 => ctx.log_warn_with(&message, empty_fields),
+                    _ => ctx.log_error_with(&message, empty_fields),
+                }
+                
+                // Verify the captured LogInfo has no extra fields
+                let captured = captured_info.lock().unwrap();
+                let info = captured.as_ref().expect("LogInfo should be captured");
+                
+                prop_assert!(
+                    info.extra.is_empty(),
+                    "Extra fields should be empty when none are provided"
+                );
+                
+                // But automatic context should still be present
+                prop_assert!(
+                    info.durable_execution_arn.is_some(),
+                    "durable_execution_arn must still be present even with empty extra fields"
+                );
+            }
+        }
+    }
 }
 
 #[cfg(test)]

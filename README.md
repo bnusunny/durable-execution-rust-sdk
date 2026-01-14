@@ -4,7 +4,7 @@ Build reliable, long-running workflows on AWS Lambda with automatic checkpointin
 
 ## Overview
 
-This SDK solves Lambda's fundamental limitations — execution time limits and ephemeral state — by automatically checkpointing every operation. If your function times out or restarts, it resumes exactly where it left off. Completed operations return cached results instantly without re-executing.
+Build resilient workflows on AWS Lambda with automatic state persistence and failure recovery. Your functions can run for up to one year, pausing and resuming seamlessly. Every operation is checkpointed — if Lambda restarts, execution continues from the last completed step. Replayed operations return cached results instantly.
 
 ## Installation
 

@@ -21,6 +21,7 @@ This directory contains examples demonstrating various features of the AWS Durab
 - `callback/simple/` - Basic callback creation
 - `callback/with_timeout/` - Callback timeout and heartbeat configuration
 - `callback/concurrent/` - Multiple concurrent callbacks
+- `callback/wait_for_callback/` - **Recommended**: Replay-safe callback with notification
 
 ### Map Operations
 - `map/basic/` - Basic array processing
@@ -66,3 +67,25 @@ Each example follows a consistent pattern:
 2. Type definitions (input/output structs)
 3. Handler function with `#[durable_execution]` macro
 4. Main function for Lambda runtime
+
+## Callback Patterns
+
+When working with callbacks, prefer `wait_for_callback` over manual callback creation:
+
+```rust
+// ✅ RECOMMENDED: wait_for_callback (replay-safe notification)
+let result: Response = ctx.wait_for_callback(
+    |callback_id| async move {
+        notify_external_system(&callback_id).await?;
+        Ok(())
+    },
+    None,
+).await?;
+
+// ⚠️ CAUTION: Manual callback (notification is NOT replay-safe)
+let callback = ctx.create_callback::<Response>(None).await?;
+notify_external_system(&callback.callback_id).await?;  // May re-execute on replay!
+let result = callback.result().await?;
+```
+
+See `callback/wait_for_callback/` for detailed examples and explanations.

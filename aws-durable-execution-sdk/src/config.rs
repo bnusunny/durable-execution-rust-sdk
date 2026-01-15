@@ -198,6 +198,349 @@ impl Clone for Box<dyn RetryStrategy> {
     }
 }
 
+// =============================================================================
+// Built-in Retry Strategies
+// =============================================================================
+
+/// Exponential backoff retry strategy.
+///
+/// Delays increase exponentially with each attempt: `base_delay * 2^(attempt-1)`,
+/// capped at `max_delay`. Includes optional jitter to prevent thundering herd.
+///
+/// # Example
+///
+/// ```
+/// use aws_durable_execution_sdk::config::ExponentialBackoff;
+/// use aws_durable_execution_sdk::Duration;
+///
+/// // Retry up to 5 times with exponential backoff starting at 1 second
+/// let strategy = ExponentialBackoff::new(5, Duration::from_seconds(1));
+///
+/// // With custom max delay
+/// let strategy = ExponentialBackoff::builder()
+///     .max_attempts(5)
+///     .base_delay(Duration::from_seconds(1))
+///     .max_delay(Duration::from_minutes(5))
+///     .build();
+/// ```
+#[derive(Debug, Clone)]
+pub struct ExponentialBackoff {
+    /// Maximum number of retry attempts (not including the initial attempt).
+    pub max_attempts: u32,
+    /// Initial delay before the first retry.
+    pub base_delay: Duration,
+    /// Maximum delay between retries.
+    pub max_delay: Duration,
+    /// Multiplier for exponential growth (default: 2.0).
+    pub multiplier: f64,
+}
+
+impl ExponentialBackoff {
+    /// Creates a new exponential backoff strategy with default settings.
+    ///
+    /// # Arguments
+    ///
+    /// * `max_attempts` - Maximum number of retry attempts
+    /// * `base_delay` - Initial delay before the first retry
+    pub fn new(max_attempts: u32, base_delay: Duration) -> Self {
+        Self {
+            max_attempts,
+            base_delay,
+            max_delay: Duration::from_hours(1),
+            multiplier: 2.0,
+        }
+    }
+
+    /// Creates a builder for more detailed configuration.
+    pub fn builder() -> ExponentialBackoffBuilder {
+        ExponentialBackoffBuilder::default()
+    }
+}
+
+impl Sealed for ExponentialBackoff {}
+
+impl RetryStrategy for ExponentialBackoff {
+    fn next_delay(&self, attempt: u32, _error: &str) -> Option<Duration> {
+        if attempt >= self.max_attempts {
+            return None;
+        }
+
+        let base_seconds = self.base_delay.to_seconds() as f64;
+        let delay_seconds = base_seconds * self.multiplier.powi(attempt as i32);
+        let max_seconds = self.max_delay.to_seconds() as f64;
+        let capped_seconds = delay_seconds.min(max_seconds);
+
+        Some(Duration::from_seconds(capped_seconds as u64))
+    }
+
+    fn clone_box(&self) -> Box<dyn RetryStrategy> {
+        Box::new(self.clone())
+    }
+}
+
+/// Builder for [`ExponentialBackoff`].
+#[derive(Debug, Clone)]
+pub struct ExponentialBackoffBuilder {
+    max_attempts: u32,
+    base_delay: Duration,
+    max_delay: Duration,
+    multiplier: f64,
+}
+
+impl Default for ExponentialBackoffBuilder {
+    fn default() -> Self {
+        Self {
+            max_attempts: 3,
+            base_delay: Duration::from_seconds(1),
+            max_delay: Duration::from_hours(1),
+            multiplier: 2.0,
+        }
+    }
+}
+
+impl ExponentialBackoffBuilder {
+    /// Sets the maximum number of retry attempts.
+    pub fn max_attempts(mut self, max_attempts: u32) -> Self {
+        self.max_attempts = max_attempts;
+        self
+    }
+
+    /// Sets the initial delay before the first retry.
+    pub fn base_delay(mut self, base_delay: Duration) -> Self {
+        self.base_delay = base_delay;
+        self
+    }
+
+    /// Sets the maximum delay between retries.
+    pub fn max_delay(mut self, max_delay: Duration) -> Self {
+        self.max_delay = max_delay;
+        self
+    }
+
+    /// Sets the multiplier for exponential growth (default: 2.0).
+    pub fn multiplier(mut self, multiplier: f64) -> Self {
+        self.multiplier = multiplier;
+        self
+    }
+
+    /// Builds the exponential backoff strategy.
+    pub fn build(self) -> ExponentialBackoff {
+        ExponentialBackoff {
+            max_attempts: self.max_attempts,
+            base_delay: self.base_delay,
+            max_delay: self.max_delay,
+            multiplier: self.multiplier,
+        }
+    }
+}
+
+/// Fixed delay retry strategy.
+///
+/// Retries with a constant delay between attempts.
+///
+/// # Example
+///
+/// ```
+/// use aws_durable_execution_sdk::config::FixedDelay;
+/// use aws_durable_execution_sdk::Duration;
+///
+/// // Retry up to 3 times with 5 second delay between attempts
+/// let strategy = FixedDelay::new(3, Duration::from_seconds(5));
+/// ```
+#[derive(Debug, Clone)]
+pub struct FixedDelay {
+    /// Maximum number of retry attempts.
+    pub max_attempts: u32,
+    /// Delay between retry attempts.
+    pub delay: Duration,
+}
+
+impl FixedDelay {
+    /// Creates a new fixed delay retry strategy.
+    ///
+    /// # Arguments
+    ///
+    /// * `max_attempts` - Maximum number of retry attempts
+    /// * `delay` - Delay between retry attempts
+    pub fn new(max_attempts: u32, delay: Duration) -> Self {
+        Self { max_attempts, delay }
+    }
+}
+
+impl Sealed for FixedDelay {}
+
+impl RetryStrategy for FixedDelay {
+    fn next_delay(&self, attempt: u32, _error: &str) -> Option<Duration> {
+        if attempt >= self.max_attempts {
+            return None;
+        }
+        Some(self.delay.clone())
+    }
+
+    fn clone_box(&self) -> Box<dyn RetryStrategy> {
+        Box::new(self.clone())
+    }
+}
+
+/// Linear backoff retry strategy.
+///
+/// Delays increase linearly with each attempt: `base_delay * attempt`.
+///
+/// # Example
+///
+/// ```
+/// use aws_durable_execution_sdk::config::LinearBackoff;
+/// use aws_durable_execution_sdk::Duration;
+///
+/// // Retry up to 5 times: 2s, 4s, 6s, 8s, 10s
+/// let strategy = LinearBackoff::new(5, Duration::from_seconds(2));
+/// ```
+#[derive(Debug, Clone)]
+pub struct LinearBackoff {
+    /// Maximum number of retry attempts.
+    pub max_attempts: u32,
+    /// Base delay that is multiplied by the attempt number.
+    pub base_delay: Duration,
+    /// Maximum delay between retries.
+    pub max_delay: Duration,
+}
+
+impl LinearBackoff {
+    /// Creates a new linear backoff retry strategy.
+    ///
+    /// # Arguments
+    ///
+    /// * `max_attempts` - Maximum number of retry attempts
+    /// * `base_delay` - Base delay multiplied by attempt number
+    pub fn new(max_attempts: u32, base_delay: Duration) -> Self {
+        Self {
+            max_attempts,
+            base_delay,
+            max_delay: Duration::from_hours(1),
+        }
+    }
+
+    /// Sets the maximum delay between retries.
+    pub fn with_max_delay(mut self, max_delay: Duration) -> Self {
+        self.max_delay = max_delay;
+        self
+    }
+}
+
+impl Sealed for LinearBackoff {}
+
+impl RetryStrategy for LinearBackoff {
+    fn next_delay(&self, attempt: u32, _error: &str) -> Option<Duration> {
+        if attempt >= self.max_attempts {
+            return None;
+        }
+
+        let base_seconds = self.base_delay.to_seconds();
+        let delay_seconds = base_seconds.saturating_mul((attempt + 1) as u64);
+        let max_seconds = self.max_delay.to_seconds();
+        let capped_seconds = delay_seconds.min(max_seconds);
+
+        Some(Duration::from_seconds(capped_seconds))
+    }
+
+    fn clone_box(&self) -> Box<dyn RetryStrategy> {
+        Box::new(self.clone())
+    }
+}
+
+/// No retry strategy - fails immediately on first error.
+///
+/// # Example
+///
+/// ```
+/// use aws_durable_execution_sdk::config::NoRetry;
+///
+/// let strategy = NoRetry;
+/// ```
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoRetry;
+
+impl Sealed for NoRetry {}
+
+impl RetryStrategy for NoRetry {
+    fn next_delay(&self, _attempt: u32, _error: &str) -> Option<Duration> {
+        None
+    }
+
+    fn clone_box(&self) -> Box<dyn RetryStrategy> {
+        Box::new(*self)
+    }
+}
+
+/// Custom retry strategy using a user-provided closure.
+///
+/// This allows users to define custom retry logic without implementing
+/// the sealed `RetryStrategy` trait directly.
+///
+/// # Example
+///
+/// ```
+/// use aws_durable_execution_sdk::config::custom_retry;
+/// use aws_durable_execution_sdk::Duration;
+///
+/// // Custom strategy: retry up to 3 times, but only for specific errors
+/// let strategy = custom_retry(|attempt, error| {
+///     if attempt >= 3 {
+///         return None;
+///     }
+///     if error.contains("transient") || error.contains("timeout") {
+///         Some(Duration::from_seconds(5))
+///     } else {
+///         None // Don't retry other errors
+///     }
+/// });
+/// ```
+pub fn custom_retry<F>(f: F) -> CustomRetry<F>
+where
+    F: Fn(u32, &str) -> Option<Duration> + Send + Sync + Clone + 'static,
+{
+    CustomRetry { f }
+}
+
+/// Custom retry strategy wrapper.
+///
+/// Created via the [`custom_retry`] function.
+#[derive(Clone)]
+pub struct CustomRetry<F>
+where
+    F: Fn(u32, &str) -> Option<Duration> + Send + Sync + Clone + 'static,
+{
+    f: F,
+}
+
+impl<F> std::fmt::Debug for CustomRetry<F>
+where
+    F: Fn(u32, &str) -> Option<Duration> + Send + Sync + Clone + 'static,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CustomRetry").finish()
+    }
+}
+
+impl<F> Sealed for CustomRetry<F> where F: Fn(u32, &str) -> Option<Duration> + Send + Sync + Clone + 'static {}
+
+impl<F> RetryStrategy for CustomRetry<F>
+where
+    F: Fn(u32, &str) -> Option<Duration> + Send + Sync + Clone + 'static,
+{
+    fn next_delay(&self, attempt: u32, error: &str) -> Option<Duration> {
+        (self.f)(attempt, error)
+    }
+
+    fn clone_box(&self) -> Box<dyn RetryStrategy> {
+        Box::new(self.clone())
+    }
+}
+
+// =============================================================================
+// Step Semantics and Configuration
+// =============================================================================
+
 /// Execution semantics for step operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum StepSemantics {
@@ -803,6 +1146,261 @@ mod tests {
         let serialized = serde_json::to_string(&mode).unwrap();
         let deserialized: CheckpointingMode = serde_json::from_str(&serialized).unwrap();
         assert_eq!(mode, deserialized);
+    }
+
+    // =========================================================================
+    // Retry Strategy Tests
+    // =========================================================================
+
+    #[test]
+    fn test_exponential_backoff_new() {
+        let strategy = ExponentialBackoff::new(5, Duration::from_seconds(1));
+        assert_eq!(strategy.max_attempts, 5);
+        assert_eq!(strategy.base_delay.to_seconds(), 1);
+        assert_eq!(strategy.max_delay.to_seconds(), 3600); // 1 hour default
+        assert!((strategy.multiplier - 2.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_exponential_backoff_builder() {
+        let strategy = ExponentialBackoff::builder()
+            .max_attempts(10)
+            .base_delay(Duration::from_seconds(2))
+            .max_delay(Duration::from_minutes(30))
+            .multiplier(3.0)
+            .build();
+
+        assert_eq!(strategy.max_attempts, 10);
+        assert_eq!(strategy.base_delay.to_seconds(), 2);
+        assert_eq!(strategy.max_delay.to_seconds(), 1800); // 30 minutes
+        assert!((strategy.multiplier - 3.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_exponential_backoff_delays() {
+        let strategy = ExponentialBackoff::new(5, Duration::from_seconds(1));
+
+        // attempt 0: 1 * 2^0 = 1 second
+        assert_eq!(strategy.next_delay(0, "error").map(|d| d.to_seconds()), Some(1));
+        // attempt 1: 1 * 2^1 = 2 seconds
+        assert_eq!(strategy.next_delay(1, "error").map(|d| d.to_seconds()), Some(2));
+        // attempt 2: 1 * 2^2 = 4 seconds
+        assert_eq!(strategy.next_delay(2, "error").map(|d| d.to_seconds()), Some(4));
+        // attempt 3: 1 * 2^3 = 8 seconds
+        assert_eq!(strategy.next_delay(3, "error").map(|d| d.to_seconds()), Some(8));
+        // attempt 4: 1 * 2^4 = 16 seconds
+        assert_eq!(strategy.next_delay(4, "error").map(|d| d.to_seconds()), Some(16));
+        // attempt 5: exceeds max_attempts
+        assert_eq!(strategy.next_delay(5, "error"), None);
+    }
+
+    #[test]
+    fn test_exponential_backoff_max_delay_cap() {
+        let strategy = ExponentialBackoff::builder()
+            .max_attempts(10)
+            .base_delay(Duration::from_seconds(10))
+            .max_delay(Duration::from_seconds(30))
+            .build();
+
+        // attempt 0: 10 * 2^0 = 10 seconds
+        assert_eq!(strategy.next_delay(0, "error").map(|d| d.to_seconds()), Some(10));
+        // attempt 1: 10 * 2^1 = 20 seconds
+        assert_eq!(strategy.next_delay(1, "error").map(|d| d.to_seconds()), Some(20));
+        // attempt 2: 10 * 2^2 = 40 seconds, capped at 30
+        assert_eq!(strategy.next_delay(2, "error").map(|d| d.to_seconds()), Some(30));
+        // attempt 3: 10 * 2^3 = 80 seconds, capped at 30
+        assert_eq!(strategy.next_delay(3, "error").map(|d| d.to_seconds()), Some(30));
+    }
+
+    #[test]
+    fn test_fixed_delay_new() {
+        let strategy = FixedDelay::new(3, Duration::from_seconds(5));
+        assert_eq!(strategy.max_attempts, 3);
+        assert_eq!(strategy.delay.to_seconds(), 5);
+    }
+
+    #[test]
+    fn test_fixed_delay_constant() {
+        let strategy = FixedDelay::new(3, Duration::from_seconds(5));
+
+        // All delays should be the same
+        assert_eq!(strategy.next_delay(0, "error").map(|d| d.to_seconds()), Some(5));
+        assert_eq!(strategy.next_delay(1, "error").map(|d| d.to_seconds()), Some(5));
+        assert_eq!(strategy.next_delay(2, "error").map(|d| d.to_seconds()), Some(5));
+        // Exceeds max_attempts
+        assert_eq!(strategy.next_delay(3, "error"), None);
+    }
+
+    #[test]
+    fn test_linear_backoff_new() {
+        let strategy = LinearBackoff::new(5, Duration::from_seconds(2));
+        assert_eq!(strategy.max_attempts, 5);
+        assert_eq!(strategy.base_delay.to_seconds(), 2);
+        assert_eq!(strategy.max_delay.to_seconds(), 3600); // 1 hour default
+    }
+
+    #[test]
+    fn test_linear_backoff_with_max_delay() {
+        let strategy = LinearBackoff::new(5, Duration::from_seconds(2))
+            .with_max_delay(Duration::from_seconds(10));
+        assert_eq!(strategy.max_delay.to_seconds(), 10);
+    }
+
+    #[test]
+    fn test_linear_backoff_delays() {
+        let strategy = LinearBackoff::new(5, Duration::from_seconds(2));
+
+        // attempt 0: 2 * (0+1) = 2 seconds
+        assert_eq!(strategy.next_delay(0, "error").map(|d| d.to_seconds()), Some(2));
+        // attempt 1: 2 * (1+1) = 4 seconds
+        assert_eq!(strategy.next_delay(1, "error").map(|d| d.to_seconds()), Some(4));
+        // attempt 2: 2 * (2+1) = 6 seconds
+        assert_eq!(strategy.next_delay(2, "error").map(|d| d.to_seconds()), Some(6));
+        // attempt 3: 2 * (3+1) = 8 seconds
+        assert_eq!(strategy.next_delay(3, "error").map(|d| d.to_seconds()), Some(8));
+        // attempt 4: 2 * (4+1) = 10 seconds
+        assert_eq!(strategy.next_delay(4, "error").map(|d| d.to_seconds()), Some(10));
+        // attempt 5: exceeds max_attempts
+        assert_eq!(strategy.next_delay(5, "error"), None);
+    }
+
+    #[test]
+    fn test_linear_backoff_max_delay_cap() {
+        let strategy = LinearBackoff::new(10, Duration::from_seconds(5))
+            .with_max_delay(Duration::from_seconds(15));
+
+        // attempt 0: 5 * 1 = 5 seconds
+        assert_eq!(strategy.next_delay(0, "error").map(|d| d.to_seconds()), Some(5));
+        // attempt 1: 5 * 2 = 10 seconds
+        assert_eq!(strategy.next_delay(1, "error").map(|d| d.to_seconds()), Some(10));
+        // attempt 2: 5 * 3 = 15 seconds
+        assert_eq!(strategy.next_delay(2, "error").map(|d| d.to_seconds()), Some(15));
+        // attempt 3: 5 * 4 = 20 seconds, capped at 15
+        assert_eq!(strategy.next_delay(3, "error").map(|d| d.to_seconds()), Some(15));
+    }
+
+    #[test]
+    fn test_no_retry() {
+        let strategy = NoRetry;
+
+        // Should always return None
+        assert_eq!(strategy.next_delay(0, "error"), None);
+        assert_eq!(strategy.next_delay(1, "error"), None);
+        assert_eq!(strategy.next_delay(100, "error"), None);
+    }
+
+    #[test]
+    fn test_no_retry_default() {
+        let strategy = NoRetry::default();
+        assert_eq!(strategy.next_delay(0, "error"), None);
+    }
+
+    #[test]
+    fn test_custom_retry_basic() {
+        let strategy = custom_retry(|attempt, _error| {
+            if attempt >= 3 {
+                None
+            } else {
+                Some(Duration::from_seconds(10))
+            }
+        });
+
+        assert_eq!(strategy.next_delay(0, "error").map(|d| d.to_seconds()), Some(10));
+        assert_eq!(strategy.next_delay(1, "error").map(|d| d.to_seconds()), Some(10));
+        assert_eq!(strategy.next_delay(2, "error").map(|d| d.to_seconds()), Some(10));
+        assert_eq!(strategy.next_delay(3, "error"), None);
+    }
+
+    #[test]
+    fn test_custom_retry_error_based() {
+        let strategy = custom_retry(|attempt, error| {
+            if attempt >= 5 {
+                return None;
+            }
+            if error.contains("transient") {
+                Some(Duration::from_seconds(1))
+            } else if error.contains("rate_limit") {
+                Some(Duration::from_seconds(30))
+            } else {
+                None // Don't retry other errors
+            }
+        });
+
+        // Transient errors get short delay
+        assert_eq!(strategy.next_delay(0, "transient error").map(|d| d.to_seconds()), Some(1));
+        // Rate limit errors get longer delay
+        assert_eq!(strategy.next_delay(0, "rate_limit exceeded").map(|d| d.to_seconds()), Some(30));
+        // Other errors don't retry
+        assert_eq!(strategy.next_delay(0, "permanent failure"), None);
+    }
+
+    #[test]
+    fn test_retry_strategy_clone_box() {
+        // Test that clone_box works for all strategies
+        let exp: Box<dyn RetryStrategy> = Box::new(ExponentialBackoff::new(3, Duration::from_seconds(1)));
+        let exp_clone = exp.clone_box();
+        assert_eq!(exp.next_delay(0, "e").map(|d| d.to_seconds()), exp_clone.next_delay(0, "e").map(|d| d.to_seconds()));
+
+        let fixed: Box<dyn RetryStrategy> = Box::new(FixedDelay::new(3, Duration::from_seconds(5)));
+        let fixed_clone = fixed.clone_box();
+        assert_eq!(fixed.next_delay(0, "e").map(|d| d.to_seconds()), fixed_clone.next_delay(0, "e").map(|d| d.to_seconds()));
+
+        let linear: Box<dyn RetryStrategy> = Box::new(LinearBackoff::new(3, Duration::from_seconds(2)));
+        let linear_clone = linear.clone_box();
+        assert_eq!(linear.next_delay(0, "e").map(|d| d.to_seconds()), linear_clone.next_delay(0, "e").map(|d| d.to_seconds()));
+
+        let no_retry: Box<dyn RetryStrategy> = Box::new(NoRetry);
+        let no_retry_clone = no_retry.clone_box();
+        assert_eq!(no_retry.next_delay(0, "e"), no_retry_clone.next_delay(0, "e"));
+    }
+
+    #[test]
+    fn test_boxed_retry_strategy_clone() {
+        // Test the Clone impl for Box<dyn RetryStrategy>
+        let strategy: Box<dyn RetryStrategy> = Box::new(ExponentialBackoff::new(3, Duration::from_seconds(1)));
+        let cloned = strategy.clone();
+        
+        assert_eq!(
+            strategy.next_delay(0, "error").map(|d| d.to_seconds()),
+            cloned.next_delay(0, "error").map(|d| d.to_seconds())
+        );
+    }
+
+    #[test]
+    fn test_step_config_with_retry_strategy() {
+        let config = StepConfig {
+            retry_strategy: Some(Box::new(ExponentialBackoff::new(3, Duration::from_seconds(1)))),
+            step_semantics: StepSemantics::AtLeastOncePerRetry,
+            serdes: None,
+        };
+
+        assert!(config.retry_strategy.is_some());
+        let strategy = config.retry_strategy.as_ref().unwrap();
+        assert_eq!(strategy.next_delay(0, "error").map(|d| d.to_seconds()), Some(1));
+    }
+
+    #[test]
+    fn test_retry_strategy_debug() {
+        // Test Debug implementations
+        let exp = ExponentialBackoff::new(3, Duration::from_seconds(1));
+        let debug_str = format!("{:?}", exp);
+        assert!(debug_str.contains("ExponentialBackoff"));
+
+        let fixed = FixedDelay::new(3, Duration::from_seconds(5));
+        let debug_str = format!("{:?}", fixed);
+        assert!(debug_str.contains("FixedDelay"));
+
+        let linear = LinearBackoff::new(3, Duration::from_seconds(2));
+        let debug_str = format!("{:?}", linear);
+        assert!(debug_str.contains("LinearBackoff"));
+
+        let no_retry = NoRetry;
+        let debug_str = format!("{:?}", no_retry);
+        assert!(debug_str.contains("NoRetry"));
+
+        let custom = custom_retry(|_, _| None);
+        let debug_str = format!("{:?}", custom);
+        assert!(debug_str.contains("CustomRetry"));
     }
 
     // =========================================================================

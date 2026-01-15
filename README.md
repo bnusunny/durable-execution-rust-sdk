@@ -171,11 +171,13 @@ Wait for external systems to signal your workflow:
 use aws_durable_execution_sdk::CallbackConfig;
 
 // Option 1: wait_for_callback - combines callback creation with notification (recommended)
+// The submitter function runs inside a checkpointed child context, ensuring
+// the notification won't be re-sent during replay.
 let approval: ApprovalResponse = ctx.wait_for_callback(
     |callback_id| async move {
-        // Notify external system with the callback ID
-        // This is executed within a durable step for replay safety
-        notify_approver(&callback_id).await
+        // This notification is checkpointed and won't re-execute on replay
+        notify_approver(&callback_id).await?;
+        Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     },
     Some(CallbackConfig {
         timeout: Duration::from_hours(24),
@@ -184,14 +186,34 @@ let approval: ApprovalResponse = ctx.wait_for_callback(
 ).await?;
 
 // Option 2: Manual callback creation for more control
+// Note: Be careful - notifications outside of steps are NOT replay-safe!
 let callback = ctx.create_callback::<ApprovalResponse>(Some(CallbackConfig {
     timeout: Duration::from_hours(24),
     ..Default::default()
 })).await?;
 
-notify_approver(&callback.callback_id).await?;
+// Wrap notification in a step for replay safety
+ctx.step_named("notify", |_| {
+    // Notification logic here
+    Ok(())
+}, None).await?;
+
 let approval = callback.result().await?;
 ```
+
+### Why use wait_for_callback?
+
+The traditional callback pattern has a subtle replay issue:
+
+```rust
+// PROBLEMATIC: If Lambda restarts after notify_approver() but before the next
+// checkpoint, the notification will be sent AGAIN during replay!
+let callback = ctx.create_callback::<Response>(None).await?;
+notify_approver(&callback.callback_id).await?;  // NOT checkpointed!
+let result = callback.result().await?;
+```
+
+`wait_for_callback` solves this by running your notification inside a checkpointed child context.
 
 ## Replay-Safe Helpers
 

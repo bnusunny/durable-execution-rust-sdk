@@ -137,6 +137,11 @@ name = "callback_concurrent"
 path = "examples/callback/concurrent/callback_concurrent.rs"
 required-features = ["macros"]
 
+[[example]]
+name = "wait_for_callback"
+path = "examples/callback/wait_for_callback/wait_for_callback.rs"
+required-features = ["macros"]
+
 # Map examples
 [[example]]
 name = "map_basic"

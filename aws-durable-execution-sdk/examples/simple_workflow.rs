@@ -236,11 +236,8 @@ fn uuid_v4_mock() -> String {
 /// The `#[durable_execution]` macro generates the actual handler.
 #[tokio::main]
 async fn main() -> Result<(), lambda_runtime::Error> {
-    // Initialize tracing for structured logging
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
-        .with_target(false)
-        .init();
+    // Initialize the default subscriber
+    lambda_runtime::tracing::init_default_subscriber();
 
     // Run the Lambda handler
     lambda_runtime::run(lambda_runtime::service_fn(process_order)).await

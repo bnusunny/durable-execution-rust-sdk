@@ -5,10 +5,10 @@
 //!
 //! ## Module Structure
 //!
-//! - [`checkpoint_result`] - Result types for checkpoint queries
-//! - [`replay_status`] - Replay state tracking
-//! - [`batcher`] - Checkpoint batching for efficient API calls
-//! - [`execution_state`] - Main execution state management
+//! - `checkpoint_result` - Result types for checkpoint queries
+//! - `replay_status` - Replay state tracking
+//! - `batcher` - Checkpoint batching for efficient API calls
+//! - `execution_state` - Main execution state management
 //!
 //! ## Checkpoint Token Management
 //!

@@ -1,0 +1,14 @@
+error[E0271]: expected `Pin<Box<dyn Future<Output = Result<String, DurableError>> + Send>>` to be a future that resolves to `Result<i32, DurableError>`, but it resolves to `Result<String, DurableError>`
+  --> tests/compile_fail/all_type_mismatch.rs:28:13
+   |
+28 |       let _ = all!(ctx,
+   |  _____________^
+29 | |         Box::pin(async { Ok::<_, DurableError>(42i32) }) as Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>,
+30 | |         Box::pin(async { Ok::<_, DurableError>("hello".to_string()) }) as Pin<Box<dyn Future<Output = Result<String, DurableError>> + Sen...
+31 | |     );
+   | |_____^ expected `Result<i32, DurableError>`, found `Result<String, DurableError>`
+   |
+   = note: expected enum `Result<i32, DurableError>`
+              found enum `Result<std::string::String, DurableError>`
+   = note: required for the cast from `Pin<Box<Pin<Box<dyn Future<Output = Result<std::string::String, DurableError>> + Send>>>>` to `Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>`
+   = note: this error originates in the macro `all` (in Nightly builds, run with -Z macro-backtrace for more info)

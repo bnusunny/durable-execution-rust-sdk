@@ -855,6 +855,8 @@ pub mod duration;
 pub mod error;
 pub mod handlers;
 pub mod lambda;
+#[macro_use]
+pub mod macros;
 pub mod operation;
 pub mod replay_safe;
 pub mod serdes;

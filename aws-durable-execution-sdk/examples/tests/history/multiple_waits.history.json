@@ -1,0 +1,31 @@
+{
+  "events": [
+    {
+      "event_type": "Execution"
+    },
+    {
+      "event_type": "Step",
+      "name": "stage_1_process"
+    },
+    {
+      "event_type": "Wait",
+      "name": "wait_before_stage_2"
+    },
+    {
+      "event_type": "Step",
+      "name": "stage_2_process"
+    },
+    {
+      "event_type": "Wait",
+      "name": "wait_before_stage_3"
+    },
+    {
+      "event_type": "Step",
+      "name": "stage_3_process"
+    },
+    {
+      "event_type": "Wait",
+      "name": "final_cooldown"
+    }
+  ]
+}

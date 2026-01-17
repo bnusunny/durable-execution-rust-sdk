@@ -1,0 +1,46 @@
+[package]
+name = "aws-durable-execution-sdk-testing"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Testing utilities for AWS Durable Execution SDK"
+keywords = ["aws", "lambda", "durable", "testing", "workflow"]
+categories = ["development-tools::testing"]
+
+[dependencies]
+# Core SDK dependency
+aws-durable-execution-sdk.workspace = true
+
+# Async runtime - with test-util for time control
+tokio = { version = "1.0", features = ["full", "sync", "time", "rt-multi-thread", "test-util"] }
+
+# Async trait support
+async-trait.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Error handling
+thiserror.workspace = true
+
+# Logging/tracing
+tracing.workspace = true
+
+# Date/time handling
+chrono = { version = "0.4", default-features = false, features = ["std", "serde", "clock"] }
+
+# UUID generation
+uuid = { version = "1.0", features = ["v4"] }
+
+# Base64 encoding for checkpoint tokens
+base64 = "0.22"
+
+# AWS SDK (for cloud runner)
+aws-sdk-lambda.workspace = true
+aws-config.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+tokio-test.workspace = true

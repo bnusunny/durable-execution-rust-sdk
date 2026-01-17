@@ -4,8 +4,8 @@
 //! for creating durable Lambda handler functions.
 
 use proc_macro::TokenStream;
-use quote::{quote, format_ident};
-use syn::{parse_macro_input, ItemFn, FnArg, Pat, ReturnType, spanned::Spanned};
+use quote::{format_ident, quote};
+use syn::{parse_macro_input, spanned::Spanned, FnArg, ItemFn, Pat, ReturnType};
 
 /// Attribute macro that transforms an async function into a durable Lambda handler.
 ///
@@ -71,93 +71,101 @@ use syn::{parse_macro_input, ItemFn, FnArg, Pat, ReturnType, spanned::Spanned};
 #[proc_macro_attribute]
 pub fn durable_execution(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as ItemFn);
-    
+
     // Validate the function is async
     if input_fn.sig.asyncness.is_none() {
         return syn::Error::new(
             input_fn.sig.fn_token.span(),
-            "durable_execution handler must be an async function"
-        ).to_compile_error().into();
+            "durable_execution handler must be an async function",
+        )
+        .to_compile_error()
+        .into();
     }
-    
+
     // Extract function components
     let fn_name = &input_fn.sig.ident;
     let fn_vis = &input_fn.vis;
     let fn_block = &input_fn.block;
     let fn_attrs = &input_fn.attrs;
-    
+
     // Parse function arguments - expect (event: EventType, ctx: DurableContext)
     let args: Vec<_> = input_fn.sig.inputs.iter().collect();
-    
+
     if args.len() != 2 {
         return syn::Error::new(
             input_fn.sig.inputs.span(),
             "durable_execution handler must have exactly 2 arguments: (event: EventType, ctx: DurableContext)"
         ).to_compile_error().into();
     }
-    
+
     // Extract event type from first argument
     let event_type = match &args[0] {
         FnArg::Typed(pat_type) => &pat_type.ty,
         FnArg::Receiver(_) => {
             return syn::Error::new(
                 args[0].span(),
-                "durable_execution handler cannot have self parameter"
-            ).to_compile_error().into();
+                "durable_execution handler cannot have self parameter",
+            )
+            .to_compile_error()
+            .into();
         }
     };
-    
+
     // Extract event parameter name
     let event_param_name = match &args[0] {
-        FnArg::Typed(pat_type) => {
-            match pat_type.pat.as_ref() {
-                Pat::Ident(ident) => &ident.ident,
-                _ => {
-                    return syn::Error::new(
-                        pat_type.pat.span(),
-                        "event parameter must be a simple identifier"
-                    ).to_compile_error().into();
-                }
+        FnArg::Typed(pat_type) => match pat_type.pat.as_ref() {
+            Pat::Ident(ident) => &ident.ident,
+            _ => {
+                return syn::Error::new(
+                    pat_type.pat.span(),
+                    "event parameter must be a simple identifier",
+                )
+                .to_compile_error()
+                .into();
             }
-        }
+        },
         _ => unreachable!(),
     };
-    
+
     // Extract context parameter name
     let ctx_param_name = match &args[1] {
-        FnArg::Typed(pat_type) => {
-            match pat_type.pat.as_ref() {
-                Pat::Ident(ident) => &ident.ident,
-                _ => {
-                    return syn::Error::new(
-                        pat_type.pat.span(),
-                        "context parameter must be a simple identifier"
-                    ).to_compile_error().into();
-                }
+        FnArg::Typed(pat_type) => match pat_type.pat.as_ref() {
+            Pat::Ident(ident) => &ident.ident,
+            _ => {
+                return syn::Error::new(
+                    pat_type.pat.span(),
+                    "context parameter must be a simple identifier",
+                )
+                .to_compile_error()
+                .into();
             }
-        }
+        },
         FnArg::Receiver(_) => {
             return syn::Error::new(
                 args[1].span(),
-                "durable_execution handler cannot have self parameter"
-            ).to_compile_error().into();
+                "durable_execution handler cannot have self parameter",
+            )
+            .to_compile_error()
+            .into();
         }
     };
-    
+
     // Extract return type
     let return_type = match &input_fn.sig.output {
         ReturnType::Type(_, ty) => ty.as_ref(),
         ReturnType::Default => {
             return syn::Error::new(
                 input_fn.sig.output.span(),
-                "durable_execution handler must return Result<T, DurableError>"
-            ).to_compile_error().into();
+                "durable_execution handler must return Result<T, DurableError>",
+            )
+            .to_compile_error()
+            .into();
         }
     };
-    
+
     // Generate the inner function name
     let inner_fn_name = format_ident!("__{}_inner", fn_name);
-    
+
     // Generate the wrapper function
     let output = quote! {
         // The inner function containing the user's logic
@@ -167,7 +175,7 @@ pub fn durable_execution(_attr: TokenStream, item: TokenStream) -> TokenStream {
             #ctx_param_name: ::aws_durable_execution_sdk::DurableContext,
         ) -> #return_type
         #fn_block
-        
+
         // The Lambda handler wrapper
         #fn_vis async fn #fn_name(
             lambda_event: ::lambda_runtime::LambdaEvent<::aws_durable_execution_sdk::DurableExecutionInvocationInput>,
@@ -178,9 +186,9 @@ pub fn durable_execution(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 SharedDurableServiceClient, LambdaDurableServiceClient,
                 OperationType,
             };
-            
+
             let (durable_input, lambda_context) = lambda_event.into_parts();
-            
+
             // Extract the user's event from the input
             // First try the top-level Input field, then fall back to ExecutionDetails.InputPayload
             let user_event: #event_type = {
@@ -198,7 +206,7 @@ pub fn durable_execution(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     // Try to extract from ExecutionDetails.InputPayload of the EXECUTION operation
                     let execution_op = durable_input.initial_execution_state.operations.iter()
                         .find(|op| op.operation_type == OperationType::Execution);
-                    
+
                     if let Some(op) = execution_op {
                         if let Some(details) = &op.execution_details {
                             if let Some(payload) = &details.input_payload {
@@ -246,13 +254,13 @@ pub fn durable_execution(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     }
                 }
             };
-            
+
             // Create the service client
             let aws_config = ::aws_config::load_defaults(::aws_config::BehaviorVersion::latest()).await;
             let service_client: SharedDurableServiceClient = ::std::sync::Arc::new(
                 LambdaDurableServiceClient::from_aws_config(&aws_config)
             );
-            
+
             // Create ExecutionState with batcher
             let batcher_config = CheckpointBatcherConfig::default();
             let (state, mut batcher) = ExecutionState::with_batcher(
@@ -264,21 +272,21 @@ pub fn durable_execution(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 100, // queue buffer size
             );
             let state = ::std::sync::Arc::new(state);
-            
+
             // Spawn the checkpoint batcher task
             let batcher_handle = ::tokio::spawn(async move {
                 batcher.run().await;
             });
-            
+
             // Create DurableContext
             let durable_ctx = DurableContext::from_lambda_context(state.clone(), lambda_context);
-            
+
             // Call the user's handler
             let result = #inner_fn_name(user_event, durable_ctx).await;
-            
+
             // Process the result while state is still alive (for large response checkpointing)
             const MAX_RESPONSE_SIZE: usize = 6 * 1024 * 1024;
-            
+
             let output = match result {
                 Ok(value) => {
                     // Serialize the result
@@ -292,14 +300,14 @@ pub fn durable_execution(_attr: TokenStream, item: TokenStream) -> TokenStream {
                                     .duration_since(::std::time::UNIX_EPOCH)
                                     .map(|d| d.as_nanos())
                                     .unwrap_or(0));
-                                
+
                                 // Create an operation update to checkpoint the large result
                                 let update = ::aws_durable_execution_sdk::OperationUpdate::succeed(
                                     &result_op_id,
                                     ::aws_durable_execution_sdk::OperationType::Execution,
                                     Some(json.clone()),
                                 );
-                                
+
                                 // Checkpoint the result synchronously
                                 match state.create_checkpoint(update, true).await {
                                     Ok(()) => {
@@ -338,19 +346,19 @@ pub fn durable_execution(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     DurableExecutionInvocationOutput::failed(ErrorObject::from(&error))
                 }
             };
-            
+
             // Drop the state to close the checkpoint queue and stop the batcher
             drop(state);
-            
+
             // Wait for batcher to finish (with timeout)
             let _ = ::tokio::time::timeout(
                 ::std::time::Duration::from_secs(5),
                 batcher_handle
             ).await;
-            
+
             Ok(output)
         }
     };
-    
+
     output.into()
 }

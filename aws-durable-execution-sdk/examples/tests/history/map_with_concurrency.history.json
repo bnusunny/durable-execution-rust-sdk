@@ -1,0 +1,91 @@
+{
+  "events": [
+    {
+      "event_type": "Execution"
+    },
+    {
+      "event_type": "Context",
+      "name": "map"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-0"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-1"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-2"
+    },
+    {
+      "event_type": "Step",
+      "name": "process_0"
+    },
+    {
+      "event_type": "Step",
+      "name": "process_1"
+    },
+    {
+      "event_type": "Step",
+      "name": "process_2"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-3"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-4"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-5"
+    },
+    {
+      "event_type": "Step",
+      "name": "process_3"
+    },
+    {
+      "event_type": "Step",
+      "name": "process_4"
+    },
+    {
+      "event_type": "Step",
+      "name": "process_5"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-6"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-7"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-8"
+    },
+    {
+      "event_type": "Step",
+      "name": "process_6"
+    },
+    {
+      "event_type": "Step",
+      "name": "process_7"
+    },
+    {
+      "event_type": "Step",
+      "name": "process_8"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-9"
+    },
+    {
+      "event_type": "Step",
+      "name": "process_9"
+    }
+  ]
+}

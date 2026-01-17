@@ -1,0 +1,22 @@
+{
+  "events": [
+    {
+      "event_type": "Execution"
+    },
+    {
+      "event_type": "Step",
+      "name": "validate"
+    },
+    {
+      "event_type": "Callback"
+    },
+    {
+      "event_type": "Context",
+      "name": "wait_for_callback_submitter"
+    },
+    {
+      "event_type": "Step",
+      "name": "execute_submitter"
+    }
+  ]
+}

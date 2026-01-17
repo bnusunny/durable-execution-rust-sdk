@@ -1,0 +1,32 @@
+{
+  "events": [
+    {
+      "event_type": "Execution"
+    },
+    {
+      "event_type": "Context",
+      "name": "map"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-0"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-1"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-2"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Step"
+    }
+  ]
+}

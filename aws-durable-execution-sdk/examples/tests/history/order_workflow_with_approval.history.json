@@ -1,0 +1,41 @@
+{
+  "events": [
+    {
+      "event_type": "Execution"
+    },
+    {
+      "event_type": "Step",
+      "name": "validate_order"
+    },
+    {
+      "event_type": "Context",
+      "name": "check_inventory"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Context",
+      "name": "check_customer"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Context",
+      "name": "map"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-0"
+    },
+    {
+      "event_type": "Step",
+      "name": "process_item_0"
+    },
+    {
+      "event_type": "Callback",
+      "name": "order_approval"
+    }
+  ]
+}

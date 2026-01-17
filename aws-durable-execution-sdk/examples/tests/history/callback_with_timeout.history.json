@@ -1,0 +1,11 @@
+{
+  "events": [
+    {
+      "event_type": "Execution"
+    },
+    {
+      "event_type": "Callback",
+      "name": "approval_callback"
+    }
+  ]
+}

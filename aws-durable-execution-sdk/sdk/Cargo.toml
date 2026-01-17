@@ -1,0 +1,68 @@
+[package]
+name = "aws-durable-execution-sdk"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "AWS Durable Execution SDK for Lambda Rust Runtime"
+keywords = ["aws", "lambda", "durable", "workflow", "serverless"]
+categories = ["asynchronous", "web-programming"]
+
+[dependencies]
+# Async runtime
+tokio.workspace = true
+
+# Async trait support
+async-trait.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Error handling
+thiserror.workspace = true
+
+# Logging/tracing
+tracing.workspace = true
+
+# AWS SDK
+aws-sdk-lambda.workspace = true
+aws-config.workspace = true
+aws-smithy-runtime-api.workspace = true
+aws-credential-types.workspace = true
+aws-sigv4.workspace = true
+aws-smithy-http.workspace = true
+
+# HTTP client
+reqwest.workspace = true
+http.workspace = true
+url.workspace = true
+urlencoding.workspace = true
+
+# Lambda runtime
+lambda_runtime.workspace = true
+
+# Hashing for deterministic IDs
+blake2.workspace = true
+hex.workspace = true
+
+# Date/time handling
+chrono.workspace = true
+
+# Static assertions for compile-time checks
+static_assertions.workspace = true
+
+# Proc macro support (for the durable_execution attribute)
+aws-durable-execution-sdk-macros = { workspace = true, optional = true }
+
+[dev-dependencies]
+# Property-based testing
+proptest.workspace = true
+tokio-test.workspace = true
+tracing-subscriber.workspace = true
+# Compile-fail testing
+trybuild.workspace = true
+
+[features]
+default = ["macros"]
+macros = ["dep:aws-durable-execution-sdk-macros"]

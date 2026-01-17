@@ -1,0 +1,19 @@
+{
+  "events": [
+    {
+      "event_type": "Execution"
+    },
+    {
+      "event_type": "Wait",
+      "name": "initial_delay"
+    },
+    {
+      "event_type": "Step",
+      "name": "process"
+    },
+    {
+      "event_type": "Wait",
+      "name": "cooldown_period"
+    }
+  ]
+}

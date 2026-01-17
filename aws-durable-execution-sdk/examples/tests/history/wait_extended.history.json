@@ -1,0 +1,15 @@
+{
+  "events": [
+    {
+      "event_type": "Execution"
+    },
+    {
+      "event_type": "Wait",
+      "name": "seconds_wait"
+    },
+    {
+      "event_type": "Wait",
+      "name": "minutes_wait"
+    }
+  ]
+}

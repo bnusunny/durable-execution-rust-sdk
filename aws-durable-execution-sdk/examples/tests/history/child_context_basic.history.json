@@ -1,0 +1,19 @@
+{
+  "events": [
+    {
+      "event_type": "Execution"
+    },
+    {
+      "event_type": "Context",
+      "name": "sub_workflow"
+    },
+    {
+      "event_type": "Step",
+      "name": "child_step_1"
+    },
+    {
+      "event_type": "Step",
+      "name": "child_step_2"
+    }
+  ]
+}

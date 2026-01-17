@@ -1,0 +1,11 @@
+{
+  "events": [
+    {
+      "event_type": "Execution"
+    },
+    {
+      "event_type": "Step",
+      "name": "process_data"
+    }
+  ]
+}

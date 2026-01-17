@@ -1,0 +1,11 @@
+{
+  "events": [
+    {
+      "event_type": "Execution"
+    },
+    {
+      "event_type": "Invoke",
+      "name": "invoke:arn:aws:lambda:us-east-1:123456789012:function:child-function"
+    }
+  ]
+}

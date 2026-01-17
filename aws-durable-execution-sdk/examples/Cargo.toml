@@ -1,0 +1,194 @@
+[package]
+name = "aws-durable-execution-sdk-examples"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Examples for AWS Durable Execution SDK"
+publish = false
+
+[dependencies]
+# Core SDK dependency
+aws-durable-execution-sdk = { workspace = true, features = ["macros"] }
+
+# Testing utilities (for integration tests)
+aws-durable-execution-sdk-testing.workspace = true
+
+# Async runtime
+tokio.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Logging/tracing
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+# Lambda runtime
+lambda_runtime.workspace = true
+
+# AWS SDK (needed for examples)
+aws-config.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+tokio-test.workspace = true
+uuid.workspace = true
+
+# Hello World
+[[bin]]
+name = "hello_world"
+path = "src/bin/hello_world/hello_world.rs"
+
+# Step examples
+[[bin]]
+name = "step_basic"
+path = "src/bin/step/basic/step_basic.rs"
+
+[[bin]]
+name = "step_named"
+path = "src/bin/step/named/step_named.rs"
+
+[[bin]]
+name = "step_with_config"
+path = "src/bin/step/with_config/step_with_config.rs"
+
+# Wait examples
+[[bin]]
+name = "wait_basic"
+path = "src/bin/wait/basic/wait_basic.rs"
+
+[[bin]]
+name = "wait_named"
+path = "src/bin/wait/named/wait_named.rs"
+
+[[bin]]
+name = "wait_extended"
+path = "src/bin/wait/extended_duration/wait_extended.rs"
+
+# Callback examples
+[[bin]]
+name = "callback_simple"
+path = "src/bin/callback/simple/callback_simple.rs"
+
+[[bin]]
+name = "callback_timeout"
+path = "src/bin/callback/with_timeout/callback_timeout.rs"
+
+[[bin]]
+name = "callback_concurrent"
+path = "src/bin/callback/concurrent/callback_concurrent.rs"
+
+[[bin]]
+name = "wait_for_callback"
+path = "src/bin/callback/wait_for_callback/wait_for_callback.rs"
+
+# Map examples
+[[bin]]
+name = "map_basic"
+path = "src/bin/map/basic/map_basic.rs"
+
+[[bin]]
+name = "map_concurrency"
+path = "src/bin/map/with_concurrency/map_concurrency.rs"
+
+[[bin]]
+name = "map_failure_tolerance"
+path = "src/bin/map/failure_tolerance/map_failure_tolerance.rs"
+
+[[bin]]
+name = "map_min_successful"
+path = "src/bin/map/min_successful/map_min_successful.rs"
+
+# Parallel examples
+[[bin]]
+name = "parallel_basic"
+path = "src/bin/parallel/basic/parallel_basic.rs"
+
+[[bin]]
+name = "parallel_first_successful"
+path = "src/bin/parallel/first_successful/parallel_first_successful.rs"
+
+[[bin]]
+name = "parallel_heterogeneous"
+path = "src/bin/parallel/heterogeneous/parallel_heterogeneous.rs"
+
+# Child context examples
+[[bin]]
+name = "child_context_basic"
+path = "src/bin/child_context/basic/child_context_basic.rs"
+
+[[bin]]
+name = "child_context_nested"
+path = "src/bin/child_context/nested/child_context_nested.rs"
+
+# Comprehensive examples
+[[bin]]
+name = "order_workflow"
+path = "src/bin/comprehensive/order_workflow.rs"
+
+# Error handling examples
+[[bin]]
+name = "step_error"
+path = "src/bin/error_handling/step_error.rs"
+
+# Invoke examples
+[[bin]]
+name = "invoke_basic"
+path = "src/bin/invoke/basic/invoke_basic.rs"
+
+# Promise combinator examples
+[[bin]]
+name = "promise_all"
+path = "src/bin/promise_combinators/all/promise_all.rs"
+
+[[bin]]
+name = "promise_all_settled"
+path = "src/bin/promise_combinators/all_settled/promise_all_settled.rs"
+
+[[bin]]
+name = "promise_race"
+path = "src/bin/promise_combinators/race/promise_race.rs"
+
+[[bin]]
+name = "promise_any"
+path = "src/bin/promise_combinators/any/promise_any.rs"
+
+# Wait for condition examples
+[[bin]]
+name = "wait_for_condition_basic"
+path = "src/bin/wait_for_condition/basic/wait_for_condition_basic.rs"
+
+# Multiple waits example
+[[bin]]
+name = "multiple_waits"
+path = "src/bin/multiple_waits/multiple_waits.rs"
+
+# Replay-safe examples
+[[bin]]
+name = "uuid_generation"
+path = "src/bin/replay_safe/uuid_generation.rs"
+
+# Serialization examples
+[[bin]]
+name = "custom_serialization"
+path = "src/bin/serde/custom_serialization.rs"
+
+# Logging examples
+[[bin]]
+name = "custom_logger"
+path = "src/bin/logging/custom_logger.rs"
+
+# Original comprehensive examples
+[[bin]]
+name = "simple_workflow"
+path = "src/bin/simple_workflow.rs"
+
+[[bin]]
+name = "parallel_processing"
+path = "src/bin/parallel_processing.rs"
+
+[[bin]]
+name = "callback_workflow"
+path = "src/bin/callback_workflow.rs"

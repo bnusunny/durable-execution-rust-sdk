@@ -1,0 +1,15 @@
+{
+  "events": [
+    {
+      "event_type": "Execution"
+    },
+    {
+      "event_type": "Step",
+      "name": "charge_payment"
+    },
+    {
+      "event_type": "Step",
+      "name": "log_transaction"
+    }
+  ]
+}

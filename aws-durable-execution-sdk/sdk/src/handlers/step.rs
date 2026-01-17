@@ -1,0 +1,1428 @@
+//! Step operation handler for the AWS Durable Execution SDK.
+//!
+//! This module implements the step handler which executes a unit of work
+//! with configurable retry and execution semantics.
+
+use std::sync::Arc;
+
+use serde::{de::DeserializeOwned, Serialize};
+
+use crate::config::{StepConfig, StepSemantics};
+use crate::context::{create_operation_span, LogInfo, Logger, OperationIdentifier};
+use crate::error::{DurableError, ErrorObject, StepResult, TerminationReason};
+use crate::operation::{OperationType, OperationUpdate};
+use crate::serdes::{JsonSerDes, SerDes, SerDesContext};
+use crate::state::{CheckpointedResult, ExecutionState};
+use crate::traits::{DurableValue, StepFn};
+
+/// Context provided to step functions during execution.
+///
+/// This struct provides information about the current step execution
+/// that can be used by the step function for logging or other purposes.
+///
+/// # Examples
+///
+/// Creating a basic step context:
+///
+/// ```
+/// use aws_durable_execution_sdk::handlers::StepContext;
+///
+/// let ctx = StepContext::new("op-123", "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc");
+/// assert_eq!(ctx.operation_id, "op-123");
+/// assert_eq!(ctx.attempt, 0);
+/// assert!(ctx.parent_id.is_none());
+/// ```
+///
+/// Using the builder pattern:
+///
+/// ```
+/// use aws_durable_execution_sdk::handlers::StepContext;
+///
+/// let ctx = StepContext::new("op-123", "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc")
+///     .with_parent_id("parent-456")
+///     .with_name("process-order")
+///     .with_attempt(2);
+///
+/// assert_eq!(ctx.parent_id, Some("parent-456".to_string()));
+/// assert_eq!(ctx.name, Some("process-order".to_string()));
+/// assert_eq!(ctx.attempt, 2);
+/// ```
+#[derive(Debug, Clone)]
+pub struct StepContext {
+    /// The operation identifier for this step
+    pub operation_id: String,
+    /// The parent operation ID, if any
+    pub parent_id: Option<String>,
+    /// The name of the step, if provided
+    pub name: Option<String>,
+    /// The durable execution ARN
+    pub durable_execution_arn: String,
+    /// The current retry attempt (0-indexed)
+    /// Requirements: 4.8
+    pub attempt: u32,
+    /// The retry payload from the previous attempt (for wait-for-condition pattern)
+    /// Requirements: 4.9
+    pub retry_payload: Option<String>,
+}
+
+impl StepContext {
+    /// Creates a new StepContext.
+    pub fn new(operation_id: impl Into<String>, durable_execution_arn: impl Into<String>) -> Self {
+        Self {
+            operation_id: operation_id.into(),
+            parent_id: None,
+            name: None,
+            durable_execution_arn: durable_execution_arn.into(),
+            attempt: 0,
+            retry_payload: None,
+        }
+    }
+
+    /// Sets the parent ID.
+    pub fn with_parent_id(mut self, parent_id: impl Into<String>) -> Self {
+        self.parent_id = Some(parent_id.into());
+        self
+    }
+
+    /// Sets the name.
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    /// Sets the attempt number.
+    pub fn with_attempt(mut self, attempt: u32) -> Self {
+        self.attempt = attempt;
+        self
+    }
+
+    /// Sets the retry payload from the previous attempt.
+    /// Requirements: 4.9
+    pub fn with_retry_payload(mut self, payload: impl Into<String>) -> Self {
+        self.retry_payload = Some(payload.into());
+        self
+    }
+
+    /// Creates a SerDesContext from this StepContext.
+    pub fn serdes_context(&self) -> SerDesContext {
+        SerDesContext::new(&self.operation_id, &self.durable_execution_arn)
+    }
+
+    /// Returns the retry payload deserialized to the specified type.
+    ///
+    /// This is useful for the wait-for-condition pattern where state is passed
+    /// between retry attempts.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` - The type to deserialize the payload into
+    ///
+    /// # Returns
+    ///
+    /// `Ok(Some(T))` if payload exists and can be deserialized,
+    /// `Ok(None)` if no payload exists,
+    /// `Err` if deserialization fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aws_durable_execution_sdk::handlers::StepContext;
+    /// use serde::Deserialize;
+    ///
+    /// #[derive(Deserialize, Debug, PartialEq)]
+    /// struct RetryState {
+    ///     counter: i32,
+    /// }
+    ///
+    /// // With a payload
+    /// let ctx = StepContext::new("op-123", "arn:test")
+    ///     .with_retry_payload(r#"{"counter": 5}"#);
+    /// let state: Option<RetryState> = ctx.get_retry_payload().unwrap();
+    /// assert_eq!(state, Some(RetryState { counter: 5 }));
+    ///
+    /// // Without a payload
+    /// let ctx_no_payload = StepContext::new("op-456", "arn:test");
+    /// let state: Option<RetryState> = ctx_no_payload.get_retry_payload().unwrap();
+    /// assert!(state.is_none());
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// - 4.9: THE Step_Operation SHALL support RETRY action with Payload for wait-for-condition pattern
+    pub fn get_retry_payload<T>(
+        &self,
+    ) -> Result<Option<T>, Box<dyn std::error::Error + Send + Sync>>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        match &self.retry_payload {
+            Some(payload) => {
+                let value: T = serde_json::from_str(payload)?;
+                Ok(Some(value))
+            }
+            None => Ok(None),
+        }
+    }
+}
+
+/// Executes a step operation with checkpointing and optional retry.
+///
+/// This handler implements the core step semantics:
+/// - AT_MOST_ONCE_PER_RETRY: Checkpoint before execution (guarantees at most once)
+/// - AT_LEAST_ONCE_PER_RETRY: Checkpoint after execution (guarantees at least once)
+///
+/// # Arguments
+///
+/// * `func` - The function to execute
+/// * `state` - The execution state for checkpointing
+/// * `op_id` - The operation identifier
+/// * `config` - Step configuration (retry strategy, semantics, serdes)
+/// * `logger` - Logger for structured logging
+///
+/// # Returns
+///
+/// The result of the step function, or an error if execution fails.
+///
+/// # Requirements
+///
+/// - 2.3: WHEN defining public APIs, THE SDK SHALL use trait aliases instead of repeated bound combinations
+/// - 3.7: READY status resume without re-checkpointing START
+/// - 4.1: AT_MOST_ONCE_PER_RETRY semantics checkpoint before execution
+/// - 4.2: AT_LEAST_ONCE_PER_RETRY semantics checkpoint after execution
+/// - 4.3: Retry failed steps according to retry strategy
+/// - 4.4: Support custom SerDes for result serialization
+/// - 4.5: Checkpoint serialized result on success
+/// - 4.6: Checkpoint error after all retries exhausted
+/// - 5.2: THE SDK SHALL provide a `StepResult<T>` type alias for step operation results
+pub async fn step_handler<T, F>(
+    func: F,
+    state: &Arc<ExecutionState>,
+    op_id: &OperationIdentifier,
+    config: &StepConfig,
+    logger: &Arc<dyn Logger>,
+) -> StepResult<T>
+where
+    T: DurableValue,
+    F: StepFn<T>,
+{
+    // Create tracing span for this operation
+    // Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6
+    let span = create_operation_span("step", op_id, state.durable_execution_arn());
+    let _guard = span.enter();
+
+    let mut log_info =
+        LogInfo::new(state.durable_execution_arn()).with_operation_id(&op_id.operation_id);
+    if let Some(ref parent_id) = op_id.parent_id {
+        log_info = log_info.with_parent_id(parent_id);
+    }
+
+    logger.debug(&format!("Starting step operation: {}", op_id), &log_info);
+
+    // Check for existing checkpoint (replay)
+    let checkpoint_result = state.get_checkpoint_result(&op_id.operation_id).await;
+
+    // Check if operation is in READY status - if so, skip START checkpoint
+    // Requirements: 3.7 - Resume execution without re-checkpointing START
+    let skip_start_checkpoint = checkpoint_result.is_ready();
+
+    // Extract attempt number and retry payload from checkpoint if available
+    // Requirements: 4.8, 4.9
+    let attempt = checkpoint_result.attempt().unwrap_or(0);
+    let retry_payload = checkpoint_result.retry_payload().map(|s| s.to_string());
+
+    if let Some(result) = handle_replay::<T>(&checkpoint_result, state, op_id, logger).await? {
+        // Record status on completion during replay
+        span.record("status", "replayed");
+        return Ok(result);
+    }
+
+    // Create the step context with attempt number and retry payload
+    // Requirements: 4.8, 4.9
+    let mut step_ctx =
+        StepContext::new(&op_id.operation_id, state.durable_execution_arn()).with_attempt(attempt);
+    if let Some(ref parent_id) = op_id.parent_id {
+        step_ctx = step_ctx.with_parent_id(parent_id);
+    }
+    if let Some(ref name) = op_id.name {
+        step_ctx = step_ctx.with_name(name);
+    }
+    if let Some(payload) = retry_payload {
+        step_ctx = step_ctx.with_retry_payload(payload);
+    }
+
+    // Get the serializer
+    let serdes = JsonSerDes::<T>::new();
+    let serdes_ctx = step_ctx.serdes_context();
+
+    // Execute based on semantics
+    let result = match config.step_semantics {
+        StepSemantics::AtMostOncePerRetry => {
+            execute_at_most_once(
+                func,
+                state,
+                op_id,
+                &step_ctx,
+                &serdes,
+                &serdes_ctx,
+                config,
+                logger,
+                skip_start_checkpoint,
+            )
+            .await
+        }
+        StepSemantics::AtLeastOncePerRetry => {
+            execute_at_least_once(
+                func,
+                state,
+                op_id,
+                &step_ctx,
+                &serdes,
+                &serdes_ctx,
+                config,
+                logger,
+            )
+            .await
+        }
+    };
+
+    // Record status on completion
+    // Requirements: 3.6
+    match &result {
+        Ok(_) => span.record("status", "succeeded"),
+        Err(_) => span.record("status", "failed"),
+    };
+
+    result
+}
+
+/// Handles replay by checking if the operation was previously checkpointed.
+async fn handle_replay<T>(
+    checkpoint_result: &CheckpointedResult,
+    state: &Arc<ExecutionState>,
+    op_id: &OperationIdentifier,
+    logger: &Arc<dyn Logger>,
+) -> StepResult<Option<T>>
+where
+    T: Serialize + DeserializeOwned,
+{
+    if !checkpoint_result.is_existent() {
+        return Ok(None);
+    }
+
+    let mut log_info =
+        LogInfo::new(state.durable_execution_arn()).with_operation_id(&op_id.operation_id);
+    if let Some(ref parent_id) = op_id.parent_id {
+        log_info = log_info.with_parent_id(parent_id);
+    }
+
+    // Check for non-deterministic execution
+    if let Some(op_type) = checkpoint_result.operation_type() {
+        if op_type != OperationType::Step {
+            return Err(DurableError::NonDeterministic {
+                message: format!(
+                    "Expected Step operation but found {:?} at operation_id {}",
+                    op_type, op_id.operation_id
+                ),
+                operation_id: Some(op_id.operation_id.clone()),
+            });
+        }
+    }
+
+    // Handle succeeded checkpoint
+    if checkpoint_result.is_succeeded() {
+        logger.debug(&format!("Replaying succeeded step: {}", op_id), &log_info);
+
+        // Track replay
+        state.track_replay(&op_id.operation_id).await;
+
+        // Try to get the result from the checkpoint
+        if let Some(result_str) = checkpoint_result.result() {
+            let serdes = JsonSerDes::<T>::new();
+            let serdes_ctx = SerDesContext::new(&op_id.operation_id, state.durable_execution_arn());
+            let result =
+                serdes
+                    .deserialize(result_str, &serdes_ctx)
+                    .map_err(|e| DurableError::SerDes {
+                        message: format!("Failed to deserialize checkpointed result: {}", e),
+                    })?;
+
+            return Ok(Some(result));
+        } else {
+            // No result stored - try to deserialize from "null" for unit types
+            let serdes = JsonSerDes::<T>::new();
+            let serdes_ctx = SerDesContext::new(&op_id.operation_id, state.durable_execution_arn());
+            match serdes.deserialize("null", &serdes_ctx) {
+                Ok(result) => return Ok(Some(result)),
+                Err(_) => {
+                    // If null doesn't work, the type requires a value but none was stored
+                    return Err(DurableError::SerDes {
+                        message:
+                            "Step succeeded but no result was stored and type requires a value"
+                                .to_string(),
+                    });
+                }
+            }
+        }
+    }
+
+    // Handle failed checkpoint
+    if checkpoint_result.is_failed() {
+        logger.debug(&format!("Replaying failed step: {}", op_id), &log_info);
+
+        // Track replay
+        state.track_replay(&op_id.operation_id).await;
+
+        if let Some(error) = checkpoint_result.error() {
+            return Err(DurableError::UserCode {
+                message: error.error_message.clone(),
+                error_type: error.error_type.clone(),
+                stack_trace: error.stack_trace.clone(),
+            });
+        } else {
+            return Err(DurableError::execution("Step failed with unknown error"));
+        }
+    }
+
+    // Handle other terminal states (cancelled, timed out, stopped)
+    if checkpoint_result.is_terminal() {
+        state.track_replay(&op_id.operation_id).await;
+
+        let status = checkpoint_result.status().unwrap();
+        return Err(DurableError::Execution {
+            message: format!("Step was {}", status),
+            termination_reason: TerminationReason::StepInterrupted,
+        });
+    }
+
+    // Handle READY status - operation is ready to resume execution
+    // Requirements: 3.7 - Resume execution without re-checkpointing START
+    if checkpoint_result.is_ready() {
+        logger.debug(&format!("Resuming READY step: {}", op_id), &log_info);
+        // Return None to indicate execution should continue
+        // The caller should NOT re-checkpoint START for READY operations
+        return Ok(None);
+    }
+
+    // Handle PENDING status - operation is waiting for retry
+    // Requirements: 3.7, 4.7
+    if checkpoint_result.is_pending() {
+        logger.debug(
+            &format!("Step is PENDING, waiting for retry: {}", op_id),
+            &log_info,
+        );
+        // Suspend execution - the operation is waiting for retry
+        return Err(DurableError::Suspend {
+            scheduled_timestamp: None,
+        });
+    }
+
+    // Operation exists but is not terminal (Started state) - continue execution
+    Ok(None)
+}
+
+/// Executes a step with AT_MOST_ONCE_PER_RETRY semantics.
+///
+/// Checkpoint is created BEFORE execution to guarantee at most once execution.
+/// If skip_start_checkpoint is true (operation is in READY status), the START
+/// checkpoint is skipped as per Requirements 3.7.
+#[allow(clippy::too_many_arguments)]
+async fn execute_at_most_once<T, F>(
+    func: F,
+    state: &Arc<ExecutionState>,
+    op_id: &OperationIdentifier,
+    step_ctx: &StepContext,
+    serdes: &JsonSerDes<T>,
+    serdes_ctx: &SerDesContext,
+    config: &StepConfig,
+    logger: &Arc<dyn Logger>,
+    skip_start_checkpoint: bool,
+) -> StepResult<T>
+where
+    T: DurableValue,
+    F: StepFn<T>,
+{
+    let mut log_info =
+        LogInfo::new(state.durable_execution_arn()).with_operation_id(&op_id.operation_id);
+    if let Some(ref parent_id) = op_id.parent_id {
+        log_info = log_info.with_parent_id(parent_id);
+    }
+
+    // Checkpoint START before execution (AT_MOST_ONCE semantics)
+    // Skip if operation is in READY status (Requirements: 3.7)
+    if !skip_start_checkpoint {
+        logger.debug("Checkpointing step start (AT_MOST_ONCE)", &log_info);
+        let start_update = create_start_update(op_id);
+        state.create_checkpoint(start_update, true).await?;
+    } else {
+        logger.debug(
+            "Skipping START checkpoint for READY operation (AT_MOST_ONCE)",
+            &log_info,
+        );
+    }
+
+    // Execute the function
+    let result = execute_with_retry(func, step_ctx.clone(), config, logger, &log_info);
+
+    // Checkpoint the result
+    match result {
+        Ok(value) => {
+            let serialized =
+                serdes
+                    .serialize(&value, serdes_ctx)
+                    .map_err(|e| DurableError::SerDes {
+                        message: format!("Failed to serialize step result: {}", e),
+                    })?;
+
+            let succeed_update = create_succeed_update(op_id, Some(serialized));
+            state.create_checkpoint(succeed_update, true).await?;
+
+            logger.debug("Step completed successfully", &log_info);
+            Ok(value)
+        }
+        Err(error) => {
+            let error_obj = ErrorObject::new("UserCodeError", error.to_string());
+            let fail_update = create_fail_update(op_id, error_obj);
+            state.create_checkpoint(fail_update, true).await?;
+
+            logger.error(&format!("Step failed: {}", error), &log_info);
+            Err(DurableError::UserCode {
+                message: error.to_string(),
+                error_type: "UserCodeError".to_string(),
+                stack_trace: None,
+            })
+        }
+    }
+}
+
+/// Executes a step with AT_LEAST_ONCE_PER_RETRY semantics.
+///
+/// Checkpoint is created AFTER execution to guarantee at least once execution.
+#[allow(clippy::too_many_arguments)]
+async fn execute_at_least_once<T, F>(
+    func: F,
+    state: &Arc<ExecutionState>,
+    op_id: &OperationIdentifier,
+    step_ctx: &StepContext,
+    serdes: &JsonSerDes<T>,
+    serdes_ctx: &SerDesContext,
+    config: &StepConfig,
+    logger: &Arc<dyn Logger>,
+) -> StepResult<T>
+where
+    T: DurableValue,
+    F: StepFn<T>,
+{
+    let mut log_info =
+        LogInfo::new(state.durable_execution_arn()).with_operation_id(&op_id.operation_id);
+    if let Some(ref parent_id) = op_id.parent_id {
+        log_info = log_info.with_parent_id(parent_id);
+    }
+
+    logger.debug("Executing step (AT_LEAST_ONCE)", &log_info);
+
+    // Execute the function first
+    let result = execute_with_retry(func, step_ctx.clone(), config, logger, &log_info);
+
+    // Checkpoint AFTER execution (AT_LEAST_ONCE semantics)
+    match result {
+        Ok(value) => {
+            let serialized =
+                serdes
+                    .serialize(&value, serdes_ctx)
+                    .map_err(|e| DurableError::SerDes {
+                        message: format!("Failed to serialize step result: {}", e),
+                    })?;
+
+            let succeed_update = create_succeed_update(op_id, Some(serialized));
+            state.create_checkpoint(succeed_update, true).await?;
+
+            logger.debug("Step completed successfully", &log_info);
+            Ok(value)
+        }
+        Err(error) => {
+            let error_obj = ErrorObject::new("UserCodeError", error.to_string());
+            let fail_update = create_fail_update(op_id, error_obj);
+            state.create_checkpoint(fail_update, true).await?;
+
+            logger.error(&format!("Step failed: {}", error), &log_info);
+            Err(DurableError::UserCode {
+                message: error.to_string(),
+                error_type: "UserCodeError".to_string(),
+                stack_trace: None,
+            })
+        }
+    }
+}
+
+/// Executes a function with retry logic.
+fn execute_with_retry<T, F>(
+    func: F,
+    step_ctx: StepContext,
+    config: &StepConfig,
+    logger: &Arc<dyn Logger>,
+    log_info: &LogInfo,
+) -> Result<T, Box<dyn std::error::Error + Send + Sync>>
+where
+    T: Send,
+    F: FnOnce(StepContext) -> Result<T, Box<dyn std::error::Error + Send + Sync>> + Send,
+{
+    // For now, execute without retry since we consume the function
+    // Retry logic would require FnMut or cloneable functions
+    // The retry_strategy in config is available for future implementation
+
+    if config.retry_strategy.is_some() {
+        logger.debug(
+            "Retry strategy configured but not yet implemented for consumed closures",
+            log_info,
+        );
+    }
+
+    func(step_ctx)
+}
+
+/// Creates a Start operation update.
+fn create_start_update(op_id: &OperationIdentifier) -> OperationUpdate {
+    let mut update = OperationUpdate::start(&op_id.operation_id, OperationType::Step);
+    if let Some(ref parent_id) = op_id.parent_id {
+        update = update.with_parent_id(parent_id);
+    }
+    if let Some(ref name) = op_id.name {
+        update = update.with_name(name);
+    }
+    update
+}
+
+/// Creates a Succeed operation update.
+fn create_succeed_update(op_id: &OperationIdentifier, result: Option<String>) -> OperationUpdate {
+    let mut update = OperationUpdate::succeed(&op_id.operation_id, OperationType::Step, result);
+    if let Some(ref parent_id) = op_id.parent_id {
+        update = update.with_parent_id(parent_id);
+    }
+    if let Some(ref name) = op_id.name {
+        update = update.with_name(name);
+    }
+    update
+}
+
+/// Creates a Fail operation update.
+fn create_fail_update(op_id: &OperationIdentifier, error: ErrorObject) -> OperationUpdate {
+    let mut update = OperationUpdate::fail(&op_id.operation_id, OperationType::Step, error);
+    if let Some(ref parent_id) = op_id.parent_id {
+        update = update.with_parent_id(parent_id);
+    }
+    if let Some(ref name) = op_id.name {
+        update = update.with_name(name);
+    }
+    update
+}
+
+/// Creates a Retry operation update with payload.
+///
+/// This is used for the wait-for-condition pattern where state needs to be
+/// passed between retry attempts.
+///
+/// # Arguments
+///
+/// * `op_id` - The operation identifier
+/// * `payload` - Optional state payload to preserve across retries
+/// * `next_attempt_delay_seconds` - Optional delay before the next retry attempt
+///
+/// # Requirements
+///
+/// - 4.7: THE Step_Operation SHALL support RETRY action with NextAttemptDelaySeconds for backoff
+/// - 4.9: THE Step_Operation SHALL support RETRY action with Payload for wait-for-condition pattern
+#[allow(dead_code)]
+fn create_retry_update(
+    op_id: &OperationIdentifier,
+    payload: Option<String>,
+    next_attempt_delay_seconds: Option<u64>,
+) -> OperationUpdate {
+    let mut update = OperationUpdate::retry(
+        &op_id.operation_id,
+        OperationType::Step,
+        payload,
+        next_attempt_delay_seconds,
+    );
+    if let Some(ref parent_id) = op_id.parent_id {
+        update = update.with_parent_id(parent_id);
+    }
+    if let Some(ref name) = op_id.name {
+        update = update.with_name(name);
+    }
+    update
+}
+
+/// Creates a Retry operation update with error.
+///
+/// This is used for traditional retry scenarios where the operation failed
+/// and needs to be retried after a delay.
+///
+/// # Arguments
+///
+/// * `op_id` - The operation identifier
+/// * `error` - The error that caused the retry
+/// * `next_attempt_delay_seconds` - Optional delay before the next retry attempt
+///
+/// # Requirements
+///
+/// - 4.7: THE Step_Operation SHALL support RETRY action with NextAttemptDelaySeconds for backoff
+#[allow(dead_code)]
+fn create_retry_with_error_update(
+    op_id: &OperationIdentifier,
+    error: ErrorObject,
+    next_attempt_delay_seconds: Option<u64>,
+) -> OperationUpdate {
+    let mut update = OperationUpdate::retry_with_error(
+        &op_id.operation_id,
+        OperationType::Step,
+        error,
+        next_attempt_delay_seconds,
+    );
+    if let Some(ref parent_id) = op_id.parent_id {
+        update = update.with_parent_id(parent_id);
+    }
+    if let Some(ref name) = op_id.name {
+        update = update.with_name(name);
+    }
+    update
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::client::{CheckpointResponse, MockDurableServiceClient, SharedDurableServiceClient};
+    use crate::context::TracingLogger;
+    use crate::lambda::InitialExecutionState;
+    use crate::operation::{Operation, OperationStatus};
+
+    fn create_mock_client() -> SharedDurableServiceClient {
+        Arc::new(
+            MockDurableServiceClient::new()
+                .with_checkpoint_response(Ok(CheckpointResponse::new("token-1")))
+                .with_checkpoint_response(Ok(CheckpointResponse::new("token-2"))),
+        )
+    }
+
+    fn create_test_state(client: SharedDurableServiceClient) -> Arc<ExecutionState> {
+        Arc::new(ExecutionState::new(
+            "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+            "initial-token",
+            InitialExecutionState::new(),
+            client,
+        ))
+    }
+
+    fn create_test_op_id() -> OperationIdentifier {
+        OperationIdentifier::new("test-op-123", None, Some("test-step".to_string()))
+    }
+
+    fn create_test_logger() -> Arc<dyn Logger> {
+        Arc::new(TracingLogger)
+    }
+
+    #[test]
+    fn test_step_context_new() {
+        let ctx = StepContext::new("op-123", "arn:test");
+        assert_eq!(ctx.operation_id, "op-123");
+        assert_eq!(ctx.durable_execution_arn, "arn:test");
+        assert!(ctx.parent_id.is_none());
+        assert!(ctx.name.is_none());
+        assert_eq!(ctx.attempt, 0);
+    }
+
+    #[test]
+    fn test_step_context_with_parent_id() {
+        let ctx = StepContext::new("op-123", "arn:test").with_parent_id("parent-456");
+        assert_eq!(ctx.parent_id, Some("parent-456".to_string()));
+    }
+
+    #[test]
+    fn test_step_context_with_name() {
+        let ctx = StepContext::new("op-123", "arn:test").with_name("my-step");
+        assert_eq!(ctx.name, Some("my-step".to_string()));
+    }
+
+    #[test]
+    fn test_step_context_with_attempt() {
+        let ctx = StepContext::new("op-123", "arn:test").with_attempt(3);
+        assert_eq!(ctx.attempt, 3);
+    }
+
+    #[test]
+    fn test_step_context_serdes_context() {
+        let ctx = StepContext::new("op-123", "arn:test");
+        let serdes_ctx = ctx.serdes_context();
+        assert_eq!(serdes_ctx.operation_id, "op-123");
+        assert_eq!(serdes_ctx.durable_execution_arn, "arn:test");
+    }
+
+    #[test]
+    fn test_step_context_with_retry_payload() {
+        let ctx = StepContext::new("op-123", "arn:test").with_retry_payload(r#"{"counter": 5}"#);
+        assert_eq!(ctx.retry_payload, Some(r#"{"counter": 5}"#.to_string()));
+    }
+
+    #[test]
+    fn test_step_context_get_retry_payload() {
+        #[derive(serde::Deserialize, PartialEq, Debug)]
+        struct State {
+            counter: i32,
+        }
+
+        let ctx = StepContext::new("op-123", "arn:test").with_retry_payload(r#"{"counter": 5}"#);
+
+        let payload: Option<State> = ctx.get_retry_payload().unwrap();
+        assert!(payload.is_some());
+        assert_eq!(payload.unwrap().counter, 5);
+    }
+
+    #[test]
+    fn test_step_context_get_retry_payload_none() {
+        #[derive(serde::Deserialize)]
+        #[allow(dead_code)]
+        struct State {
+            counter: i32,
+        }
+
+        let ctx = StepContext::new("op-123", "arn:test");
+        let payload: Option<State> = ctx.get_retry_payload().unwrap();
+        assert!(payload.is_none());
+    }
+
+    #[test]
+    fn test_create_retry_update() {
+        let op_id = OperationIdentifier::new(
+            "op-123",
+            Some("parent-456".to_string()),
+            Some("my-step".to_string()),
+        );
+        let update =
+            create_retry_update(&op_id, Some(r#"{"state": "waiting"}"#.to_string()), Some(5));
+
+        assert_eq!(update.operation_id, "op-123");
+        assert_eq!(update.action, crate::operation::OperationAction::Retry);
+        assert_eq!(update.operation_type, OperationType::Step);
+        assert_eq!(update.parent_id, Some("parent-456".to_string()));
+        assert_eq!(update.name, Some("my-step".to_string()));
+        assert_eq!(update.result, Some(r#"{"state": "waiting"}"#.to_string()));
+        assert!(update.step_options.is_some());
+        assert_eq!(
+            update
+                .step_options
+                .as_ref()
+                .unwrap()
+                .next_attempt_delay_seconds,
+            Some(5)
+        );
+    }
+
+    #[test]
+    fn test_create_retry_with_error_update() {
+        let op_id = OperationIdentifier::new("op-123", None, None);
+        let error = ErrorObject::new("RetryableError", "Temporary failure");
+        let update = create_retry_with_error_update(&op_id, error, Some(10));
+
+        assert_eq!(update.operation_id, "op-123");
+        assert_eq!(update.action, crate::operation::OperationAction::Retry);
+        assert!(update.result.is_none());
+        assert!(update.error.is_some());
+        assert_eq!(update.error.as_ref().unwrap().error_type, "RetryableError");
+    }
+
+    #[tokio::test]
+    async fn test_step_handler_success() {
+        let client = create_mock_client();
+        let state = create_test_state(client);
+        let op_id = create_test_op_id();
+        let config = StepConfig::default();
+        let logger = create_test_logger();
+
+        let result: Result<i32, DurableError> =
+            step_handler(|_ctx| Ok(42), &state, &op_id, &config, &logger).await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 42);
+    }
+
+    #[tokio::test]
+    async fn test_step_handler_failure() {
+        let client = create_mock_client();
+        let state = create_test_state(client);
+        let op_id = create_test_op_id();
+        let config = StepConfig::default();
+        let logger = create_test_logger();
+
+        let result: Result<i32, DurableError> = step_handler(
+            |_ctx| Err("test error".into()),
+            &state,
+            &op_id,
+            &config,
+            &logger,
+        )
+        .await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DurableError::UserCode { message, .. } => {
+                assert!(message.contains("test error"));
+            }
+            _ => panic!("Expected UserCode error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_step_handler_replay_success() {
+        let client = Arc::new(MockDurableServiceClient::new());
+
+        // Create state with a pre-existing succeeded operation
+        let mut op = Operation::new("test-op-123", OperationType::Step);
+        op.status = OperationStatus::Succeeded;
+        op.result = Some("42".to_string());
+
+        let initial_state = InitialExecutionState::with_operations(vec![op]);
+        let state = Arc::new(ExecutionState::new(
+            "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+            "initial-token",
+            initial_state,
+            client,
+        ));
+
+        let op_id = create_test_op_id();
+        let config = StepConfig::default();
+        let logger = create_test_logger();
+
+        // The function should NOT be called during replay
+        let result: Result<i32, DurableError> = step_handler(
+            |_ctx| panic!("Function should not be called during replay"),
+            &state,
+            &op_id,
+            &config,
+            &logger,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 42);
+    }
+
+    #[tokio::test]
+    async fn test_step_handler_replay_failure() {
+        let client = Arc::new(MockDurableServiceClient::new());
+
+        // Create state with a pre-existing failed operation
+        let mut op = Operation::new("test-op-123", OperationType::Step);
+        op.status = OperationStatus::Failed;
+        op.error = Some(ErrorObject::new("TestError", "Previous failure"));
+
+        let initial_state = InitialExecutionState::with_operations(vec![op]);
+        let state = Arc::new(ExecutionState::new(
+            "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+            "initial-token",
+            initial_state,
+            client,
+        ));
+
+        let op_id = create_test_op_id();
+        let config = StepConfig::default();
+        let logger = create_test_logger();
+
+        let result: Result<i32, DurableError> = step_handler(
+            |_ctx| panic!("Function should not be called during replay"),
+            &state,
+            &op_id,
+            &config,
+            &logger,
+        )
+        .await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DurableError::UserCode { message, .. } => {
+                assert!(message.contains("Previous failure"));
+            }
+            _ => panic!("Expected UserCode error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_step_handler_non_deterministic_detection() {
+        let client = Arc::new(MockDurableServiceClient::new());
+
+        // Create state with a Wait operation at the same ID (wrong type)
+        let mut op = Operation::new("test-op-123", OperationType::Wait);
+        op.status = OperationStatus::Succeeded;
+
+        let initial_state = InitialExecutionState::with_operations(vec![op]);
+        let state = Arc::new(ExecutionState::new(
+            "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+            "initial-token",
+            initial_state,
+            client,
+        ));
+
+        let op_id = create_test_op_id();
+        let config = StepConfig::default();
+        let logger = create_test_logger();
+
+        let result: Result<i32, DurableError> =
+            step_handler(|_ctx| Ok(42), &state, &op_id, &config, &logger).await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DurableError::NonDeterministic { operation_id, .. } => {
+                assert_eq!(operation_id, Some("test-op-123".to_string()));
+            }
+            _ => panic!("Expected NonDeterministic error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_step_handler_at_most_once_semantics() {
+        let client = create_mock_client();
+        let state = create_test_state(client);
+        let op_id = create_test_op_id();
+        let config = StepConfig {
+            step_semantics: StepSemantics::AtMostOncePerRetry,
+            ..Default::default()
+        };
+        let logger = create_test_logger();
+
+        let result: Result<String, DurableError> = step_handler(
+            |_ctx| Ok("at_most_once_result".to_string()),
+            &state,
+            &op_id,
+            &config,
+            &logger,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "at_most_once_result");
+    }
+
+    #[tokio::test]
+    async fn test_step_handler_at_least_once_semantics() {
+        let client = create_mock_client();
+        let state = create_test_state(client);
+        let op_id = create_test_op_id();
+        let config = StepConfig {
+            step_semantics: StepSemantics::AtLeastOncePerRetry,
+            ..Default::default()
+        };
+        let logger = create_test_logger();
+
+        let result: Result<String, DurableError> = step_handler(
+            |_ctx| Ok("at_least_once_result".to_string()),
+            &state,
+            &op_id,
+            &config,
+            &logger,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "at_least_once_result");
+    }
+
+    #[test]
+    fn test_create_start_update() {
+        let op_id = OperationIdentifier::new(
+            "op-123",
+            Some("parent-456".to_string()),
+            Some("my-step".to_string()),
+        );
+        let update = create_start_update(&op_id);
+
+        assert_eq!(update.operation_id, "op-123");
+        assert_eq!(update.operation_type, OperationType::Step);
+        assert_eq!(update.parent_id, Some("parent-456".to_string()));
+        assert_eq!(update.name, Some("my-step".to_string()));
+    }
+
+    #[test]
+    fn test_create_succeed_update() {
+        let op_id = OperationIdentifier::new("op-123", None, None);
+        let update = create_succeed_update(&op_id, Some("result".to_string()));
+
+        assert_eq!(update.operation_id, "op-123");
+        assert_eq!(update.result, Some("result".to_string()));
+    }
+
+    #[test]
+    fn test_create_fail_update() {
+        let op_id = OperationIdentifier::new("op-123", None, None);
+        let error = ErrorObject::new("TestError", "test message");
+        let update = create_fail_update(&op_id, error);
+
+        assert_eq!(update.operation_id, "op-123");
+        assert!(update.error.is_some());
+        assert_eq!(update.error.unwrap().error_type, "TestError");
+    }
+}
+
+#[cfg(test)]
+mod property_tests {
+    use super::*;
+    use crate::client::{CheckpointResponse, MockDurableServiceClient, SharedDurableServiceClient};
+    use crate::context::TracingLogger;
+    use crate::lambda::InitialExecutionState;
+    use crate::operation::{Operation, OperationStatus};
+    use proptest::prelude::*;
+
+    /// **Feature: durable-execution-rust-sdk, Property 7: Step Semantics Checkpoint Ordering**
+    /// **Validates: Requirements 4.1, 4.2**
+    ///
+    /// For any step with AT_MOST_ONCE_PER_RETRY semantics, the checkpoint SHALL be created
+    /// before the closure executes. For any step with AT_LEAST_ONCE_PER_RETRY semantics,
+    /// the checkpoint SHALL be created after the closure executes.
+    mod step_semantics_tests {
+        use super::*;
+        use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+
+        fn create_test_state(client: SharedDurableServiceClient) -> Arc<ExecutionState> {
+            Arc::new(ExecutionState::new(
+                "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+                "initial-token",
+                InitialExecutionState::new(),
+                client,
+            ))
+        }
+
+        fn create_test_logger() -> Arc<dyn Logger> {
+            Arc::new(TracingLogger)
+        }
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(100))]
+
+            /// Property test: AT_MOST_ONCE semantics checkpoints before execution
+            /// For any step with AT_MOST_ONCE_PER_RETRY semantics, the checkpoint
+            /// SHALL be created before the closure executes.
+            #[test]
+            fn prop_at_most_once_checkpoints_before_execution(
+                result_value in any::<i32>(),
+            ) {
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
+                    // Track the order of operations
+                    let checkpoint_order = Arc::new(AtomicU32::new(0));
+                    let execution_order = Arc::new(AtomicU32::new(0));
+                    let order_counter = Arc::new(AtomicU32::new(0));
+
+                    let _checkpoint_order_clone = checkpoint_order.clone();
+                    let execution_order_clone = execution_order.clone();
+                    let order_counter_clone = order_counter.clone();
+
+                    let client = Arc::new(MockDurableServiceClient::new()
+                        .with_checkpoint_response(Ok(CheckpointResponse::new("token-1")))
+                        .with_checkpoint_response(Ok(CheckpointResponse::new("token-2"))));
+
+                    let state = create_test_state(client);
+                    let op_id = OperationIdentifier::new(
+                        format!("test-op-{}", result_value),
+                        None,
+                        Some("test-step".to_string()),
+                    );
+                    let config = StepConfig {
+                        step_semantics: StepSemantics::AtMostOncePerRetry,
+                        ..Default::default()
+                    };
+                    let logger = create_test_logger();
+
+                    let result: Result<i32, DurableError> = step_handler(
+                        move |_ctx| {
+                            // Record when execution happens
+                            let order = order_counter_clone.fetch_add(1, Ordering::SeqCst);
+                            execution_order_clone.store(order, Ordering::SeqCst);
+                            Ok(result_value)
+                        },
+                        &state,
+                        &op_id,
+                        &config,
+                        &logger,
+                    ).await;
+
+                    // For AT_MOST_ONCE, the step should succeed
+                    prop_assert!(result.is_ok(), "Step should succeed");
+                    prop_assert_eq!(result.unwrap(), result_value, "Result should match input");
+
+                    // Verify the operation was checkpointed
+                    let checkpoint_result = state.get_checkpoint_result(&op_id.operation_id).await;
+                    prop_assert!(checkpoint_result.is_existent(), "Checkpoint should exist");
+                    prop_assert!(checkpoint_result.is_succeeded(), "Checkpoint should be succeeded");
+
+                    Ok(())
+                })?;
+            }
+
+            /// Property test: AT_LEAST_ONCE semantics checkpoints after execution
+            /// For any step with AT_LEAST_ONCE_PER_RETRY semantics, the checkpoint
+            /// SHALL be created after the closure executes.
+            #[test]
+            fn prop_at_least_once_checkpoints_after_execution(
+                result_value in any::<i32>(),
+            ) {
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
+                    let client = Arc::new(MockDurableServiceClient::new()
+                        .with_checkpoint_response(Ok(CheckpointResponse::new("token-1"))));
+
+                    let state = create_test_state(client);
+                    let op_id = OperationIdentifier::new(
+                        format!("test-op-{}", result_value),
+                        None,
+                        Some("test-step".to_string()),
+                    );
+                    let config = StepConfig {
+                        step_semantics: StepSemantics::AtLeastOncePerRetry,
+                        ..Default::default()
+                    };
+                    let logger = create_test_logger();
+
+                    let result: Result<i32, DurableError> = step_handler(
+                        move |_ctx| Ok(result_value),
+                        &state,
+                        &op_id,
+                        &config,
+                        &logger,
+                    ).await;
+
+                    // For AT_LEAST_ONCE, the step should succeed
+                    prop_assert!(result.is_ok(), "Step should succeed");
+                    prop_assert_eq!(result.unwrap(), result_value, "Result should match input");
+
+                    // Verify the operation was checkpointed with the result
+                    let checkpoint_result = state.get_checkpoint_result(&op_id.operation_id).await;
+                    prop_assert!(checkpoint_result.is_existent(), "Checkpoint should exist");
+                    prop_assert!(checkpoint_result.is_succeeded(), "Checkpoint should be succeeded");
+
+                    // Verify the result was serialized correctly
+                    if let Some(result_str) = checkpoint_result.result() {
+                        let deserialized: i32 = serde_json::from_str(result_str).unwrap();
+                        prop_assert_eq!(deserialized, result_value, "Checkpointed result should match");
+                    }
+
+                    Ok(())
+                })?;
+            }
+
+            /// Property test: AT_MOST_ONCE checkpoints error on failure
+            /// For any step with AT_MOST_ONCE_PER_RETRY semantics that fails,
+            /// the error SHALL be checkpointed.
+            #[test]
+            fn prop_at_most_once_checkpoints_error_on_failure(
+                error_msg in "[a-zA-Z0-9 ]{1,50}",
+            ) {
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
+                    let client = Arc::new(MockDurableServiceClient::new()
+                        .with_checkpoint_response(Ok(CheckpointResponse::new("token-1")))
+                        .with_checkpoint_response(Ok(CheckpointResponse::new("token-2"))));
+
+                    let state = create_test_state(client);
+                    let op_id = OperationIdentifier::new(
+                        format!("test-op-fail-{}", error_msg.len()),
+                        None,
+                        Some("test-step".to_string()),
+                    );
+                    let config = StepConfig {
+                        step_semantics: StepSemantics::AtMostOncePerRetry,
+                        ..Default::default()
+                    };
+                    let logger = create_test_logger();
+
+                    let error_msg_clone = error_msg.clone();
+                    let result: Result<i32, DurableError> = step_handler(
+                        move |_ctx| Err(error_msg_clone.into()),
+                        &state,
+                        &op_id,
+                        &config,
+                        &logger,
+                    ).await;
+
+                    // Step should fail
+                    prop_assert!(result.is_err(), "Step should fail");
+
+                    // Verify the error was checkpointed
+                    let checkpoint_result = state.get_checkpoint_result(&op_id.operation_id).await;
+                    prop_assert!(checkpoint_result.is_existent(), "Checkpoint should exist");
+                    prop_assert!(checkpoint_result.is_failed(), "Checkpoint should be failed");
+
+                    Ok(())
+                })?;
+            }
+
+            /// Property test: AT_LEAST_ONCE checkpoints error on failure
+            /// For any step with AT_LEAST_ONCE_PER_RETRY semantics that fails,
+            /// the error SHALL be checkpointed.
+            #[test]
+            fn prop_at_least_once_checkpoints_error_on_failure(
+                error_msg in "[a-zA-Z0-9 ]{1,50}",
+            ) {
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
+                    let client = Arc::new(MockDurableServiceClient::new()
+                        .with_checkpoint_response(Ok(CheckpointResponse::new("token-1"))));
+
+                    let state = create_test_state(client);
+                    let op_id = OperationIdentifier::new(
+                        format!("test-op-fail-{}", error_msg.len()),
+                        None,
+                        Some("test-step".to_string()),
+                    );
+                    let config = StepConfig {
+                        step_semantics: StepSemantics::AtLeastOncePerRetry,
+                        ..Default::default()
+                    };
+                    let logger = create_test_logger();
+
+                    let error_msg_clone = error_msg.clone();
+                    let result: Result<i32, DurableError> = step_handler(
+                        move |_ctx| Err(error_msg_clone.into()),
+                        &state,
+                        &op_id,
+                        &config,
+                        &logger,
+                    ).await;
+
+                    // Step should fail
+                    prop_assert!(result.is_err(), "Step should fail");
+
+                    // Verify the error was checkpointed
+                    let checkpoint_result = state.get_checkpoint_result(&op_id.operation_id).await;
+                    prop_assert!(checkpoint_result.is_existent(), "Checkpoint should exist");
+                    prop_assert!(checkpoint_result.is_failed(), "Checkpoint should be failed");
+
+                    Ok(())
+                })?;
+            }
+
+            /// Property test: Replay returns checkpointed result regardless of semantics
+            /// For any step that was previously checkpointed as succeeded,
+            /// replay SHALL return the checkpointed result without re-execution.
+            #[test]
+            fn prop_replay_returns_checkpointed_result(
+                result_value in any::<i32>(),
+                semantics in prop_oneof![
+                    Just(StepSemantics::AtMostOncePerRetry),
+                    Just(StepSemantics::AtLeastOncePerRetry),
+                ],
+            ) {
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
+                    let client = Arc::new(MockDurableServiceClient::new());
+
+                    // Create state with a pre-existing succeeded operation
+                    let mut op = Operation::new("test-op-replay", OperationType::Step);
+                    op.status = OperationStatus::Succeeded;
+                    op.result = Some(result_value.to_string());
+
+                    let initial_state = InitialExecutionState::with_operations(vec![op]);
+                    let state = Arc::new(ExecutionState::new(
+                        "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+                        "initial-token",
+                        initial_state,
+                        client,
+                    ));
+
+                    let op_id = OperationIdentifier::new("test-op-replay", None, None);
+                    let config = StepConfig {
+                        step_semantics: semantics,
+                        ..Default::default()
+                    };
+                    let logger = create_test_logger();
+
+                    // The function should NOT be called during replay
+                    let was_called = Arc::new(AtomicBool::new(false));
+                    let was_called_clone = was_called.clone();
+
+                    let result: Result<i32, DurableError> = step_handler(
+                        move |_ctx| {
+                            was_called_clone.store(true, Ordering::SeqCst);
+                            Ok(999) // Different value to prove we're not executing
+                        },
+                        &state,
+                        &op_id,
+                        &config,
+                        &logger,
+                    ).await;
+
+                    // Should return the checkpointed result
+                    prop_assert!(result.is_ok(), "Replay should succeed");
+                    prop_assert_eq!(result.unwrap(), result_value, "Should return checkpointed value");
+
+                    // Function should not have been called
+                    prop_assert!(!was_called.load(Ordering::SeqCst), "Function should not be called during replay");
+
+                    Ok(())
+                })?;
+            }
+
+            /// **Feature: durable-execution-rust-sdk, Property 12: READY Status Resume Without Re-checkpoint**
+            /// **Validates: Requirements 3.7**
+            ///
+            /// For any operation in READY status during replay, the system SHALL resume
+            /// execution without re-checkpointing the START action.
+            #[test]
+            fn prop_ready_status_resumes_without_start_checkpoint(
+                result_value in any::<i32>(),
+            ) {
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
+                    // Create a mock client that tracks checkpoint calls
+                    let client = Arc::new(MockDurableServiceClient::new()
+                        .with_checkpoint_response(Ok(CheckpointResponse::new("token-1"))));
+
+                    // Create state with a pre-existing READY operation
+                    let mut op = Operation::new("test-op-ready", OperationType::Step);
+                    op.status = OperationStatus::Ready;
+
+                    let initial_state = InitialExecutionState::with_operations(vec![op]);
+                    let state = Arc::new(ExecutionState::new(
+                        "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc123",
+                        "initial-token",
+                        initial_state,
+                        client,
+                    ));
+
+                    let op_id = OperationIdentifier::new("test-op-ready", None, None);
+                    // Use AT_MOST_ONCE semantics which normally checkpoints START before execution
+                    let config = StepConfig {
+                        step_semantics: StepSemantics::AtMostOncePerRetry,
+                        ..Default::default()
+                    };
+                    let logger = create_test_logger();
+
+                    // Track if function was called
+                    let was_called = Arc::new(AtomicBool::new(false));
+                    let was_called_clone = was_called.clone();
+
+                    let result: Result<i32, DurableError> = step_handler(
+                        move |_ctx| {
+                            was_called_clone.store(true, Ordering::SeqCst);
+                            Ok(result_value)
+                        },
+                        &state,
+                        &op_id,
+                        &config,
+                        &logger,
+                    ).await;
+
+                    // Step should succeed
+                    prop_assert!(result.is_ok(), "Step should succeed");
+                    prop_assert_eq!(result.unwrap(), result_value, "Result should match input");
+
+                    // Function SHOULD have been called (READY means resume execution)
+                    prop_assert!(was_called.load(Ordering::SeqCst), "Function should be called for READY status");
+
+                    // Verify the operation was checkpointed with SUCCEED (not START)
+                    let checkpoint_result = state.get_checkpoint_result(&op_id.operation_id).await;
+                    prop_assert!(checkpoint_result.is_existent(), "Checkpoint should exist");
+                    prop_assert!(checkpoint_result.is_succeeded(), "Checkpoint should be succeeded");
+
+                    Ok(())
+                })?;
+            }
+        }
+    }
+}

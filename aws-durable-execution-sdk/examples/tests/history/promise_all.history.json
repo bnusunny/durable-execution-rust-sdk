@@ -1,0 +1,20 @@
+{
+  "events": [
+    {
+      "event_type": "Execution"
+    },
+    {
+      "event_type": "Step",
+      "name": "all"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Step"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "events": [
+    {
+      "event_type": "Execution"
+    },
+    {
+      "event_type": "Callback",
+      "name": "credit_check"
+    },
+    {
+      "event_type": "Callback",
+      "name": "fraud_check"
+    }
+  ]
+}

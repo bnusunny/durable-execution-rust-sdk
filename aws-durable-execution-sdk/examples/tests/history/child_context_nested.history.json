@@ -1,0 +1,21 @@
+{
+  "events": [
+    {
+      "event_type": "Execution"
+    },
+    {
+      "event_type": "Context",
+      "name": "level_1"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Context",
+      "name": "level_2"
+    },
+    {
+      "event_type": "Step"
+    }
+  ]
+}

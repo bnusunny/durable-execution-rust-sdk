@@ -1,0 +1,151 @@
+{
+  "events": [
+    {
+      "event_type": "Execution"
+    },
+    {
+      "event_type": "Context",
+      "name": "map"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-0"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-1"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-2"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-3"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-4"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-5"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-6"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-7"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-8"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-9"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-10"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-11"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-12"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-13"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-14"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-15"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-16"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-17"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-18"
+    },
+    {
+      "event_type": "Context",
+      "name": "map-item-19"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Step"
+    },
+    {
+      "event_type": "Step"
+    }
+  ]
+}

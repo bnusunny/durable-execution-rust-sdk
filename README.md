@@ -1,5 +1,10 @@
 # AWS Durable Execution SDK for Rust
 
+[![CI](https://github.com/aws/aws-durable-execution-sdk-rust/actions/workflows/pr.yml/badge.svg)](https://github.com/aws/aws-durable-execution-sdk-rust/actions/workflows/pr.yml)
+[![Crates.io](https://img.shields.io/crates/v/aws-durable-execution-sdk.svg)](https://crates.io/crates/aws-durable-execution-sdk)
+[![Documentation](https://docs.rs/aws-durable-execution-sdk/badge.svg)](https://docs.rs/aws-durable-execution-sdk)
+[![License](https://img.shields.io/crates/l/aws-durable-execution-sdk.svg)](LICENSE)
+
 Build reliable, long-running workflows on AWS Lambda with automatic checkpointing and replay.
 
 ## Overview

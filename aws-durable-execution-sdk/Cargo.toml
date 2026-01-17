@@ -1,14 +1,19 @@
-[package]
-name = "aws-durable-execution-sdk"
-version = "0.1.0"
+[workspace]
+resolver = "2"
+members = [
+    "sdk",
+    "testing",
+    "examples",
+    "macros",
+]
+
+[workspace.package]
+version = "0.1.0-alpha1"
 edition = "2021"
-description = "AWS Durable Execution SDK for Lambda Rust Runtime"
 license = "Apache-2.0"
 repository = "https://github.com/aws/aws-durable-execution-sdk-rust"
-keywords = ["aws", "lambda", "durable", "workflow", "serverless"]
-categories = ["asynchronous", "web-programming"]
 
-[dependencies]
+[workspace.dependencies]
 # Async runtime
 tokio = { version = "1.0", features = ["full", "sync", "time", "rt-multi-thread"] }
 
@@ -47,217 +52,24 @@ blake2 = "0.10"
 hex = "0.4"
 
 # Date/time handling
-chrono = { version = "0.4", default-features = false, features = ["std"] }
+chrono = { version = "0.4", default-features = false, features = ["std", "serde"] }
 
 # Static assertions for compile-time checks
 static_assertions = "1.1"
 
-# Proc macro support (for the durable_execution attribute)
-aws-durable-execution-sdk-macros = { path = "./macros", optional = true }
+# Proc macro dependencies
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "2.0", features = ["full", "parsing"] }
 
-[dev-dependencies]
-# Property-based testing
+# Testing dependencies
 proptest = "1.0"
 tokio-test = "0.4"
 tracing-subscriber = "0.3"
-# Compile-fail testing
 trybuild = "1.0"
+uuid = { version = "1.0", features = ["v4"] }
 
-[features]
-default = ["macros"]
-macros = ["dep:aws-durable-execution-sdk-macros"]
-
-# Original comprehensive examples
-[[example]]
-name = "simple_workflow"
-path = "examples/simple_workflow.rs"
-required-features = ["macros"]
-
-[[example]]
-name = "parallel_processing"
-path = "examples/parallel_processing.rs"
-required-features = ["macros"]
-
-[[example]]
-name = "callback_workflow"
-path = "examples/callback_workflow.rs"
-required-features = ["macros"]
-
-# Hello World
-[[example]]
-name = "hello_world"
-path = "examples/hello_world/hello_world.rs"
-required-features = ["macros"]
-
-# Step examples
-[[example]]
-name = "step_basic"
-path = "examples/step/basic/step_basic.rs"
-required-features = ["macros"]
-
-[[example]]
-name = "step_named"
-path = "examples/step/named/step_named.rs"
-required-features = ["macros"]
-
-[[example]]
-name = "step_with_config"
-path = "examples/step/with_config/step_with_config.rs"
-required-features = ["macros"]
-
-# Wait examples
-[[example]]
-name = "wait_basic"
-path = "examples/wait/basic/wait_basic.rs"
-required-features = ["macros"]
-
-[[example]]
-name = "wait_named"
-path = "examples/wait/named/wait_named.rs"
-required-features = ["macros"]
-
-[[example]]
-name = "wait_extended"
-path = "examples/wait/extended_duration/wait_extended.rs"
-required-features = ["macros"]
-
-# Callback examples
-[[example]]
-name = "callback_simple"
-path = "examples/callback/simple/callback_simple.rs"
-required-features = ["macros"]
-
-[[example]]
-name = "callback_timeout"
-path = "examples/callback/with_timeout/callback_timeout.rs"
-required-features = ["macros"]
-
-[[example]]
-name = "callback_concurrent"
-path = "examples/callback/concurrent/callback_concurrent.rs"
-required-features = ["macros"]
-
-[[example]]
-name = "wait_for_callback"
-path = "examples/callback/wait_for_callback/wait_for_callback.rs"
-required-features = ["macros"]
-
-# Map examples
-[[example]]
-name = "map_basic"
-path = "examples/map/basic/map_basic.rs"
-required-features = ["macros"]
-
-[[example]]
-name = "map_concurrency"
-path = "examples/map/with_concurrency/map_concurrency.rs"
-required-features = ["macros"]
-
-[[example]]
-name = "map_failure_tolerance"
-path = "examples/map/failure_tolerance/map_failure_tolerance.rs"
-required-features = ["macros"]
-
-[[example]]
-name = "map_min_successful"
-path = "examples/map/min_successful/map_min_successful.rs"
-required-features = ["macros"]
-
-# Parallel examples
-[[example]]
-name = "parallel_basic"
-path = "examples/parallel/basic/parallel_basic.rs"
-required-features = ["macros"]
-
-[[example]]
-name = "parallel_first_successful"
-path = "examples/parallel/first_successful/parallel_first_successful.rs"
-required-features = ["macros"]
-
-[[example]]
-name = "parallel_heterogeneous"
-path = "examples/parallel/heterogeneous/parallel_heterogeneous.rs"
-required-features = ["macros"]
-
-# Child context examples
-[[example]]
-name = "child_context_basic"
-path = "examples/child_context/basic/child_context_basic.rs"
-required-features = ["macros"]
-
-[[example]]
-name = "child_context_nested"
-path = "examples/child_context/nested/child_context_nested.rs"
-required-features = ["macros"]
-
-# Comprehensive examples
-[[example]]
-name = "order_workflow"
-path = "examples/comprehensive/order_workflow.rs"
-required-features = ["macros"]
-
-# Error handling examples
-[[example]]
-name = "step_error"
-path = "examples/error_handling/step_error.rs"
-required-features = ["macros"]
-
-# Invoke examples
-[[example]]
-name = "invoke_basic"
-path = "examples/invoke/basic/invoke_basic.rs"
-required-features = ["macros"]
-
-# Promise combinator examples
-[[example]]
-name = "promise_all"
-path = "examples/promise_combinators/all/promise_all.rs"
-required-features = ["macros"]
-
-[[example]]
-name = "promise_all_settled"
-path = "examples/promise_combinators/all_settled/promise_all_settled.rs"
-required-features = ["macros"]
-
-[[example]]
-name = "promise_race"
-path = "examples/promise_combinators/race/promise_race.rs"
-required-features = ["macros"]
-
-[[example]]
-name = "promise_any"
-path = "examples/promise_combinators/any/promise_any.rs"
-required-features = ["macros"]
-
-# Wait for condition examples
-[[example]]
-name = "wait_for_condition_basic"
-path = "examples/wait_for_condition/basic/wait_for_condition_basic.rs"
-required-features = ["macros"]
-
-# Multiple waits example
-[[example]]
-name = "multiple_waits"
-path = "examples/multiple_waits/multiple_waits.rs"
-required-features = ["macros"]
-
-# Replay-safe examples
-[[example]]
-name = "uuid_generation"
-path = "examples/replay_safe/uuid_generation.rs"
-required-features = ["macros"]
-
-# Serialization examples
-[[example]]
-name = "custom_serialization"
-path = "examples/serde/custom_serialization.rs"
-required-features = ["macros"]
-
-# Logging examples
-[[example]]
-name = "custom_logger"
-path = "examples/logging/custom_logger.rs"
-required-features = ["macros"]
-
-[workspace]
-members = [".", "macros"]
+# Internal crate dependencies
+aws-durable-execution-sdk = { path = "sdk" }
+aws-durable-execution-sdk-testing = { path = "testing" }
+aws-durable-execution-sdk-macros = { path = "macros" }

@@ -64,6 +64,7 @@ async fn process_order(event: OrderEvent, ctx: DurableContext) -> Result<OrderRe
 |-----------|-------------|
 | `step()` / `step_named()` | Execute and checkpoint a unit of work |
 | `wait()` | Pause execution for a duration (suspends Lambda) |
+| `wait_for_condition()` | Poll a condition with configurable retry until it passes |
 | `create_callback()` | Wait for external systems to signal completion |
 | `wait_for_callback()` | Create callback and notify external system in one replay-safe call |
 | `invoke()` | Call other durable Lambda functions |

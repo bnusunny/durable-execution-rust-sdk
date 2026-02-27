@@ -31,25 +31,25 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-bench-
 
+      - name: Check for benchmarks
+        id: check
+        working-directory: aws-durable-execution-sdk
+        run: |
+          if find . -path '*/benches/*.rs' | grep -q .; then
+            echo "has_benchmarks=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_benchmarks=false" >> $GITHUB_OUTPUT
+            echo "No benchmarks found in workspace. Skipping."
+          fi
+
       - name: Run benchmarks
+        if: steps.check.outputs.has_benchmarks == 'true'
         working-directory: aws-durable-execution-sdk
         run: cargo bench --workspace --all-features -- --output-format bencher | tee output.txt
 
       - name: Store benchmark result
+        if: steps.check.outputs.has_benchmarks == 'true'
         uses: benchmark-action/github-action-benchmark@v1
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        with:
-          tool: 'cargo'
-          output-file-path: aws-durable-execution-sdk/output.txt
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: true
-          alert-threshold: '150%'
-          comment-on-alert: true
-          fail-on-alert: false
-
-      - name: Compare benchmark result
-        uses: benchmark-action/github-action-benchmark@v1
-        if: github.event_name == 'pull_request'
         with:
           tool: 'cargo'
           output-file-path: aws-durable-execution-sdk/output.txt

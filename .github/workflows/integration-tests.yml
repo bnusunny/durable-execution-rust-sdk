@@ -71,7 +71,7 @@ jobs:
       - name: Deploy test infrastructure
         run: |
           aws cloudformation deploy \
-            --template-file .github/workflows/integration-test-stack.yml \
+            --template-file .github/workflows/integration-test-stack.yml.disabled \
             --stack-name ${{ env.STACK_NAME }} \
             --capabilities CAPABILITY_IAM \
             --parameter-overrides \

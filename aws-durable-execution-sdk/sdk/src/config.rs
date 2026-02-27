@@ -18,10 +18,253 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 
+use blake2::{Blake2b512, Digest};
 use serde::{Deserialize, Serialize};
 
 use crate::duration::Duration;
+use crate::error::DurableError;
 use crate::sealed::Sealed;
+
+/// Jitter strategy for retry delays.
+///
+/// Jitter adds randomness to retry delays to prevent thundering herd problems
+/// when many executions retry simultaneously.
+///
+/// # Variants
+///
+/// - `None` — Use the exact calculated delay (no jitter).
+/// - `Full` — Random delay in `[0, calculated_delay]`.
+/// - `Half` — Random delay in `[calculated_delay/2, calculated_delay]`.
+///
+/// # Example
+///
+/// ```
+/// use aws_durable_execution_sdk::config::JitterStrategy;
+///
+/// let none = JitterStrategy::None;
+/// assert_eq!(none.apply(10.0, 1), 10.0);
+///
+/// let full = JitterStrategy::Full;
+/// let jittered = full.apply(10.0, 1);
+/// assert!(jittered >= 0.0 && jittered <= 10.0);
+///
+/// let half = JitterStrategy::Half;
+/// let jittered = half.apply(10.0, 1);
+/// assert!(jittered >= 5.0 && jittered <= 10.0);
+/// ```
+///
+/// # Requirements
+///
+/// - 1.1: JitterStrategy enum with None, Full, Half variants
+/// - 1.2: None returns delay exactly
+/// - 1.3: Full returns delay in [0, d]
+/// - 1.4: Half returns delay in [d/2, d]
+/// - 1.5: Default returns None
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum JitterStrategy {
+    /// No jitter — use exact calculated delay.
+    #[default]
+    None,
+    /// Full jitter — random delay in [0, calculated_delay].
+    Full,
+    /// Half jitter — random delay in [calculated_delay/2, calculated_delay].
+    Half,
+}
+
+impl JitterStrategy {
+    /// Applies jitter to a delay value in seconds.
+    ///
+    /// Uses a deterministic seed derived from the attempt number via blake2b
+    /// hashing. This makes jitter replay-safe since the same attempt always
+    /// produces the same jittered value.
+    ///
+    /// # Arguments
+    ///
+    /// * `delay_secs` - The base delay in seconds
+    /// * `attempt` - The retry attempt number (used as seed for deterministic randomness)
+    ///
+    /// # Returns
+    ///
+    /// The jittered delay in seconds:
+    /// - `None`: returns `delay_secs` exactly
+    /// - `Full`: returns a value in `[0, delay_secs]`
+    /// - `Half`: returns a value in `[delay_secs/2, delay_secs]`
+    pub fn apply(&self, delay_secs: f64, attempt: u32) -> f64 {
+        match self {
+            JitterStrategy::None => delay_secs,
+            JitterStrategy::Full => {
+                let factor = deterministic_random_factor(attempt);
+                factor * delay_secs
+            }
+            JitterStrategy::Half => {
+                let factor = deterministic_random_factor(attempt);
+                delay_secs / 2.0 + factor * (delay_secs / 2.0)
+            }
+        }
+    }
+}
+
+/// Generates a deterministic random factor in [0.0, 1.0) from an attempt number.
+///
+/// Uses blake2b hashing to produce a deterministic pseudo-random value
+/// seeded by the attempt number. This ensures replay safety.
+fn deterministic_random_factor(attempt: u32) -> f64 {
+    let mut hasher = Blake2b512::new();
+    hasher.update(b"jitter");
+    hasher.update(attempt.to_le_bytes());
+    let result = hasher.finalize();
+
+    // Take the first 8 bytes and convert to a u64, then normalize to [0.0, 1.0)
+    let mut bytes = [0u8; 8];
+    bytes.copy_from_slice(&result[..8]);
+    let value = u64::from_le_bytes(bytes);
+    (value as f64) / (u64::MAX as f64)
+}
+
+/// Decision returned by a wait strategy.
+///
+/// A wait strategy function returns this enum to indicate whether polling
+/// should continue (with a specified delay) or stop (condition is met).
+///
+/// # Variants
+///
+/// - `Continue { delay }` — Continue polling after the specified delay.
+/// - `Done` — Stop polling; the condition has been met.
+///
+/// # Example
+///
+/// ```
+/// use aws_durable_execution_sdk::config::WaitDecision;
+/// use aws_durable_execution_sdk::Duration;
+///
+/// let cont = WaitDecision::Continue { delay: Duration::from_seconds(5) };
+/// let done = WaitDecision::Done;
+/// ```
+///
+/// # Requirements
+///
+/// - 4.1: WaitDecision enum with Continue { delay: Duration } and Done variants
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WaitDecision {
+    /// Continue polling after the specified delay.
+    Continue { delay: Duration },
+    /// Stop polling — condition is met.
+    Done,
+}
+
+/// Configuration for creating a wait strategy.
+///
+/// This struct holds all the parameters needed to build a wait strategy function
+/// via [`create_wait_strategy`]. The resulting function can be used with
+/// [`WaitForConditionConfig`](crate::context::WaitForConditionConfig) to control
+/// polling behavior with backoff, jitter, and a custom predicate.
+///
+/// # Type Parameters
+///
+/// - `T`: The state type returned by the condition check function.
+///
+/// # Example
+///
+/// ```
+/// use aws_durable_execution_sdk::config::{WaitStrategyConfig, JitterStrategy, create_wait_strategy, WaitDecision};
+/// use aws_durable_execution_sdk::Duration;
+///
+/// let config = WaitStrategyConfig {
+///     max_attempts: Some(10),
+///     initial_delay: Duration::from_seconds(5),
+///     max_delay: Duration::from_seconds(300),
+///     backoff_rate: 1.5,
+///     jitter: JitterStrategy::Full,
+///     should_continue_polling: Box::new(|state: &String| state != "COMPLETED"),
+/// };
+///
+/// let strategy = create_wait_strategy(config);
+/// // strategy(&"COMPLETED".to_string(), 1) => WaitDecision::Done
+/// ```
+///
+/// # Requirements
+///
+/// - 4.2: should_continue_polling returning false → Done
+/// - 4.3: should_continue_polling returning true + attempts < max → Continue with delay >= 1s
+/// - 4.4: Panic when max_attempts exceeded
+/// - 4.5: Delay = min(initial_delay * backoff_rate^(N-1), max_delay)
+/// - 4.6: Jitter applied to base delay
+pub struct WaitStrategyConfig<T> {
+    /// Maximum number of polling attempts. `None` defaults to 60.
+    pub max_attempts: Option<usize>,
+    /// Initial delay between polls.
+    pub initial_delay: Duration,
+    /// Maximum delay cap.
+    pub max_delay: Duration,
+    /// Backoff multiplier applied per attempt.
+    pub backoff_rate: f64,
+    /// Jitter strategy applied to the computed delay.
+    pub jitter: JitterStrategy,
+    /// Predicate that returns `true` if polling should continue, `false` if the condition is met.
+    pub should_continue_polling: Box<dyn Fn(&T) -> bool + Send + Sync>,
+}
+
+/// Creates a wait strategy function from the given configuration.
+///
+/// The returned closure takes a reference to the current state and the number of
+/// attempts made so far (1-indexed), and returns a [`WaitDecision`].
+///
+/// # Behavior
+///
+/// 1. If `should_continue_polling` returns `false`, returns `WaitDecision::Done`.
+/// 2. If `attempts_made >= max_attempts` and `should_continue_polling` is `true`,
+///    panics with a message indicating max attempts exceeded.
+/// 3. Otherwise, computes delay as `min(initial_delay * backoff_rate^(attempts_made - 1), max_delay)`,
+///    applies jitter, floors at 1 second, and returns `WaitDecision::Continue { delay }`.
+///
+/// # Requirements
+///
+/// - 4.2: should_continue_polling returning false → Done
+/// - 4.3: should_continue_polling returning true + attempts < max → Continue with delay >= 1s
+/// - 4.4: Panic when max_attempts exceeded
+/// - 4.5: Delay = min(initial_delay * backoff_rate^(N-1), max_delay)
+/// - 4.6: Jitter applied to base delay
+pub fn create_wait_strategy<T: Send + Sync + 'static>(
+    config: WaitStrategyConfig<T>,
+) -> Box<dyn Fn(&T, usize) -> WaitDecision + Send + Sync> {
+    let max_attempts = config.max_attempts.unwrap_or(60);
+    let initial_delay_secs = config.initial_delay.to_seconds() as f64;
+    let max_delay_secs = config.max_delay.to_seconds() as f64;
+    let backoff_rate = config.backoff_rate;
+    let jitter = config.jitter;
+    let should_continue = config.should_continue_polling;
+
+    Box::new(move |result: &T, attempts_made: usize| -> WaitDecision {
+        // Check if condition is met
+        if !should_continue(result) {
+            return WaitDecision::Done;
+        }
+
+        // Check max attempts
+        if attempts_made >= max_attempts {
+            panic!(
+                "waitForCondition exceeded maximum attempts ({})",
+                max_attempts
+            );
+        }
+
+        // Calculate delay with exponential backoff
+        let exponent = if attempts_made > 0 {
+            (attempts_made as i32) - 1
+        } else {
+            0
+        };
+        let base_delay = (initial_delay_secs * backoff_rate.powi(exponent)).min(max_delay_secs);
+
+        // Apply jitter
+        let jittered = jitter.apply(base_delay, attempts_made as u32);
+        let final_delay = jittered.max(1.0).round() as u64;
+
+        WaitDecision::Continue {
+            delay: Duration::from_seconds(final_delay),
+        }
+    })
+}
 
 /// Checkpointing mode that controls the trade-off between durability and performance.
 ///
@@ -235,6 +478,8 @@ pub struct ExponentialBackoff {
     pub max_delay: Duration,
     /// Multiplier for exponential growth (default: 2.0).
     pub multiplier: f64,
+    /// Jitter strategy applied to computed delays.
+    pub jitter: JitterStrategy,
 }
 
 impl ExponentialBackoff {
@@ -250,6 +495,7 @@ impl ExponentialBackoff {
             base_delay,
             max_delay: Duration::from_hours(1),
             multiplier: 2.0,
+            jitter: JitterStrategy::None,
         }
     }
 
@@ -272,7 +518,10 @@ impl RetryStrategy for ExponentialBackoff {
         let max_seconds = self.max_delay.to_seconds() as f64;
         let capped_seconds = delay_seconds.min(max_seconds);
 
-        Some(Duration::from_seconds(capped_seconds as u64))
+        let jittered = self.jitter.apply(capped_seconds, attempt);
+        let final_seconds = jittered.max(1.0);
+
+        Some(Duration::from_seconds(final_seconds as u64))
     }
 
     fn clone_box(&self) -> Box<dyn RetryStrategy> {
@@ -287,6 +536,7 @@ pub struct ExponentialBackoffBuilder {
     base_delay: Duration,
     max_delay: Duration,
     multiplier: f64,
+    jitter: JitterStrategy,
 }
 
 impl Default for ExponentialBackoffBuilder {
@@ -296,6 +546,7 @@ impl Default for ExponentialBackoffBuilder {
             base_delay: Duration::from_seconds(1),
             max_delay: Duration::from_hours(1),
             multiplier: 2.0,
+            jitter: JitterStrategy::None,
         }
     }
 }
@@ -325,6 +576,12 @@ impl ExponentialBackoffBuilder {
         self
     }
 
+    /// Sets the jitter strategy for retry delays.
+    pub fn jitter(mut self, jitter: JitterStrategy) -> Self {
+        self.jitter = jitter;
+        self
+    }
+
     /// Builds the exponential backoff strategy.
     pub fn build(self) -> ExponentialBackoff {
         ExponentialBackoff {
@@ -332,6 +589,7 @@ impl ExponentialBackoffBuilder {
             base_delay: self.base_delay,
             max_delay: self.max_delay,
             multiplier: self.multiplier,
+            jitter: self.jitter,
         }
     }
 }
@@ -355,6 +613,8 @@ pub struct FixedDelay {
     pub max_attempts: u32,
     /// Delay between retry attempts.
     pub delay: Duration,
+    /// Jitter strategy applied to the fixed delay.
+    pub jitter: JitterStrategy,
 }
 
 impl FixedDelay {
@@ -368,7 +628,14 @@ impl FixedDelay {
         Self {
             max_attempts,
             delay,
+            jitter: JitterStrategy::None,
         }
+    }
+
+    /// Sets the jitter strategy for retry delays.
+    pub fn with_jitter(mut self, jitter: JitterStrategy) -> Self {
+        self.jitter = jitter;
+        self
     }
 }
 
@@ -379,7 +646,12 @@ impl RetryStrategy for FixedDelay {
         if attempt >= self.max_attempts {
             return None;
         }
-        Some(self.delay)
+
+        let delay_secs = self.delay.to_seconds() as f64;
+        let jittered = self.jitter.apply(delay_secs, attempt);
+        let final_seconds = jittered.max(1.0);
+
+        Some(Duration::from_seconds(final_seconds as u64))
     }
 
     fn clone_box(&self) -> Box<dyn RetryStrategy> {
@@ -408,6 +680,8 @@ pub struct LinearBackoff {
     pub base_delay: Duration,
     /// Maximum delay between retries.
     pub max_delay: Duration,
+    /// Jitter strategy applied to computed delays.
+    pub jitter: JitterStrategy,
 }
 
 impl LinearBackoff {
@@ -422,12 +696,19 @@ impl LinearBackoff {
             max_attempts,
             base_delay,
             max_delay: Duration::from_hours(1),
+            jitter: JitterStrategy::None,
         }
     }
 
     /// Sets the maximum delay between retries.
     pub fn with_max_delay(mut self, max_delay: Duration) -> Self {
         self.max_delay = max_delay;
+        self
+    }
+
+    /// Sets the jitter strategy for retry delays.
+    pub fn with_jitter(mut self, jitter: JitterStrategy) -> Self {
+        self.jitter = jitter;
         self
     }
 }
@@ -443,9 +724,12 @@ impl RetryStrategy for LinearBackoff {
         let base_seconds = self.base_delay.to_seconds();
         let delay_seconds = base_seconds.saturating_mul((attempt + 1) as u64);
         let max_seconds = self.max_delay.to_seconds();
-        let capped_seconds = delay_seconds.min(max_seconds);
+        let capped_seconds = delay_seconds.min(max_seconds) as f64;
 
-        Some(Duration::from_seconds(capped_seconds))
+        let jittered = self.jitter.apply(capped_seconds, attempt);
+        let final_seconds = jittered.max(1.0);
+
+        Some(Duration::from_seconds(final_seconds as u64))
     }
 
     fn clone_box(&self) -> Box<dyn RetryStrategy> {
@@ -474,6 +758,114 @@ impl RetryStrategy for NoRetry {
 
     fn clone_box(&self) -> Box<dyn RetryStrategy> {
         Box::new(*self)
+    }
+}
+
+/// Pattern for matching retryable errors.
+///
+/// Used with [`RetryableErrorFilter`] to declaratively specify which errors
+/// should be retried.
+///
+/// # Example
+///
+/// ```
+/// use aws_durable_execution_sdk::config::ErrorPattern;
+///
+/// let contains = ErrorPattern::Contains("timeout".to_string());
+/// let regex = ErrorPattern::Regex(regex::Regex::new(r"(?i)connection.*refused").unwrap());
+/// ```
+///
+/// # Requirements
+///
+/// - 2.1: Contains matches substring
+/// - 2.2: Contains doesn't match when substring absent
+/// - 2.3: Regex matches regex pattern
+#[derive(Clone)]
+pub enum ErrorPattern {
+    /// Match if error message contains this substring.
+    Contains(String),
+    /// Match if error message matches this regex.
+    Regex(regex::Regex),
+}
+
+impl std::fmt::Debug for ErrorPattern {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ErrorPattern::Contains(s) => f.debug_tuple("Contains").field(s).finish(),
+            ErrorPattern::Regex(r) => f.debug_tuple("Regex").field(&r.as_str()).finish(),
+        }
+    }
+}
+
+/// Declarative filter for retryable errors.
+///
+/// When configured on a [`StepConfig`], only errors matching the filter will be retried.
+/// If no patterns and no error types are configured, all errors are retried (backward-compatible).
+///
+/// Patterns and error types are combined with OR logic: an error is retryable if it matches
+/// ANY pattern OR ANY error type.
+///
+/// # Example
+///
+/// ```
+/// use aws_durable_execution_sdk::config::{RetryableErrorFilter, ErrorPattern};
+///
+/// let filter = RetryableErrorFilter {
+///     patterns: vec![
+///         ErrorPattern::Contains("timeout".to_string()),
+///         ErrorPattern::Regex(regex::Regex::new(r"(?i)connection.*refused").unwrap()),
+///     ],
+///     error_types: vec!["TransientError".to_string()],
+/// };
+///
+/// assert!(filter.is_retryable("request timeout occurred"));
+/// assert!(!filter.is_retryable("invalid input"));
+/// assert!(filter.is_retryable_with_type("invalid input", "TransientError"));
+/// ```
+///
+/// # Requirements
+///
+/// - 2.4: Empty filter retries all (backward-compatible)
+/// - 2.5: OR logic between patterns and error_types
+#[derive(Clone, Debug, Default)]
+pub struct RetryableErrorFilter {
+    /// Error message patterns (string contains or regex).
+    pub patterns: Vec<ErrorPattern>,
+    /// Error type names to match against.
+    pub error_types: Vec<String>,
+}
+
+impl RetryableErrorFilter {
+    /// Returns `true` if the error message is retryable according to this filter.
+    ///
+    /// If no filters are configured (empty patterns and empty error_types),
+    /// returns `true` for all errors (backward-compatible default).
+    ///
+    /// Otherwise, returns `true` if the error message matches any configured pattern.
+    pub fn is_retryable(&self, error_msg: &str) -> bool {
+        if self.patterns.is_empty() && self.error_types.is_empty() {
+            return true;
+        }
+
+        self.patterns.iter().any(|p| match p {
+            ErrorPattern::Contains(s) => error_msg.contains(s.as_str()),
+            ErrorPattern::Regex(r) => r.is_match(error_msg),
+        })
+    }
+
+    /// Returns `true` if the error is retryable by message or type.
+    ///
+    /// Uses OR logic: returns `true` if the error matches any pattern
+    /// OR if the error type matches any configured error type.
+    ///
+    /// If no filters are configured, returns `true` for all errors.
+    pub fn is_retryable_with_type(&self, error_msg: &str, error_type: &str) -> bool {
+        if self.patterns.is_empty() && self.error_types.is_empty() {
+            return true;
+        }
+
+        let matches_type = self.error_types.iter().any(|t| t == error_type);
+        matches_type || self.is_retryable(error_msg)
     }
 }
 
@@ -591,6 +983,10 @@ pub struct StepConfig {
     pub step_semantics: StepSemantics,
     /// Optional custom serializer/deserializer.
     pub serdes: Option<Arc<dyn SerDesAny>>,
+    /// Optional filter for retryable errors. When set, only errors matching
+    /// the filter will be retried. When `None`, all errors are retried
+    /// (current behavior preserved).
+    pub retryable_error_filter: Option<RetryableErrorFilter>,
 }
 
 impl std::fmt::Debug for StepConfig {
@@ -599,6 +995,7 @@ impl std::fmt::Debug for StepConfig {
             .field("retry_strategy", &self.retry_strategy.is_some())
             .field("step_semantics", &self.step_semantics)
             .field("serdes", &self.serdes.is_some())
+            .field("retryable_error_filter", &self.retryable_error_filter.is_some())
             .finish()
     }
 }
@@ -711,7 +1108,7 @@ pub struct ParallelConfig {
 /// - 10.5: THE Child_Context_Operation SHALL support ReplayChildren option for large parallel operations
 /// - 10.6: WHEN ReplayChildren is true, THE Child_Context_Operation SHALL include child operations in state loads for replay
 /// - 12.8: THE Configuration_System SHALL provide ContextConfig with replay_children option
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct ChildConfig {
     /// Optional custom serializer/deserializer.
     pub serdes: Option<Arc<dyn SerDesAny>>,
@@ -729,6 +1126,50 @@ pub struct ChildConfig {
     /// - 10.5: THE Child_Context_Operation SHALL support ReplayChildren option for large parallel operations
     /// - 10.6: WHEN ReplayChildren is true, THE Child_Context_Operation SHALL include child operations in state loads for replay
     pub replay_children: bool,
+    /// Optional function to map child context errors before propagation.
+    ///
+    /// When set, this function is applied to errors from child context execution
+    /// before they are checkpointed and propagated. Suspend errors are never mapped.
+    ///
+    /// Default is `None`, which preserves current behavior (errors propagate unchanged).
+    ///
+    /// # Requirements
+    ///
+    /// - 6.1: error_mapper applied to errors before checkpointing and propagation
+    /// - 6.2: None preserves current behavior
+    /// - 6.3: Suspend errors skip the mapper
+    pub error_mapper: Option<Arc<dyn Fn(DurableError) -> DurableError + Send + Sync>>,
+    /// Optional function to generate a summary when the serialized child result exceeds 256KB.
+    ///
+    /// When set, this function is invoked with the serialized result string if its size
+    /// exceeds 256KB (262144 bytes). The returned summary string is stored instead of the
+    /// full result, enabling replay-based reconstruction for large payloads.
+    ///
+    /// When the serialized result is 256KB or less, the full result is stored even if
+    /// a summary generator is configured.
+    ///
+    /// Default is `None`, which preserves current behavior (full result stored regardless of size).
+    ///
+    /// # Requirements
+    ///
+    /// - 7.1: summary_generator invoked when result > 256KB
+    /// - 7.2: summary_generator NOT invoked when result <= 256KB
+    /// - 7.3: None preserves current behavior
+    pub summary_generator: Option<Arc<dyn Fn(&str) -> String + Send + Sync>>,
+}
+
+impl std::fmt::Debug for ChildConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ChildConfig")
+            .field("serdes", &self.serdes)
+            .field("replay_children", &self.replay_children)
+            .field("error_mapper", &self.error_mapper.as_ref().map(|_| "..."))
+            .field(
+                "summary_generator",
+                &self.summary_generator.as_ref().map(|_| "..."),
+            )
+            .finish()
+    }
 }
 
 impl ChildConfig {
@@ -770,6 +1211,39 @@ impl ChildConfig {
     /// Sets the custom serializer/deserializer.
     pub fn set_serdes(mut self, serdes: Arc<dyn SerDesAny>) -> Self {
         self.serdes = Some(serdes);
+        self
+    }
+
+    /// Sets the error mapper function.
+    ///
+    /// The error mapper is applied to child context errors before they are
+    /// checkpointed and propagated. Suspend errors are never mapped.
+    ///
+    /// # Requirements
+    ///
+    /// - 6.1: error_mapper applied to errors before checkpointing and propagation
+    pub fn set_error_mapper(
+        mut self,
+        mapper: Arc<dyn Fn(DurableError) -> DurableError + Send + Sync>,
+    ) -> Self {
+        self.error_mapper = Some(mapper);
+        self
+    }
+
+    /// Sets the summary generator function.
+    ///
+    /// The summary generator is invoked when the serialized child result exceeds
+    /// 256KB (262144 bytes). It receives the serialized result string and should
+    /// return a compact summary string to store instead.
+    ///
+    /// # Requirements
+    ///
+    /// - 7.1: summary_generator invoked when result > 256KB
+    pub fn set_summary_generator(
+        mut self,
+        generator: Arc<dyn Fn(&str) -> String + Send + Sync>,
+    ) -> Self {
+        self.summary_generator = Some(generator);
         self
     }
 }
@@ -1082,6 +1556,8 @@ mod tests {
         let config = ChildConfig::default();
         assert!(!config.replay_children);
         assert!(config.serdes.is_none());
+        assert!(config.error_mapper.is_none());
+        assert!(config.summary_generator.is_none());
     }
 
     #[test]
@@ -1490,6 +1966,7 @@ mod tests {
             ))),
             step_semantics: StepSemantics::AtLeastOncePerRetry,
             serdes: None,
+            retryable_error_filter: None,
         };
 
         assert!(config.retry_strategy.is_some());
@@ -1556,6 +2033,7 @@ mod tests {
                 retry_strategy: None,
                 step_semantics: semantics,
                 serdes: None,
+                retryable_error_filter: None,
             };
 
             // Verify the config is usable - accessing fields should not panic
@@ -1849,5 +2327,655 @@ mod tests {
                 );
             }
         }
+    }
+
+    // =========================================================================
+    // JitterStrategy Unit Tests
+    // =========================================================================
+
+    #[test]
+    fn test_jitter_strategy_none_returns_exact_delay() {
+        let jitter = JitterStrategy::None;
+        assert_eq!(jitter.apply(10.0, 0), 10.0);
+        assert_eq!(jitter.apply(5.5, 3), 5.5);
+        assert_eq!(jitter.apply(0.0, 0), 0.0);
+        assert_eq!(jitter.apply(100.0, 99), 100.0);
+    }
+
+    #[test]
+    fn test_jitter_strategy_full_bounds() {
+        let jitter = JitterStrategy::Full;
+        for attempt in 0..20 {
+            let result = jitter.apply(10.0, attempt);
+            assert!(
+                result >= 0.0 && result <= 10.0,
+                "Full jitter for attempt {} produced {}, expected [0, 10]",
+                attempt,
+                result
+            );
+        }
+    }
+
+    #[test]
+    fn test_jitter_strategy_half_bounds() {
+        let jitter = JitterStrategy::Half;
+        for attempt in 0..20 {
+            let result = jitter.apply(10.0, attempt);
+            assert!(
+                result >= 5.0 && result <= 10.0,
+                "Half jitter for attempt {} produced {}, expected [5, 10]",
+                attempt,
+                result
+            );
+        }
+    }
+
+    #[test]
+    fn test_jitter_strategy_deterministic() {
+        // Same inputs should always produce the same output
+        let full = JitterStrategy::Full;
+        let r1 = full.apply(10.0, 5);
+        let r2 = full.apply(10.0, 5);
+        assert_eq!(r1, r2);
+
+        let half = JitterStrategy::Half;
+        let r1 = half.apply(10.0, 5);
+        let r2 = half.apply(10.0, 5);
+        assert_eq!(r1, r2);
+    }
+
+    #[test]
+    fn test_jitter_strategy_zero_delay() {
+        // Jitter with zero delay should return 0
+        assert_eq!(JitterStrategy::Full.apply(0.0, 0), 0.0);
+        assert_eq!(JitterStrategy::Half.apply(0.0, 0), 0.0);
+        assert_eq!(JitterStrategy::None.apply(0.0, 0), 0.0);
+    }
+
+    #[test]
+    fn test_jitter_strategy_default_is_none() {
+        assert_eq!(JitterStrategy::default(), JitterStrategy::None);
+    }
+
+    // =========================================================================
+    // Retry Strategy with Jitter Integration Tests
+    // =========================================================================
+
+    #[test]
+    fn test_exponential_backoff_with_full_jitter() {
+        let strategy = ExponentialBackoff::builder()
+            .max_attempts(5)
+            .base_delay(Duration::from_seconds(5))
+            .max_delay(Duration::from_seconds(60))
+            .jitter(JitterStrategy::Full)
+            .build();
+
+        for attempt in 0..5 {
+            let delay = strategy.next_delay(attempt, "error");
+            assert!(delay.is_some());
+            let secs = delay.unwrap().to_seconds();
+            // With full jitter, delay should be >= 1 (minimum floor)
+            assert!(secs >= 1, "Attempt {} delay {} < 1", attempt, secs);
+        }
+        assert!(strategy.next_delay(5, "error").is_none());
+    }
+
+    #[test]
+    fn test_exponential_backoff_with_half_jitter() {
+        let strategy = ExponentialBackoff::builder()
+            .max_attempts(5)
+            .base_delay(Duration::from_seconds(10))
+            .max_delay(Duration::from_seconds(60))
+            .jitter(JitterStrategy::Half)
+            .build();
+
+        for attempt in 0..5 {
+            let delay = strategy.next_delay(attempt, "error");
+            assert!(delay.is_some());
+            let secs = delay.unwrap().to_seconds();
+            assert!(secs >= 1, "Attempt {} delay {} < 1", attempt, secs);
+        }
+    }
+
+    #[test]
+    fn test_exponential_backoff_no_jitter_unchanged() {
+        // Verify backward compatibility: no jitter produces same results as before
+        let strategy = ExponentialBackoff::new(5, Duration::from_seconds(1));
+        assert_eq!(strategy.jitter, JitterStrategy::None);
+        assert_eq!(strategy.next_delay(0, "e").map(|d| d.to_seconds()), Some(1));
+        assert_eq!(strategy.next_delay(1, "e").map(|d| d.to_seconds()), Some(2));
+        assert_eq!(strategy.next_delay(2, "e").map(|d| d.to_seconds()), Some(4));
+    }
+
+    #[test]
+    fn test_fixed_delay_with_jitter() {
+        let strategy = FixedDelay::new(3, Duration::from_seconds(10))
+            .with_jitter(JitterStrategy::Full);
+
+        for attempt in 0..3 {
+            let delay = strategy.next_delay(attempt, "error");
+            assert!(delay.is_some());
+            let secs = delay.unwrap().to_seconds();
+            assert!(secs >= 1, "Attempt {} delay {} < 1", attempt, secs);
+        }
+        assert!(strategy.next_delay(3, "error").is_none());
+    }
+
+    #[test]
+    fn test_fixed_delay_no_jitter_unchanged() {
+        let strategy = FixedDelay::new(3, Duration::from_seconds(5));
+        assert_eq!(strategy.jitter, JitterStrategy::None);
+        assert_eq!(strategy.next_delay(0, "e").map(|d| d.to_seconds()), Some(5));
+        assert_eq!(strategy.next_delay(1, "e").map(|d| d.to_seconds()), Some(5));
+    }
+
+    #[test]
+    fn test_linear_backoff_with_jitter() {
+        let strategy = LinearBackoff::new(5, Duration::from_seconds(5))
+            .with_jitter(JitterStrategy::Half);
+
+        for attempt in 0..5 {
+            let delay = strategy.next_delay(attempt, "error");
+            assert!(delay.is_some());
+            let secs = delay.unwrap().to_seconds();
+            assert!(secs >= 1, "Attempt {} delay {} < 1", attempt, secs);
+        }
+        assert!(strategy.next_delay(5, "error").is_none());
+    }
+
+    #[test]
+    fn test_linear_backoff_no_jitter_unchanged() {
+        let strategy = LinearBackoff::new(5, Duration::from_seconds(2));
+        assert_eq!(strategy.jitter, JitterStrategy::None);
+        assert_eq!(strategy.next_delay(0, "e").map(|d| d.to_seconds()), Some(2));
+        assert_eq!(strategy.next_delay(1, "e").map(|d| d.to_seconds()), Some(4));
+    }
+
+    #[test]
+    fn test_jitter_minimum_floor_all_strategies() {
+        // Even with full jitter on small delays, minimum should be 1 second
+        let exp = ExponentialBackoff::builder()
+            .max_attempts(3)
+            .base_delay(Duration::from_seconds(1))
+            .jitter(JitterStrategy::Full)
+            .build();
+        for attempt in 0..3 {
+            let secs = exp.next_delay(attempt, "e").unwrap().to_seconds();
+            assert!(secs >= 1, "ExponentialBackoff attempt {} delay {} < 1", attempt, secs);
+        }
+
+        let fixed = FixedDelay::new(3, Duration::from_seconds(1))
+            .with_jitter(JitterStrategy::Full);
+        for attempt in 0..3 {
+            let secs = fixed.next_delay(attempt, "e").unwrap().to_seconds();
+            assert!(secs >= 1, "FixedDelay attempt {} delay {} < 1", attempt, secs);
+        }
+
+        let linear = LinearBackoff::new(3, Duration::from_seconds(1))
+            .with_jitter(JitterStrategy::Full);
+        for attempt in 0..3 {
+            let secs = linear.next_delay(attempt, "e").unwrap().to_seconds();
+            assert!(secs >= 1, "LinearBackoff attempt {} delay {} < 1", attempt, secs);
+        }
+    }
+
+    // =========================================================================
+    // JitterStrategy Property-Based Tests
+    // =========================================================================
+
+    /// Strategy for generating valid JitterStrategy values
+    fn jitter_strategy_strategy() -> impl Strategy<Value = JitterStrategy> {
+        prop_oneof![
+            Just(JitterStrategy::None),
+            Just(JitterStrategy::Full),
+            Just(JitterStrategy::Half),
+        ]
+    }
+
+    proptest! {
+        // **Feature: rust-sdk-parity-gaps, Property: JitterStrategy::None identity**
+        // **Validates: Requirements 1.2**
+        /// Property: JitterStrategy::None SHALL return the exact delay for any delay and attempt.
+        #[test]
+        fn prop_jitter_none_identity(delay in 0.0f64..1000.0, attempt in 0u32..100) {
+            let result = JitterStrategy::None.apply(delay, attempt);
+            prop_assert!((result - delay).abs() < f64::EPSILON,
+                "None jitter changed delay from {} to {}", delay, result);
+        }
+
+        // **Feature: rust-sdk-parity-gaps, Property: JitterStrategy::Full bounds**
+        // **Validates: Requirements 1.3**
+        /// Property: JitterStrategy::Full SHALL return a delay in [0, d] for any non-negative delay.
+        #[test]
+        fn prop_jitter_full_bounds(delay in 0.0f64..1000.0, attempt in 0u32..100) {
+            let result = JitterStrategy::Full.apply(delay, attempt);
+            prop_assert!(result >= 0.0, "Full jitter result {} < 0", result);
+            prop_assert!(result <= delay + f64::EPSILON,
+                "Full jitter result {} > delay {}", result, delay);
+        }
+
+        // **Feature: rust-sdk-parity-gaps, Property: JitterStrategy::Half bounds**
+        // **Validates: Requirements 1.4**
+        /// Property: JitterStrategy::Half SHALL return a delay in [d/2, d] for any non-negative delay.
+        #[test]
+        fn prop_jitter_half_bounds(delay in 0.0f64..1000.0, attempt in 0u32..100) {
+            let result = JitterStrategy::Half.apply(delay, attempt);
+            prop_assert!(result >= delay / 2.0 - f64::EPSILON,
+                "Half jitter result {} < delay/2 {}", result, delay / 2.0);
+            prop_assert!(result <= delay + f64::EPSILON,
+                "Half jitter result {} > delay {}", result, delay);
+        }
+
+        // **Feature: rust-sdk-parity-gaps, Property: JitterStrategy determinism**
+        // **Validates: Requirements 1.2, 1.3, 1.4**
+        /// Property: JitterStrategy::apply SHALL be deterministic for the same inputs.
+        #[test]
+        fn prop_jitter_deterministic(
+            jitter in jitter_strategy_strategy(),
+            delay in 0.0f64..1000.0,
+            attempt in 0u32..100
+        ) {
+            let r1 = jitter.apply(delay, attempt);
+            let r2 = jitter.apply(delay, attempt);
+            prop_assert!((r1 - r2).abs() < f64::EPSILON,
+                "Jitter not deterministic: {} vs {}", r1, r2);
+        }
+
+        // **Feature: rust-sdk-parity-gaps, Property: Jittered delay minimum floor**
+        // **Validates: Requirements 1.10**
+        /// Property: All retry strategies with jitter SHALL produce delays >= 1 second.
+        #[test]
+        fn prop_jitter_minimum_floor(
+            jitter in jitter_strategy_strategy(),
+            attempt in 0u32..10,
+            base_delay_secs in 1u64..100
+        ) {
+            // ExponentialBackoff
+            let exp = ExponentialBackoff::builder()
+                .max_attempts(10)
+                .base_delay(Duration::from_seconds(base_delay_secs))
+                .jitter(jitter)
+                .build();
+            if let Some(d) = exp.next_delay(attempt, "e") {
+                prop_assert!(d.to_seconds() >= 1,
+                    "ExponentialBackoff delay {} < 1 for attempt {}", d.to_seconds(), attempt);
+            }
+
+            // FixedDelay
+            let fixed = FixedDelay::new(10, Duration::from_seconds(base_delay_secs))
+                .with_jitter(jitter);
+            if let Some(d) = fixed.next_delay(attempt, "e") {
+                prop_assert!(d.to_seconds() >= 1,
+                    "FixedDelay delay {} < 1 for attempt {}", d.to_seconds(), attempt);
+            }
+
+            // LinearBackoff
+            let linear = LinearBackoff::new(10, Duration::from_seconds(base_delay_secs))
+                .with_jitter(jitter);
+            if let Some(d) = linear.next_delay(attempt, "e") {
+                prop_assert!(d.to_seconds() >= 1,
+                    "LinearBackoff delay {} < 1 for attempt {}", d.to_seconds(), attempt);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod retryable_error_filter_tests {
+    use super::*;
+
+    #[test]
+    fn test_empty_filter_retries_all() {
+        let filter = RetryableErrorFilter::default();
+        assert!(filter.is_retryable("any error message"));
+        assert!(filter.is_retryable(""));
+        assert!(filter.is_retryable("timeout"));
+        assert!(filter.is_retryable_with_type("any error", "AnyType"));
+    }
+
+    #[test]
+    fn test_contains_pattern_matches_substring() {
+        let filter = RetryableErrorFilter {
+            patterns: vec![ErrorPattern::Contains("timeout".to_string())],
+            error_types: vec![],
+        };
+        assert!(filter.is_retryable("request timeout occurred"));
+        assert!(filter.is_retryable("timeout"));
+        assert!(filter.is_retryable("a timeout happened"));
+    }
+
+    #[test]
+    fn test_contains_pattern_no_match() {
+        let filter = RetryableErrorFilter {
+            patterns: vec![ErrorPattern::Contains("timeout".to_string())],
+            error_types: vec![],
+        };
+        assert!(!filter.is_retryable("connection refused"));
+        assert!(!filter.is_retryable("invalid input"));
+        assert!(!filter.is_retryable(""));
+    }
+
+    #[test]
+    fn test_regex_pattern_matches() {
+        let filter = RetryableErrorFilter {
+            patterns: vec![ErrorPattern::Regex(
+                regex::Regex::new(r"(?i)connection.*refused").unwrap(),
+            )],
+            error_types: vec![],
+        };
+        assert!(filter.is_retryable("Connection was refused"));
+        assert!(filter.is_retryable("connection refused"));
+        assert!(filter.is_retryable("CONNECTION actively REFUSED"));
+    }
+
+    #[test]
+    fn test_regex_pattern_no_match() {
+        let filter = RetryableErrorFilter {
+            patterns: vec![ErrorPattern::Regex(
+                regex::Regex::new(r"(?i)connection.*refused").unwrap(),
+            )],
+            error_types: vec![],
+        };
+        assert!(!filter.is_retryable("timeout error"));
+        assert!(!filter.is_retryable("refused connection")); // wrong order
+    }
+
+    #[test]
+    fn test_or_logic_multiple_patterns() {
+        let filter = RetryableErrorFilter {
+            patterns: vec![
+                ErrorPattern::Contains("timeout".to_string()),
+                ErrorPattern::Regex(regex::Regex::new(r"(?i)connection.*refused").unwrap()),
+            ],
+            error_types: vec![],
+        };
+        // Matches first pattern
+        assert!(filter.is_retryable("request timeout"));
+        // Matches second pattern
+        assert!(filter.is_retryable("Connection refused"));
+        // Matches neither
+        assert!(!filter.is_retryable("invalid input"));
+    }
+
+    #[test]
+    fn test_error_type_matching() {
+        let filter = RetryableErrorFilter {
+            patterns: vec![],
+            error_types: vec!["TransientError".to_string()],
+        };
+        // is_retryable only checks patterns, not types
+        assert!(!filter.is_retryable("some error"));
+        // is_retryable_with_type checks both
+        assert!(filter.is_retryable_with_type("some error", "TransientError"));
+        assert!(!filter.is_retryable_with_type("some error", "PermanentError"));
+    }
+
+    #[test]
+    fn test_or_logic_patterns_and_types() {
+        let filter = RetryableErrorFilter {
+            patterns: vec![ErrorPattern::Contains("timeout".to_string())],
+            error_types: vec!["TransientError".to_string()],
+        };
+        // Matches pattern only
+        assert!(filter.is_retryable_with_type("request timeout", "PermanentError"));
+        // Matches type only
+        assert!(filter.is_retryable_with_type("invalid input", "TransientError"));
+        // Matches both
+        assert!(filter.is_retryable_with_type("request timeout", "TransientError"));
+        // Matches neither
+        assert!(!filter.is_retryable_with_type("invalid input", "PermanentError"));
+    }
+
+    #[test]
+    fn test_error_pattern_debug() {
+        let contains = ErrorPattern::Contains("test".to_string());
+        let debug_str = format!("{:?}", contains);
+        assert!(debug_str.contains("Contains"));
+        assert!(debug_str.contains("test"));
+
+        let regex = ErrorPattern::Regex(regex::Regex::new(r"\d+").unwrap());
+        let debug_str = format!("{:?}", regex);
+        assert!(debug_str.contains("Regex"));
+    }
+
+    #[test]
+    fn test_retryable_error_filter_clone() {
+        let filter = RetryableErrorFilter {
+            patterns: vec![
+                ErrorPattern::Contains("timeout".to_string()),
+                ErrorPattern::Regex(regex::Regex::new(r"err\d+").unwrap()),
+            ],
+            error_types: vec!["TransientError".to_string()],
+        };
+        let cloned = filter.clone();
+        assert!(cloned.is_retryable("timeout error"));
+        assert!(cloned.is_retryable("err42"));
+        assert!(cloned.is_retryable_with_type("x", "TransientError"));
+    }
+
+    // ==========================================================================
+    // Tests for WaitDecision, WaitStrategyConfig, and create_wait_strategy
+    // Requirements: 4.1–4.6
+    // ==========================================================================
+
+    #[test]
+    fn test_wait_decision_done_when_predicate_false() {
+        // **Validates: Requirements 4.1, 4.2**
+        let strategy = create_wait_strategy(WaitStrategyConfig {
+            max_attempts: Some(10),
+            initial_delay: Duration::from_seconds(5),
+            max_delay: Duration::from_seconds(300),
+            backoff_rate: 1.5,
+            jitter: JitterStrategy::None,
+            should_continue_polling: Box::new(|state: &String| state != "COMPLETED"),
+        });
+
+        // When predicate returns false (state == "COMPLETED"), should return Done
+        let decision = strategy(&"COMPLETED".to_string(), 1);
+        assert_eq!(decision, WaitDecision::Done);
+    }
+
+    #[test]
+    fn test_wait_decision_continue_with_backoff() {
+        // **Validates: Requirements 4.3, 4.5**
+        let strategy = create_wait_strategy(WaitStrategyConfig {
+            max_attempts: Some(10),
+            initial_delay: Duration::from_seconds(5),
+            max_delay: Duration::from_seconds(300),
+            backoff_rate: 2.0,
+            jitter: JitterStrategy::None,
+            should_continue_polling: Box::new(|state: &String| state != "DONE"),
+        });
+
+        // Attempt 1: delay = min(5 * 2^0, 300) = 5s
+        let decision = strategy(&"PENDING".to_string(), 1);
+        assert_eq!(
+            decision,
+            WaitDecision::Continue {
+                delay: Duration::from_seconds(5)
+            }
+        );
+
+        // Attempt 2: delay = min(5 * 2^1, 300) = 10s
+        let decision = strategy(&"PENDING".to_string(), 2);
+        assert_eq!(
+            decision,
+            WaitDecision::Continue {
+                delay: Duration::from_seconds(10)
+            }
+        );
+
+        // Attempt 3: delay = min(5 * 2^2, 300) = 20s
+        let decision = strategy(&"PENDING".to_string(), 3);
+        assert_eq!(
+            decision,
+            WaitDecision::Continue {
+                delay: Duration::from_seconds(20)
+            }
+        );
+    }
+
+    #[test]
+    fn test_wait_strategy_delay_capped_at_max() {
+        // **Validates: Requirement 4.5**
+        let strategy = create_wait_strategy(WaitStrategyConfig {
+            max_attempts: Some(20),
+            initial_delay: Duration::from_seconds(10),
+            max_delay: Duration::from_seconds(30),
+            backoff_rate: 2.0,
+            jitter: JitterStrategy::None,
+            should_continue_polling: Box::new(|_: &i32| true),
+        });
+
+        // Attempt 3: delay = min(10 * 2^2, 30) = min(40, 30) = 30s
+        let decision = strategy(&0, 3);
+        assert_eq!(
+            decision,
+            WaitDecision::Continue {
+                delay: Duration::from_seconds(30)
+            }
+        );
+
+        // Attempt 5: delay = min(10 * 2^4, 30) = min(160, 30) = 30s
+        let decision = strategy(&0, 5);
+        assert_eq!(
+            decision,
+            WaitDecision::Continue {
+                delay: Duration::from_seconds(30)
+            }
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "waitForCondition exceeded maximum attempts")]
+    fn test_wait_strategy_max_attempts_panic() {
+        // **Validates: Requirement 4.4**
+        let strategy = create_wait_strategy(WaitStrategyConfig {
+            max_attempts: Some(3),
+            initial_delay: Duration::from_seconds(5),
+            max_delay: Duration::from_seconds(300),
+            backoff_rate: 1.5,
+            jitter: JitterStrategy::None,
+            should_continue_polling: Box::new(|_: &i32| true),
+        });
+
+        // Attempt 3 should panic (attempts_made >= max_attempts)
+        let _ = strategy(&0, 3);
+    }
+
+    #[test]
+    fn test_wait_strategy_jitter_application() {
+        // **Validates: Requirement 4.6**
+        let strategy = create_wait_strategy(WaitStrategyConfig {
+            max_attempts: Some(10),
+            initial_delay: Duration::from_seconds(10),
+            max_delay: Duration::from_seconds(300),
+            backoff_rate: 1.0,
+            jitter: JitterStrategy::Full,
+            should_continue_polling: Box::new(|_: &i32| true),
+        });
+
+        // With Full jitter on a 10s base delay, the result should be in [1, 10]
+        // (floored at 1s minimum)
+        let decision = strategy(&0, 1);
+        match decision {
+            WaitDecision::Continue { delay } => {
+                assert!(
+                    delay.to_seconds() >= 1 && delay.to_seconds() <= 10,
+                    "Jittered delay {} should be in [1, 10]",
+                    delay.to_seconds()
+                );
+            }
+            WaitDecision::Done => panic!("Expected Continue, got Done"),
+        }
+    }
+
+    #[test]
+    fn test_wait_strategy_delay_minimum_floor() {
+        // **Validates: Requirement 4.3**
+        let strategy = create_wait_strategy(WaitStrategyConfig {
+            max_attempts: Some(10),
+            initial_delay: Duration::from_seconds(1),
+            max_delay: Duration::from_seconds(300),
+            backoff_rate: 1.0,
+            jitter: JitterStrategy::Full,
+            should_continue_polling: Box::new(|_: &i32| true),
+        });
+
+        // Even with Full jitter that could produce 0, the floor should be 1s
+        let decision = strategy(&0, 1);
+        match decision {
+            WaitDecision::Continue { delay } => {
+                assert!(
+                    delay.to_seconds() >= 1,
+                    "Delay {} should be at least 1 second",
+                    delay.to_seconds()
+                );
+            }
+            WaitDecision::Done => panic!("Expected Continue, got Done"),
+        }
+    }
+
+    #[test]
+    fn test_wait_strategy_default_max_attempts() {
+        // **Validates: Requirement 4.4** — default max_attempts is 60
+        let strategy = create_wait_strategy(WaitStrategyConfig {
+            max_attempts: None, // defaults to 60
+            initial_delay: Duration::from_seconds(1),
+            max_delay: Duration::from_seconds(10),
+            backoff_rate: 1.0,
+            jitter: JitterStrategy::None,
+            should_continue_polling: Box::new(|_: &i32| true),
+        });
+
+        // Attempt 59 should succeed (< 60)
+        let decision = strategy(&0, 59);
+        assert!(matches!(decision, WaitDecision::Continue { .. }));
+    }
+
+    #[test]
+    #[should_panic(expected = "waitForCondition exceeded maximum attempts")]
+    fn test_wait_strategy_default_max_attempts_panic() {
+        // **Validates: Requirement 4.4** — default max_attempts is 60
+        let strategy = create_wait_strategy(WaitStrategyConfig {
+            max_attempts: None, // defaults to 60
+            initial_delay: Duration::from_seconds(1),
+            max_delay: Duration::from_seconds(10),
+            backoff_rate: 1.0,
+            jitter: JitterStrategy::None,
+            should_continue_polling: Box::new(|_: &i32| true),
+        });
+
+        // Attempt 60 should panic (>= 60)
+        let _ = strategy(&0, 60);
+    }
+
+    #[test]
+    fn test_wait_decision_enum_variants() {
+        // **Validates: Requirement 4.1**
+        let cont = WaitDecision::Continue {
+            delay: Duration::from_seconds(5),
+        };
+        let done = WaitDecision::Done;
+
+        // Verify Debug
+        assert!(format!("{:?}", cont).contains("Continue"));
+        assert!(format!("{:?}", done).contains("Done"));
+
+        // Verify PartialEq
+        assert_eq!(
+            WaitDecision::Continue {
+                delay: Duration::from_seconds(5)
+            },
+            WaitDecision::Continue {
+                delay: Duration::from_seconds(5)
+            }
+        );
+        assert_ne!(
+            WaitDecision::Continue {
+                delay: Duration::from_seconds(5)
+            },
+            WaitDecision::Done
+        );
     }
 }

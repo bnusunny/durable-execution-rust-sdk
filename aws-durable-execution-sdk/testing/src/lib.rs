@@ -67,7 +67,9 @@ pub use operation_handle::OperationHandle;
 pub use run_future::RunFuture;
 pub use test_result::{HistoryEvent, PrintConfig, TestResult};
 pub use time_control::{TimeControl, TimeControlGuard};
-pub use types::{ExecutionStatus, InvokeRequest, Invocation, TestResultError, WaitingOperationStatus};
+pub use types::{
+    ExecutionStatus, Invocation, InvokeRequest, TestResultError, WaitingOperationStatus,
+};
 
 // Re-export key types from the SDK for convenience
 pub use aws_durable_execution_sdk::{

@@ -158,8 +158,7 @@ fn test_timestamps_are_iso_8601_format() {
     let parsed: Value = serde_json::from_str(&json).unwrap();
 
     // ISO 8601 format: YYYY-MM-DDTHH:MM:SS.sssZ
-    let iso_8601_pattern =
-        Regex::new(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$").unwrap();
+    let iso_8601_pattern = Regex::new(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$").unwrap();
 
     let timestamp = parsed["EventTimestamp"].as_str().unwrap();
     assert!(
@@ -298,7 +297,10 @@ fn test_nodejs_sdk_compatible_format() {
     // Verify the JSON can be deserialized back to our types
     let deserialized: Vec<NodeJsHistoryEvent> = serde_json::from_str(&json).unwrap();
     assert_eq!(deserialized.len(), 4);
-    assert_eq!(deserialized[0].event_type, NodeJsEventType::ExecutionStarted);
+    assert_eq!(
+        deserialized[0].event_type,
+        NodeJsEventType::ExecutionStarted
+    );
     assert_eq!(deserialized[1].event_type, NodeJsEventType::StepStarted);
     assert_eq!(deserialized[2].event_type, NodeJsEventType::StepSucceeded);
     assert_eq!(

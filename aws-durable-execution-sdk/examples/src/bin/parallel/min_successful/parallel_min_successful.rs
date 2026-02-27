@@ -43,11 +43,9 @@ pub async fn handler(
                 "task-e".to_string(),
             ],
             |child_ctx: DurableContext, item: String, _index: usize| {
-                Box::pin(async move {
-                    child_ctx
-                        .step(|_| Ok(format!("{} done", item)), None)
-                        .await
-                })
+                Box::pin(
+                    async move { child_ctx.step(|_| Ok(format!("{} done", item)), None).await },
+                )
             },
             Some(config),
         )

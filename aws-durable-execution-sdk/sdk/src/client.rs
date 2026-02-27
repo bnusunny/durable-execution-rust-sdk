@@ -991,15 +991,9 @@ mod tests {
 
     /// Helper to build a test SdkConfig with fake credentials.
     fn test_sdk_config() -> aws_config::SdkConfig {
-        let creds = aws_credential_types::Credentials::new(
-            "test-key",
-            "test-secret",
-            None,
-            None,
-            "test",
-        );
-        let provider =
-            aws_credential_types::provider::SharedCredentialsProvider::new(creds);
+        let creds =
+            aws_credential_types::Credentials::new("test-key", "test-secret", None, None, "test");
+        let provider = aws_credential_types::provider::SharedCredentialsProvider::new(creds);
         aws_config::SdkConfig::builder()
             .credentials_provider(provider)
             .region(aws_config::Region::new("us-east-1"))
@@ -1010,11 +1004,8 @@ mod tests {
     fn test_from_aws_config_with_user_agent_constructs_client() {
         // Verify from_aws_config_with_user_agent creates a client successfully (Req 14.1)
         let config = test_sdk_config();
-        let client = LambdaDurableServiceClient::from_aws_config_with_user_agent(
-            &config,
-            "my-sdk",
-            "1.0.0",
-        );
+        let client =
+            LambdaDurableServiceClient::from_aws_config_with_user_agent(&config, "my-sdk", "1.0.0");
         // Client should be constructed with the correct region config
         assert_eq!(client.config.region, "us-east-1");
     }

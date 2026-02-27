@@ -292,10 +292,7 @@ mod tests {
         let deserialized: WorkerCommand = serde_json::from_str(&json).unwrap();
 
         assert_eq!(deserialized.command_type, WorkerCommandType::ApiRequest);
-        assert_eq!(
-            deserialized.data.api_type,
-            ApiType::StartDurableExecution
-        );
+        assert_eq!(deserialized.data.api_type, ApiType::StartDurableExecution);
         assert_eq!(deserialized.data.request_id, "req-123");
     }
 }

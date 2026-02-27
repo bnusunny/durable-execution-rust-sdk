@@ -224,6 +224,7 @@ pub struct WaitStrategyConfig<T> {
 /// - 4.4: Panic when max_attempts exceeded
 /// - 4.5: Delay = min(initial_delay * backoff_rate^(N-1), max_delay)
 /// - 4.6: Jitter applied to base delay
+#[allow(clippy::type_complexity)]
 pub fn create_wait_strategy<T: Send + Sync + 'static>(
     config: WaitStrategyConfig<T>,
 ) -> Box<dyn Fn(&T, usize) -> WaitDecision + Send + Sync> {
@@ -995,7 +996,10 @@ impl std::fmt::Debug for StepConfig {
             .field("retry_strategy", &self.retry_strategy.is_some())
             .field("step_semantics", &self.step_semantics)
             .field("serdes", &self.serdes.is_some())
-            .field("retryable_error_filter", &self.retryable_error_filter.is_some())
+            .field(
+                "retryable_error_filter",
+                &self.retryable_error_filter.is_some(),
+            )
             .finish()
     }
 }
@@ -1109,6 +1113,7 @@ pub struct ParallelConfig {
 /// - 10.6: WHEN ReplayChildren is true, THE Child_Context_Operation SHALL include child operations in state loads for replay
 /// - 12.8: THE Configuration_System SHALL provide ContextConfig with replay_children option
 #[derive(Clone, Default)]
+#[allow(clippy::type_complexity)]
 pub struct ChildConfig {
     /// Optional custom serializer/deserializer.
     pub serdes: Option<Arc<dyn SerDesAny>>,
@@ -2449,8 +2454,8 @@ mod tests {
 
     #[test]
     fn test_fixed_delay_with_jitter() {
-        let strategy = FixedDelay::new(3, Duration::from_seconds(10))
-            .with_jitter(JitterStrategy::Full);
+        let strategy =
+            FixedDelay::new(3, Duration::from_seconds(10)).with_jitter(JitterStrategy::Full);
 
         for attempt in 0..3 {
             let delay = strategy.next_delay(attempt, "error");
@@ -2471,8 +2476,8 @@ mod tests {
 
     #[test]
     fn test_linear_backoff_with_jitter() {
-        let strategy = LinearBackoff::new(5, Duration::from_seconds(5))
-            .with_jitter(JitterStrategy::Half);
+        let strategy =
+            LinearBackoff::new(5, Duration::from_seconds(5)).with_jitter(JitterStrategy::Half);
 
         for attempt in 0..5 {
             let delay = strategy.next_delay(attempt, "error");
@@ -2501,21 +2506,35 @@ mod tests {
             .build();
         for attempt in 0..3 {
             let secs = exp.next_delay(attempt, "e").unwrap().to_seconds();
-            assert!(secs >= 1, "ExponentialBackoff attempt {} delay {} < 1", attempt, secs);
+            assert!(
+                secs >= 1,
+                "ExponentialBackoff attempt {} delay {} < 1",
+                attempt,
+                secs
+            );
         }
 
-        let fixed = FixedDelay::new(3, Duration::from_seconds(1))
-            .with_jitter(JitterStrategy::Full);
+        let fixed = FixedDelay::new(3, Duration::from_seconds(1)).with_jitter(JitterStrategy::Full);
         for attempt in 0..3 {
             let secs = fixed.next_delay(attempt, "e").unwrap().to_seconds();
-            assert!(secs >= 1, "FixedDelay attempt {} delay {} < 1", attempt, secs);
+            assert!(
+                secs >= 1,
+                "FixedDelay attempt {} delay {} < 1",
+                attempt,
+                secs
+            );
         }
 
-        let linear = LinearBackoff::new(3, Duration::from_seconds(1))
-            .with_jitter(JitterStrategy::Full);
+        let linear =
+            LinearBackoff::new(3, Duration::from_seconds(1)).with_jitter(JitterStrategy::Full);
         for attempt in 0..3 {
             let secs = linear.next_delay(attempt, "e").unwrap().to_seconds();
-            assert!(secs >= 1, "LinearBackoff attempt {} delay {} < 1", attempt, secs);
+            assert!(
+                secs >= 1,
+                "LinearBackoff attempt {} delay {} < 1",
+                attempt,
+                secs
+            );
         }
     }
 

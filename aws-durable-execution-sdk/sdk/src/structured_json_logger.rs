@@ -261,7 +261,8 @@ mod tests {
         let mut logger = StructuredJsonLogger::new(LogLevel::Debug);
         logger.set_context(JsonLogContext {
             request_id: "req-abc-123".to_string(),
-            durable_execution_arn: "arn:aws:lambda:us-east-1:123456789012:function:my-func:durable:exec-1".to_string(),
+            durable_execution_arn:
+                "arn:aws:lambda:us-east-1:123456789012:function:my-func:durable:exec-1".to_string(),
             tenant_id: None,
         });
         logger

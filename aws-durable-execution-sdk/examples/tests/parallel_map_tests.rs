@@ -18,7 +18,9 @@ use aws_durable_execution_sdk::{
     CompletionConfig, CompletionReason, DurableContext, DurableError, Duration, MapConfig,
     OperationType,
 };
-use aws_durable_execution_sdk_examples::test_helper::{assert_nodejs_event_signatures, assert_nodejs_event_signatures_unordered};
+use aws_durable_execution_sdk_examples::test_helper::{
+    assert_nodejs_event_signatures, assert_nodejs_event_signatures_unordered,
+};
 use aws_durable_execution_sdk_testing::{
     ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig,
 };
@@ -174,7 +176,6 @@ async fn parallel_heterogeneous_handler(
     })
 }
 
-
 #[tokio::test(flavor = "current_thread")]
 async fn test_parallel_heterogeneous() {
     LocalDurableTestRunner::<serde_json::Value, ServiceResults>::setup_test_environment(
@@ -232,10 +233,7 @@ async fn test_parallel_heterogeneous() {
     assert!(!wait_ops.is_empty(), "Should have wait operation");
 
     // Check event signatures (Node.js-compatible format)
-    assert_nodejs_event_signatures(
-        &result,
-        "tests/history/parallel_heterogeneous.history.json",
-    );
+    assert_nodejs_event_signatures(&result, "tests/history/parallel_heterogeneous.history.json");
 }
 
 // ============================================================================
@@ -401,7 +399,6 @@ async fn test_map_basic() {
     assert_nodejs_event_signatures(&result, "tests/history/map_basic.history.json");
 }
 
-
 // ============================================================================
 // Map With Concurrency Example Handler
 // ============================================================================
@@ -505,7 +502,10 @@ async fn test_map_with_concurrency() {
     assert!(!operations.is_empty(), "Should have operations");
 
     // Check event signatures (Node.js-compatible format, unordered because concurrency can affect operation order)
-    assert_nodejs_event_signatures_unordered(&result, "tests/history/map_with_concurrency.history.json");
+    assert_nodejs_event_signatures_unordered(
+        &result,
+        "tests/history/map_with_concurrency.history.json",
+    );
 }
 
 // ============================================================================
@@ -593,7 +593,10 @@ async fn test_map_failure_tolerance() {
     assert_eq!(batch_result.total, 20, "Should have 20 total items");
     // Items 7 and 14 should fail (divisible by 7)
     assert_eq!(batch_result.failed, 2, "Should have 2 failed items");
-    assert_eq!(batch_result.successful, 18, "Should have 18 successful items");
+    assert_eq!(
+        batch_result.successful, 18,
+        "Should have 18 successful items"
+    );
 
     // Verify operations
     let operations = result.get_operations();
@@ -605,7 +608,6 @@ async fn test_map_failure_tolerance() {
         "tests/history/map_failure_tolerance.history.json",
     );
 }
-
 
 // ============================================================================
 // Map Min Successful Example Handler
@@ -687,7 +689,10 @@ async fn test_map_min_successful() {
     );
 
     let quorum_result = result.get_result().unwrap();
-    assert_eq!(quorum_result.required, 3, "Should require 3 (majority of 5)");
+    assert_eq!(
+        quorum_result.required, 3,
+        "Should require 3 (majority of 5)"
+    );
     assert!(
         quorum_result.achieved >= quorum_result.required,
         "Should achieve at least the required quorum"
@@ -765,7 +770,10 @@ async fn test_parallel_empty_array() {
     );
 
     let output = result.get_result().unwrap();
-    assert_eq!(output.total_branches, 0, "Should have 0 branches for empty input");
+    assert_eq!(
+        output.total_branches, 0,
+        "Should have 0 branches for empty input"
+    );
     assert_eq!(output.message, "Empty parallel completed successfully");
 
     // Check event signatures against history file
@@ -951,7 +959,10 @@ async fn test_parallel_error_preservation() {
 
     let output = result.get_result().unwrap();
     assert_eq!(output.total, 5, "Should have 5 total items");
-    assert_eq!(output.succeeded, 3, "Should have 3 succeeded items (1, 3, 5)");
+    assert_eq!(
+        output.succeeded, 3,
+        "Should have 3 succeeded items (1, 3, 5)"
+    );
     assert_eq!(output.failed, 2, "Should have 2 failed items (2, 4)");
     assert_eq!(
         output.error_messages.len(),
@@ -1011,11 +1022,9 @@ async fn parallel_min_successful_handler(
                 "task-e".to_string(),
             ],
             |child_ctx: DurableContext, item: String, _index: usize| {
-                Box::pin(async move {
-                    child_ctx
-                        .step(|_| Ok(format!("{} done", item)), None)
-                        .await
-                })
+                Box::pin(
+                    async move { child_ctx.step(|_| Ok(format!("{} done", item)), None).await },
+                )
             },
             Some(config),
         )
@@ -1124,10 +1133,7 @@ async fn parallel_min_successful_callback_handler(
             |child_ctx: DurableContext, item: String, _index: usize| {
                 Box::pin(async move {
                     let callback = child_ctx
-                        .create_callback_named::<String>(
-                            &format!("{}_callback", item),
-                            None,
-                        )
+                        .create_callback_named::<String>(&format!("{}_callback", item), None)
                         .await?;
                     println!("Callback for {}: {}", item, callback.callback_id);
                     callback.result().await
@@ -1278,7 +1284,10 @@ async fn test_parallel_tolerated_failure_count() {
 
     let output = result.get_result().unwrap();
     assert_eq!(output.total, 6, "Should have 6 total items");
-    assert_eq!(output.succeeded, 4, "Should have 4 succeeded items (1, 2, 4, 5)");
+    assert_eq!(
+        output.succeeded, 4,
+        "Should have 4 succeeded items (1, 2, 4, 5)"
+    );
     assert_eq!(output.failed, 2, "Should have 2 failed items (3, 6)");
 
     // Verify operations
@@ -1291,9 +1300,10 @@ async fn test_parallel_tolerated_failure_count() {
         "tests/history/parallel_tolerated_failure_count.history.json",
     );
 
-    LocalDurableTestRunner::<serde_json::Value, ToleratedFailureResult>::teardown_test_environment()
-        .await
-        .unwrap();
+    LocalDurableTestRunner::<serde_json::Value, ToleratedFailureResult>::teardown_test_environment(
+    )
+    .await
+    .unwrap();
 }
 
 // ============================================================================
@@ -1452,10 +1462,7 @@ async fn parallel_failure_threshold_exceeded_handler(
 
     let threshold_exceeded = results.is_failure();
     let error_message = if threshold_exceeded {
-        results
-            .get_results()
-            .err()
-            .map(|e| e.to_string())
+        results.get_results().err().map(|e| e.to_string())
     } else {
         None
     };
@@ -1492,8 +1499,14 @@ async fn test_parallel_failure_threshold_exceeded() {
     let output = result.get_result().unwrap();
     assert!(output.threshold_exceeded, "Threshold should be exceeded");
     assert_eq!(output.total, 5, "Should have 5 total items");
-    assert!(output.failed >= 2, "Should have at least 2 failed items (threshold exceeded after 2nd failure)");
-    assert!(output.error_message.is_some(), "Should have an error message");
+    assert!(
+        output.failed >= 2,
+        "Should have at least 2 failed items (threshold exceeded after 2nd failure)"
+    );
+    assert!(
+        output.error_message.is_some(),
+        "Should have an error message"
+    );
 
     // Verify operations
     let operations = result.get_operations();
@@ -1505,9 +1518,10 @@ async fn test_parallel_failure_threshold_exceeded() {
         "tests/history/parallel_failure_threshold_exceeded.history.json",
     );
 
-    LocalDurableTestRunner::<serde_json::Value, FailureThresholdResult>::teardown_test_environment()
-        .await
-        .unwrap();
+    LocalDurableTestRunner::<serde_json::Value, FailureThresholdResult>::teardown_test_environment(
+    )
+    .await
+    .unwrap();
 }
 
 // ============================================================================
@@ -1666,7 +1680,11 @@ async fn test_map_error_preservation() {
     assert_eq!(output.total, 8, "Should have 8 total items");
     assert_eq!(output.succeeded, 5, "Should have 5 succeeded items");
     assert_eq!(output.failed, 3, "Should have 3 failed items (2, 5, 8)");
-    assert_eq!(output.error_messages.len(), 3, "Should have 3 error messages");
+    assert_eq!(
+        output.error_messages.len(),
+        3,
+        "Should have 3 error messages"
+    );
 
     // Verify error messages are preserved
     for msg in &output.error_messages {
@@ -1807,9 +1825,7 @@ async fn map_large_scale_handler(
         .map(
             items,
             |child_ctx: DurableContext, item: i32, _index: usize| {
-                Box::pin(async move {
-                    child_ctx.step(|_| Ok(item * 2), None).await
-                })
+                Box::pin(async move { child_ctx.step(|_| Ok(item * 2), None).await })
             },
             Some(config),
         )
@@ -1862,10 +1878,7 @@ async fn test_map_large_scale() {
     }
 
     // Check event signatures against history file (unordered for concurrent map ops)
-    assert_nodejs_event_signatures_unordered(
-        &result,
-        "tests/history/map_large_scale.history.json",
-    );
+    assert_nodejs_event_signatures_unordered(&result, "tests/history/map_large_scale.history.json");
 
     LocalDurableTestRunner::<serde_json::Value, LargeScaleResult>::teardown_test_environment()
         .await

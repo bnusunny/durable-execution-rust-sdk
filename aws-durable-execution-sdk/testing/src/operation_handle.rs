@@ -182,9 +182,7 @@ impl OperationHandle {
     ///
     /// - `Ok(StepDetails<T>)` - The step details if populated and is a Step operation
     /// - `Err(TestError)` - If unpopulated or wrong operation type
-    pub async fn get_step_details<T: DeserializeOwned>(
-        &self,
-    ) -> Result<StepDetails<T>, TestError> {
+    pub async fn get_step_details<T: DeserializeOwned>(&self) -> Result<StepDetails<T>, TestError> {
         let op = self.get_durable_operation().await?;
         op.get_step_details()
     }
@@ -288,10 +286,7 @@ impl OperationHandle {
     /// // Wait for an operation to complete
     /// handle.wait_for_data(WaitingOperationStatus::Completed).await?;
     /// ```
-    pub async fn wait_for_data(
-        &self,
-        status: WaitingOperationStatus,
-    ) -> Result<(), TestError> {
+    pub async fn wait_for_data(&self, status: WaitingOperationStatus) -> Result<(), TestError> {
         // Check if the current status already satisfies the target
         if self.check_status_reached(status).await {
             return Ok(());
@@ -445,9 +440,9 @@ impl OperationHandle {
     /// a callback_id available (Submitted status). Returns the callback_id on success.
     async fn validate_callback_ready(&self) -> Result<String, TestError> {
         let inner = self.inner.read().await;
-        let op = inner.as_ref().ok_or_else(|| {
-            TestError::OperationNotFound("Operation not yet populated".into())
-        })?;
+        let op = inner
+            .as_ref()
+            .ok_or_else(|| TestError::OperationNotFound("Operation not yet populated".into()))?;
 
         if op.operation_type != OperationType::Callback {
             return Err(TestError::NotCallbackOperation);
@@ -486,9 +481,9 @@ impl OperationHandle {
     /// - 3.4: Preserves execution order of child operations
     pub async fn get_child_operations(&self) -> Result<Vec<DurableOperation>, TestError> {
         let inner = self.inner.read().await;
-        let op = inner.as_ref().ok_or_else(|| {
-            TestError::OperationNotFound("Operation not yet populated".into())
-        })?;
+        let op = inner
+            .as_ref()
+            .ok_or_else(|| TestError::OperationNotFound("Operation not yet populated".into()))?;
 
         let my_id = &op.operation_id;
         let all_ops = self.all_operations.read().await;
@@ -517,7 +512,6 @@ impl OperationHandle {
             OperationMatcher::ByNameAndIndex(name, idx) => format!("name={}, index={}", name, idx),
         }
     }
-
 }
 
 #[cfg(test)]
@@ -707,7 +701,10 @@ mod tests {
         let all_ops = Arc::new(RwLock::new(Vec::new()));
         let handle = OperationHandle::new(OperationMatcher::ByName("test".into()), all_ops);
         populate_handle(&handle, create_step_operation()).await;
-        assert_eq!(handle.get_name().await.unwrap(), Some("my-step".to_string()));
+        assert_eq!(
+            handle.get_name().await.unwrap(),
+            Some("my-step".to_string())
+        );
     }
 
     #[tokio::test]
@@ -739,7 +736,10 @@ mod tests {
         let all_ops = Arc::new(RwLock::new(Vec::new()));
         let handle = OperationHandle::new(OperationMatcher::ByName("test".into()), all_ops);
         populate_handle(&handle, create_step_operation()).await;
-        assert_eq!(handle.get_status().await.unwrap(), OperationStatus::Succeeded);
+        assert_eq!(
+            handle.get_status().await.unwrap(),
+            OperationStatus::Succeeded
+        );
     }
 
     #[tokio::test]
@@ -860,7 +860,9 @@ mod tests {
         let handle = OperationHandle::new(OperationMatcher::ByName("test".into()), all_ops);
         // create_step_operation has status Succeeded (terminal)
         populate_handle(&handle, create_step_operation()).await;
-        let result = handle.wait_for_data(WaitingOperationStatus::Completed).await;
+        let result = handle
+            .wait_for_data(WaitingOperationStatus::Completed)
+            .await;
         assert!(result.is_ok());
     }
 
@@ -870,7 +872,9 @@ mod tests {
         let handle = OperationHandle::new(OperationMatcher::ByName("test".into()), all_ops);
         // create_callback_operation has callback_id set
         populate_handle(&handle, create_callback_operation()).await;
-        let result = handle.wait_for_data(WaitingOperationStatus::Submitted).await;
+        let result = handle
+            .wait_for_data(WaitingOperationStatus::Submitted)
+            .await;
         assert!(result.is_ok());
     }
 
@@ -880,7 +884,9 @@ mod tests {
         let handle = OperationHandle::new(OperationMatcher::ByName("test".into()), all_ops);
         // Non-callback operations treat Submitted as Started
         populate_handle(&handle, create_step_operation()).await;
-        let result = handle.wait_for_data(WaitingOperationStatus::Submitted).await;
+        let result = handle
+            .wait_for_data(WaitingOperationStatus::Submitted)
+            .await;
         assert!(result.is_ok());
     }
 
@@ -898,9 +904,21 @@ mod tests {
         let handle = OperationHandle::new(OperationMatcher::ByName("test".into()), all_ops);
 
         // Unpopulated handle should not satisfy any status
-        assert!(!handle.check_status_reached(WaitingOperationStatus::Started).await);
-        assert!(!handle.check_status_reached(WaitingOperationStatus::Submitted).await);
-        assert!(!handle.check_status_reached(WaitingOperationStatus::Completed).await);
+        assert!(
+            !handle
+                .check_status_reached(WaitingOperationStatus::Started)
+                .await
+        );
+        assert!(
+            !handle
+                .check_status_reached(WaitingOperationStatus::Submitted)
+                .await
+        );
+        assert!(
+            !handle
+                .check_status_reached(WaitingOperationStatus::Completed)
+                .await
+        );
     }
 
     #[tokio::test]
@@ -914,8 +932,16 @@ mod tests {
         populate_handle(&handle, op).await;
 
         // Started satisfies Started but not Completed
-        assert!(handle.check_status_reached(WaitingOperationStatus::Started).await);
-        assert!(!handle.check_status_reached(WaitingOperationStatus::Completed).await);
+        assert!(
+            handle
+                .check_status_reached(WaitingOperationStatus::Started)
+                .await
+        );
+        assert!(
+            !handle
+                .check_status_reached(WaitingOperationStatus::Completed)
+                .await
+        );
     }
 
     #[tokio::test]
@@ -934,8 +960,16 @@ mod tests {
         populate_handle(&handle, op).await;
 
         // Started is satisfied, but Submitted is not (no callback_id)
-        assert!(handle.check_status_reached(WaitingOperationStatus::Started).await);
-        assert!(!handle.check_status_reached(WaitingOperationStatus::Submitted).await);
+        assert!(
+            handle
+                .check_status_reached(WaitingOperationStatus::Started)
+                .await
+        );
+        assert!(
+            !handle
+                .check_status_reached(WaitingOperationStatus::Submitted)
+                .await
+        );
     }
 
     #[tokio::test]
@@ -994,10 +1028,14 @@ mod tests {
                 let mut inner = handle_clone.inner.write().await;
                 *inner = Some(op);
             }
-            let _ = handle_clone.status_tx.send(Some(OperationStatus::Succeeded));
+            let _ = handle_clone
+                .status_tx
+                .send(Some(OperationStatus::Succeeded));
         });
 
-        let result = handle.wait_for_data(WaitingOperationStatus::Completed).await;
+        let result = handle
+            .wait_for_data(WaitingOperationStatus::Completed)
+            .await;
         assert!(result.is_ok());
     }
 
@@ -1026,10 +1064,14 @@ mod tests {
                     op.status = OperationStatus::Succeeded;
                 }
             }
-            let _ = handle_clone.status_tx.send(Some(OperationStatus::Succeeded));
+            let _ = handle_clone
+                .status_tx
+                .send(Some(OperationStatus::Succeeded));
         });
 
-        let result = handle.wait_for_data(WaitingOperationStatus::Completed).await;
+        let result = handle
+            .wait_for_data(WaitingOperationStatus::Completed)
+            .await;
         assert!(result.is_ok());
     }
 
@@ -1069,7 +1111,9 @@ mod tests {
             let _ = handle_clone.status_tx.send(Some(OperationStatus::Started));
         });
 
-        let result = handle.wait_for_data(WaitingOperationStatus::Submitted).await;
+        let result = handle
+            .wait_for_data(WaitingOperationStatus::Submitted)
+            .await;
         assert!(result.is_ok());
     }
 
@@ -1077,7 +1121,8 @@ mod tests {
     async fn test_matcher_description() {
         let all_ops = Arc::new(RwLock::new(Vec::new()));
 
-        let handle = OperationHandle::new(OperationMatcher::ByName("my-op".into()), all_ops.clone());
+        let handle =
+            OperationHandle::new(OperationMatcher::ByName("my-op".into()), all_ops.clone());
         assert_eq!(handle.matcher_description(), "name=my-op");
 
         let handle = OperationHandle::new(OperationMatcher::ByIndex(3), all_ops.clone());
@@ -1112,7 +1157,10 @@ mod tests {
     #[async_trait::async_trait]
     impl CallbackSender for MockCallbackSender {
         async fn send_success(&self, callback_id: &str, result: &str) -> Result<(), TestError> {
-            self.success_calls.write().await.push((callback_id.to_string(), result.to_string()));
+            self.success_calls
+                .write()
+                .await
+                .push((callback_id.to_string(), result.to_string()));
             Ok(())
         }
 
@@ -1121,12 +1169,18 @@ mod tests {
             callback_id: &str,
             error: &crate::types::TestResultError,
         ) -> Result<(), TestError> {
-            self.failure_calls.write().await.push((callback_id.to_string(), error.to_string()));
+            self.failure_calls
+                .write()
+                .await
+                .push((callback_id.to_string(), error.to_string()));
             Ok(())
         }
 
         async fn send_heartbeat(&self, callback_id: &str) -> Result<(), TestError> {
-            self.heartbeat_calls.write().await.push(callback_id.to_string());
+            self.heartbeat_calls
+                .write()
+                .await
+                .push(callback_id.to_string());
             Ok(())
         }
     }
@@ -1342,13 +1396,10 @@ mod tests {
     async fn test_get_child_operations_children_support_recursive_enumeration() {
         let parent_op = create_operation_with_parent("parent-1", "parent", None);
         let child = create_operation_with_parent("child-1", "child", Some("parent-1"));
-        let grandchild = create_operation_with_parent("grandchild-1", "grandchild", Some("child-1"));
+        let grandchild =
+            create_operation_with_parent("grandchild-1", "grandchild", Some("child-1"));
 
-        let all_ops = Arc::new(RwLock::new(vec![
-            parent_op.clone(),
-            child,
-            grandchild,
-        ]));
+        let all_ops = Arc::new(RwLock::new(vec![parent_op.clone(), child, grandchild]));
 
         let handle = OperationHandle::new(OperationMatcher::ByName("parent".into()), all_ops);
         populate_handle(&handle, parent_op).await;

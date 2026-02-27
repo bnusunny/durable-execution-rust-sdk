@@ -82,7 +82,11 @@ impl<T> TestExecutionResult<T> {
     }
 
     /// Create a failed result.
-    pub fn failure(error: TestResultError, operations: Vec<Operation>, execution_id: String) -> Self {
+    pub fn failure(
+        error: TestResultError,
+        operations: Vec<Operation>,
+        execution_id: String,
+    ) -> Self {
         Self {
             status: ExecutionStatus::Failed,
             result: None,
@@ -112,7 +116,6 @@ impl<T> TestExecutionResult<T> {
     }
 }
 
-
 /// Internal storage for operations during test execution.
 #[derive(Debug, Default)]
 pub struct OperationStorage {
@@ -140,10 +143,7 @@ impl OperationStorage {
         self.operations_by_id.insert(id, index);
 
         if let Some(name) = name {
-            self.operations_by_name
-                .entry(name)
-                .or_default()
-                .push(index);
+            self.operations_by_name.entry(name).or_default().push(index);
         }
     }
 
@@ -342,7 +342,6 @@ where
     }
 }
 
-
 impl<I, O> TestExecutionOrchestrator<I, O>
 where
     I: DeserializeOwned + Send + Serialize + Clone + 'static,
@@ -405,13 +404,12 @@ where
             return Err(crate::error::TestError::CheckpointServerError(error));
         }
 
-        let invocation_result: super::InvocationResult = serde_json::from_str(
-            &start_response.payload.ok_or_else(|| {
+        let invocation_result: super::InvocationResult =
+            serde_json::from_str(&start_response.payload.ok_or_else(|| {
                 crate::error::TestError::CheckpointServerError(
                     "Empty response from checkpoint server".to_string(),
                 )
-            })?,
-        )?;
+            })?)?;
 
         self.execution_id = Some(invocation_result.execution_id.clone());
         self.checkpoint_token = Some(invocation_result.checkpoint_token.clone());
@@ -484,7 +482,9 @@ where
                     let test_error = TestResultError::new(error_obj.error_type, error.to_string());
                     let mut test_result =
                         TestExecutionResult::failure(test_error.clone(), operations, execution_arn);
-                    test_result.invocations.push(invocation.with_error(test_error));
+                    test_result
+                        .invocations
+                        .push(invocation.with_error(test_error));
                     Ok(test_result)
                 }
             }
@@ -511,7 +511,8 @@ where
             }
 
             // Get current operations
-            let mut operations = match self.checkpoint_api.get_operations(&execution_arn, "").await {
+            let mut operations = match self.checkpoint_api.get_operations(&execution_arn, "").await
+            {
                 Ok(response) => {
                     let mut storage = self.operation_storage.write().await;
                     for op in &response.operations {
@@ -581,18 +582,19 @@ where
                                 self.populate_handles(&poll_operations).await;
 
                                 // Check if any previously pending callback has completed
-                                let all_callbacks_done = self.pending_operations.iter().all(|op_id| {
-                                    poll_operations.iter().any(|op| {
-                                        &op.operation_id == op_id
-                                            && op.operation_type == OperationType::Callback
-                                            && matches!(
-                                                op.status,
-                                                OperationStatus::Succeeded
-                                                    | OperationStatus::Failed
-                                                    | OperationStatus::Cancelled
-                                            )
-                                    })
-                                });
+                                let all_callbacks_done =
+                                    self.pending_operations.iter().all(|op_id| {
+                                        poll_operations.iter().any(|op| {
+                                            &op.operation_id == op_id
+                                                && op.operation_type == OperationType::Callback
+                                                && matches!(
+                                                    op.status,
+                                                    OperationStatus::Succeeded
+                                                        | OperationStatus::Failed
+                                                        | OperationStatus::Cancelled
+                                                )
+                                        })
+                                    });
 
                                 if all_callbacks_done {
                                     operations = poll_operations;
@@ -629,11 +631,12 @@ where
                                 // In time-skip mode, complete all pending waits immediately
                                 // We don't check the timestamp because tokio::time::advance
                                 // doesn't affect chrono::Utc::now()
-                                
+
                                 // Update the wait operation to SUCCEEDED
                                 let mut updated_operation = op.clone();
                                 updated_operation.status = OperationStatus::Succeeded;
-                                updated_operation.end_timestamp = Some(chrono::Utc::now().timestamp_millis());
+                                updated_operation.end_timestamp =
+                                    Some(chrono::Utc::now().timestamp_millis());
 
                                 let update_request = super::types::UpdateCheckpointDataRequest {
                                     execution_id: execution_arn.clone(),
@@ -646,7 +649,10 @@ where
                                 let payload = serde_json::to_string(&update_request)?;
                                 let _ = self
                                     .checkpoint_api
-                                    .send_api_request(super::types::ApiType::UpdateCheckpointData, payload)
+                                    .send_api_request(
+                                        super::types::ApiType::UpdateCheckpointData,
+                                        payload,
+                                    )
                                     .await;
                             }
                         }
@@ -671,13 +677,12 @@ where
                 return Err(crate::error::TestError::CheckpointServerError(error));
             }
 
-            let invocation_result: super::InvocationResult = serde_json::from_str(
-                &start_response.payload.ok_or_else(|| {
+            let invocation_result: super::InvocationResult =
+                serde_json::from_str(&start_response.payload.ok_or_else(|| {
                     crate::error::TestError::CheckpointServerError(
                         "Empty response from checkpoint server".to_string(),
                     )
-                })?,
-            )?;
+                })?)?;
 
             self.checkpoint_token = Some(invocation_result.checkpoint_token.clone());
 
@@ -962,7 +967,9 @@ where
         _execution_id: &str,
     ) -> OperationProcessResult {
         // Check if step is pending retry
-        if operation.status != OperationStatus::Pending && operation.status != OperationStatus::Started {
+        if operation.status != OperationStatus::Pending
+            && operation.status != OperationStatus::Started
+        {
             return OperationProcessResult::Completed;
         }
 
@@ -1049,19 +1056,15 @@ where
         // Check each registered handle against the operations
         for handle in &self.registered_handles {
             let matched_op = match &handle.matcher {
-                OperationMatcher::ByName(name) => {
-                    operations.iter().find(|op| op.name.as_deref() == Some(name))
-                }
+                OperationMatcher::ByName(name) => operations
+                    .iter()
+                    .find(|op| op.name.as_deref() == Some(name)),
                 OperationMatcher::ByIndex(index) => operations.get(*index),
-                OperationMatcher::ById(id) => {
-                    operations.iter().find(|op| op.operation_id == *id)
-                }
-                OperationMatcher::ByNameAndIndex(name, index) => {
-                    operations
-                        .iter()
-                        .filter(|op| op.name.as_deref() == Some(name))
-                        .nth(*index)
-                }
+                OperationMatcher::ById(id) => operations.iter().find(|op| op.operation_id == *id),
+                OperationMatcher::ByNameAndIndex(name, index) => operations
+                    .iter()
+                    .filter(|op| op.name.as_deref() == Some(name))
+                    .nth(*index),
             };
 
             if let Some(op) = matched_op {
@@ -1072,7 +1075,7 @@ where
                 }
 
                 // Send status update via the watch channel
-                let _ = handle.status_tx.send(Some(op.status.clone()));
+                let _ = handle.status_tx.send(Some(op.status));
             }
         }
     }
@@ -1132,8 +1135,7 @@ where
                 }
 
                 // Update checkpoint data to mark the operation as SUCCEEDED
-                let mut updated_operation =
-                    Operation::new(&operation_id, OperationType::Wait);
+                let mut updated_operation = Operation::new(&operation_id, OperationType::Wait);
                 updated_operation.status = OperationStatus::Succeeded;
                 updated_operation.end_timestamp = Some(chrono::Utc::now().timestamp_millis());
 
@@ -1243,12 +1245,8 @@ where
         });
 
         // Schedule the function
-        self.scheduler.schedule_function(
-            start_invocation,
-            on_error,
-            timestamp,
-            wrapped_update,
-        );
+        self.scheduler
+            .schedule_function(start_invocation, on_error, timestamp, wrapped_update);
     }
 
     /// Check if there are scheduled functions pending.
@@ -1330,13 +1328,12 @@ where
                 return Err(crate::error::TestError::CheckpointServerError(error));
             }
 
-            let invocation_result: super::InvocationResult = serde_json::from_str(
-                &start_response.payload.ok_or_else(|| {
+            let invocation_result: super::InvocationResult =
+                serde_json::from_str(&start_response.payload.ok_or_else(|| {
                     crate::error::TestError::CheckpointServerError(
                         "Empty response from checkpoint server".to_string(),
                     )
-                })?,
-            )?;
+                })?)?;
 
             // Update orchestrator state
             self.execution_id = Some(invocation_result.execution_id.clone());
@@ -1360,13 +1357,12 @@ where
                 return Err(crate::error::TestError::CheckpointServerError(error));
             }
 
-            let invocation_result: super::InvocationResult = serde_json::from_str(
-                &start_response.payload.ok_or_else(|| {
+            let invocation_result: super::InvocationResult =
+                serde_json::from_str(&start_response.payload.ok_or_else(|| {
                     crate::error::TestError::CheckpointServerError(
                         "Empty response from checkpoint server".to_string(),
                     )
-                })?,
-            )?;
+                })?)?;
 
             // Update checkpoint token
             self.checkpoint_token = Some(invocation_result.checkpoint_token.clone());
@@ -1621,7 +1617,7 @@ pub enum InvokeHandlerResult<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aws_durable_execution_sdk::{ErrorObject, WaitDetails, StepDetails};
+    use aws_durable_execution_sdk::{ErrorObject, StepDetails, WaitDetails};
 
     #[test]
     fn test_skip_time_config_default() {
@@ -1720,7 +1716,10 @@ mod tests {
     #[test]
     fn test_process_operations_result_no_pending() {
         let result = ProcessOperationsResult::NoPendingOperations;
-        assert!(matches!(result, ProcessOperationsResult::NoPendingOperations));
+        assert!(matches!(
+            result,
+            ProcessOperationsResult::NoPendingOperations
+        ));
     }
 
     #[test]
@@ -2020,9 +2019,8 @@ mod tests {
         let checkpoint_api = CheckpointWorkerManager::get_instance(None).unwrap();
 
         // Create an orchestrator with time skipping disabled
-        let handler = |_input: String, _ctx: DurableContext| async move {
-            Ok("result".to_string())
-        };
+        let handler =
+            |_input: String, _ctx: DurableContext| async move { Ok("result".to_string()) };
 
         let operation_storage = Arc::new(RwLock::new(OperationStorage::new()));
         let mut orchestrator = TestExecutionOrchestrator::new(
@@ -2034,11 +2032,7 @@ mod tests {
 
         // Schedule an invocation at a future timestamp
         let future_timestamp = chrono::Utc::now().timestamp_millis() + 1000;
-        orchestrator.schedule_invocation_at_timestamp(
-            future_timestamp,
-            "exec-1",
-            "wait-1",
-        );
+        orchestrator.schedule_invocation_at_timestamp(future_timestamp, "exec-1", "wait-1");
 
         // Verify that a function was scheduled
         assert!(orchestrator.has_scheduled_functions());
@@ -2054,9 +2048,8 @@ mod tests {
         let checkpoint_api = CheckpointWorkerManager::get_instance(None).unwrap();
 
         // Create an orchestrator
-        let handler = |_input: String, _ctx: DurableContext| async move {
-            Ok("result".to_string())
-        };
+        let handler =
+            |_input: String, _ctx: DurableContext| async move { Ok("result".to_string()) };
 
         let operation_storage = Arc::new(RwLock::new(OperationStorage::new()));
         let mut orchestrator = TestExecutionOrchestrator::new(
@@ -2083,9 +2076,8 @@ mod tests {
         let checkpoint_api = CheckpointWorkerManager::get_instance(None).unwrap();
 
         // Create an orchestrator
-        let handler = |_input: String, _ctx: DurableContext| async move {
-            Ok("result".to_string())
-        };
+        let handler =
+            |_input: String, _ctx: DurableContext| async move { Ok("result".to_string()) };
 
         let operation_storage = Arc::new(RwLock::new(OperationStorage::new()));
         let mut orchestrator = TestExecutionOrchestrator::new(
@@ -2120,9 +2112,8 @@ mod tests {
         let checkpoint_api = CheckpointWorkerManager::get_instance(None).unwrap();
 
         // Create an orchestrator
-        let handler = |_input: String, _ctx: DurableContext| async move {
-            Ok("result".to_string())
-        };
+        let handler =
+            |_input: String, _ctx: DurableContext| async move { Ok("result".to_string()) };
 
         let operation_storage = Arc::new(RwLock::new(OperationStorage::new()));
         let mut orchestrator = TestExecutionOrchestrator::new(
@@ -2153,9 +2144,8 @@ mod tests {
         let checkpoint_api = CheckpointWorkerManager::get_instance(None).unwrap();
 
         // Create an orchestrator with time skipping enabled
-        let handler = |_input: String, _ctx: DurableContext| async move {
-            Ok("result".to_string())
-        };
+        let handler =
+            |_input: String, _ctx: DurableContext| async move { Ok("result".to_string()) };
 
         let operation_storage = Arc::new(RwLock::new(OperationStorage::new()));
         let mut orchestrator = TestExecutionOrchestrator::new(
@@ -2170,11 +2160,7 @@ mod tests {
 
         // Schedule an invocation at a future timestamp
         let future_timestamp = chrono::Utc::now().timestamp_millis() + 5000;
-        orchestrator.schedule_invocation_at_timestamp(
-            future_timestamp,
-            "exec-1",
-            "wait-1",
-        );
+        orchestrator.schedule_invocation_at_timestamp(future_timestamp, "exec-1", "wait-1");
 
         // Verify that a function was scheduled
         assert!(orchestrator.has_scheduled_functions());
@@ -2189,9 +2175,11 @@ mod tests {
             operations: vec![],
             invocation,
         };
-        
+
         match result {
-            InvokeHandlerResult::Succeeded { result, operations, .. } => {
+            InvokeHandlerResult::Succeeded {
+                result, operations, ..
+            } => {
                 assert_eq!(result, "test result");
                 assert!(operations.is_empty());
             }
@@ -2208,9 +2196,11 @@ mod tests {
             operations: vec![],
             invocation,
         };
-        
+
         match result {
-            InvokeHandlerResult::Failed { error, operations, .. } => {
+            InvokeHandlerResult::Failed {
+                error, operations, ..
+            } => {
                 assert_eq!(error.error_type, Some("TestError".to_string()));
                 assert!(operations.is_empty());
             }
@@ -2227,9 +2217,13 @@ mod tests {
             should_reinvoke: true,
             advance_time_ms: Some(5000),
         };
-        
+
         match result {
-            InvokeHandlerResult::Pending { should_reinvoke, advance_time_ms, .. } => {
+            InvokeHandlerResult::Pending {
+                should_reinvoke,
+                advance_time_ms,
+                ..
+            } => {
                 assert!(should_reinvoke);
                 assert_eq!(advance_time_ms, Some(5000));
             }
@@ -2246,9 +2240,13 @@ mod tests {
             should_reinvoke: false,
             advance_time_ms: None,
         };
-        
+
         match result {
-            InvokeHandlerResult::Pending { should_reinvoke, advance_time_ms, .. } => {
+            InvokeHandlerResult::Pending {
+                should_reinvoke,
+                advance_time_ms,
+                ..
+            } => {
                 assert!(!should_reinvoke);
                 assert_eq!(advance_time_ms, None);
             }
@@ -2267,9 +2265,8 @@ mod tests {
         let checkpoint_api = CheckpointWorkerManager::get_instance(None).unwrap();
 
         // Create an orchestrator
-        let handler = |_input: String, _ctx: DurableContext| async move {
-            Ok("result".to_string())
-        };
+        let handler =
+            |_input: String, _ctx: DurableContext| async move { Ok("result".to_string()) };
 
         let operation_storage = Arc::new(RwLock::new(OperationStorage::new()));
         let orchestrator = TestExecutionOrchestrator::new(
@@ -2296,9 +2293,8 @@ mod tests {
         let checkpoint_api = CheckpointWorkerManager::get_instance(None).unwrap();
 
         // Create an orchestrator with time skipping enabled
-        let handler = |_input: String, _ctx: DurableContext| async move {
-            Ok("result".to_string())
-        };
+        let handler =
+            |_input: String, _ctx: DurableContext| async move { Ok("result".to_string()) };
 
         let operation_storage = Arc::new(RwLock::new(OperationStorage::new()));
         let orchestrator = TestExecutionOrchestrator::new(
@@ -2310,7 +2306,7 @@ mod tests {
 
         // Verify time skipping is enabled
         assert!(orchestrator.is_time_skipping_enabled());
-        
+
         // Initially no invocation is active
         assert!(!orchestrator.is_invocation_active());
     }
@@ -2318,8 +2314,8 @@ mod tests {
     #[tokio::test]
     async fn test_invoke_handler_tracks_invocation_active_state() {
         use super::*;
-        use std::sync::Arc;
         use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
         use tokio::sync::RwLock;
 
         // Create a mock checkpoint worker manager
@@ -2438,7 +2434,7 @@ mod property_tests {
                             advance_time_ms.is_some(),
                             "Should have advance time when time skipping is enabled"
                         );
-                        
+
                         // The advance time should be approximately the wait duration
                         // (may be slightly less due to time elapsed during test)
                         if let Some(advance_ms) = advance_time_ms {

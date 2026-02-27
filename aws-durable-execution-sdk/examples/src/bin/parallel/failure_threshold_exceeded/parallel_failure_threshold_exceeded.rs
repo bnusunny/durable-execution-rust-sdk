@@ -63,10 +63,7 @@ pub async fn handler(
 
     let threshold_exceeded = results.is_failure();
     let error_message = if threshold_exceeded {
-        results
-            .get_results()
-            .err()
-            .map(|e| e.to_string())
+        results.get_results().err().map(|e| e.to_string())
     } else {
         None
     };

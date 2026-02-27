@@ -223,13 +223,12 @@ where
 
     // Create the service client
     let aws_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
-    let service_client: SharedDurableServiceClient = Arc::new(
-        LambdaDurableServiceClient::from_aws_config_with_user_agent(
+    let service_client: SharedDurableServiceClient =
+        Arc::new(LambdaDurableServiceClient::from_aws_config_with_user_agent(
             &aws_config,
             SDK_NAME,
             SDK_VERSION,
-        ),
-    );
+        ));
 
     // Create ExecutionState with batcher
     let batcher_config = CheckpointBatcherConfig::default();
@@ -293,8 +292,8 @@ mod tests {
         operations: Vec<Operation>,
     ) -> DurableExecutionInvocationInput {
         DurableExecutionInvocationInput {
-            durable_execution_arn: "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc"
-                .to_string(),
+            durable_execution_arn:
+                "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc".to_string(),
             checkpoint_token: "token".to_string(),
             initial_execution_state: InitialExecutionState {
                 operations,
@@ -323,9 +322,7 @@ mod tests {
     fn test_extract_event_from_execution_details_payload() {
         let mut op = Operation::new("exec-1", OperationType::Execution);
         op.execution_details = Some(ExecutionDetails {
-            input_payload: Some(
-                r#"{"order_id":"ORD-2","amount":50.0}"#.to_string(),
-            ),
+            input_payload: Some(r#"{"order_id":"ORD-2","amount":50.0}"#.to_string()),
         });
         let input = make_input(None, vec![op]);
         let event: TestEvent = extract_event(&input).unwrap();
@@ -358,9 +355,7 @@ mod tests {
     fn test_extract_event_top_level_input_takes_priority() {
         let mut op = Operation::new("exec-1", OperationType::Execution);
         op.execution_details = Some(ExecutionDetails {
-            input_payload: Some(
-                r#"{"order_id":"FROM-PAYLOAD","amount":1.0}"#.to_string(),
-            ),
+            input_payload: Some(r#"{"order_id":"FROM-PAYLOAD","amount":1.0}"#.to_string()),
         });
         let input = make_input(
             Some(serde_json::json!({"order_id": "FROM-INPUT", "amount": 2.0})),
@@ -434,8 +429,7 @@ mod tests {
             InitialExecutionState::new(),
             client,
         ));
-        let output =
-            process_result(Ok("hello"), &state, "test-arn").await;
+        let output = process_result(Ok("hello"), &state, "test-arn").await;
         assert!(output.is_succeeded());
         assert_eq!(output.result.unwrap(), "\"hello\"");
     }
@@ -463,8 +457,7 @@ mod tests {
             InitialExecutionState::new(),
             client,
         ));
-        let result: Result<String, DurableError> =
-            Err(DurableError::execution("something broke"));
+        let result: Result<String, DurableError> = Err(DurableError::execution("something broke"));
         let output = process_result(result, &state, "test-arn").await;
         assert!(output.is_failed());
         assert!(output

@@ -3,7 +3,9 @@
 //! These tests verify that concurrent durable operations using `tokio::join!`
 //! execute correctly and produce deterministic replay behavior.
 
-use aws_durable_execution_sdk::{CallbackConfig, DurableContext, DurableError, Duration, OperationType};
+use aws_durable_execution_sdk::{
+    CallbackConfig, DurableContext, DurableError, Duration, OperationType,
+};
 use aws_durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures_unordered;
 use aws_durable_execution_sdk_testing::{
     ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig,
@@ -144,10 +146,7 @@ async fn test_concurrent_wait() {
         .collect();
     assert_eq!(wait_ops.len(), 3, "Should have 3 wait operations");
 
-    assert_nodejs_event_signatures_unordered(
-        &result,
-        "tests/history/concurrent_wait.history.json",
-    );
+    assert_nodejs_event_signatures_unordered(&result, "tests/history/concurrent_wait.history.json");
 
     LocalDurableTestRunner::<serde_json::Value, ConcurrentWaitResult>::teardown_test_environment()
         .await
@@ -177,16 +176,14 @@ async fn concurrent_callback_wait_handler(
         ..Default::default()
     };
 
-    let (step_result, callback_result) = tokio::join!(
-        ctx1.step(|_| Ok("step_done".to_string()), None),
-        async {
+    let (step_result, callback_result) =
+        tokio::join!(ctx1.step(|_| Ok("step_done".to_string()), None), async {
             let cb = ctx2
                 .create_callback_named::<String>("concurrent_cb", Some(config))
                 .await?;
             println!("Callback ID: {}", cb.callback_id);
             cb.result().await
-        },
-    );
+        },);
 
     Ok(CallbackWaitResult {
         step_result: step_result?,

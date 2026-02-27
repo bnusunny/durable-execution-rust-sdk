@@ -19,9 +19,10 @@ pub async fn handler(
     ctx: DurableContext,
 ) -> Result<String, DurableError> {
     let config = StepConfig {
-        retry_strategy: Some(Box::new(
-            ExponentialBackoff::new(2, Duration::from_seconds(1)),
-        )),
+        retry_strategy: Some(Box::new(ExponentialBackoff::new(
+            2,
+            Duration::from_seconds(1),
+        ))),
         ..Default::default()
     };
 

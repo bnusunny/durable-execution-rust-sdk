@@ -148,10 +148,7 @@ async fn test_promise_all_macro() {
     );
 
     // Check event signatures (Node.js-compatible format)
-    assert_nodejs_event_signatures(
-        &result,
-        "tests/history/promise_all_macro.history.json",
-    );
+    assert_nodejs_event_signatures(&result, "tests/history/promise_all_macro.history.json");
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -221,10 +218,7 @@ async fn test_promise_all_with_map() {
     assert!(!operations.is_empty(), "Should have operations");
 
     // Check event signatures (Node.js-compatible format)
-    assert_nodejs_event_signatures(
-        &result,
-        "tests/history/promise_all_with_map.history.json",
-    );
+    assert_nodejs_event_signatures(&result, "tests/history/promise_all_with_map.history.json");
 }
 
 // ============================================================================
@@ -493,10 +487,7 @@ async fn test_promise_any_macro() {
     assert!(!operations.is_empty(), "Should have operations");
 
     // Check event signatures (Node.js-compatible format)
-    assert_nodejs_event_signatures(
-        &result,
-        "tests/history/promise_any_macro.history.json",
-    );
+    assert_nodejs_event_signatures(&result, "tests/history/promise_any_macro.history.json");
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -532,10 +523,7 @@ async fn test_promise_any() {
     assert!(!operations.is_empty(), "Should have operations");
 
     // Check event signatures (Node.js-compatible format, unordered because concurrency can affect order)
-    assert_nodejs_event_signatures_unordered(
-        &result,
-        "tests/history/promise_any.history.json",
-    );
+    assert_nodejs_event_signatures_unordered(&result, "tests/history/promise_any.history.json");
 }
 
 // ============================================================================
@@ -552,12 +540,8 @@ async fn promise_race_macro_handler(
 
     let result = race!(
         ctx,
-        async move {
-            ctx1.step(|_| Ok("fast result".to_string()), None).await
-        },
-        async move {
-            ctx2.step(|_| Ok("slow result".to_string()), None).await
-        },
+        async move { ctx1.step(|_| Ok("fast result".to_string()), None).await },
+        async move { ctx2.step(|_| Ok("slow result".to_string()), None).await },
     )
     .await?;
 
@@ -656,10 +640,7 @@ async fn test_promise_race_macro() {
     assert!(!operations.is_empty(), "Should have operations");
 
     // Check event signatures (Node.js-compatible format)
-    assert_nodejs_event_signatures(
-        &result,
-        "tests/history/promise_race_macro.history.json",
-    );
+    assert_nodejs_event_signatures(&result, "tests/history/promise_race_macro.history.json");
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -697,10 +678,7 @@ async fn test_promise_race() {
     assert!(!operations.is_empty(), "Should have operations");
 
     // Check event signatures (Node.js-compatible format, unordered because concurrency can affect order)
-    assert_nodejs_event_signatures_unordered(
-        &result,
-        "tests/history/promise_race.history.json",
-    );
+    assert_nodejs_event_signatures_unordered(&result, "tests/history/promise_race.history.json");
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -730,10 +708,7 @@ async fn test_promise_race_timeout_pattern() {
     assert!(!operations.is_empty(), "Should have operations");
 
     // Check event signatures (Node.js-compatible format)
-    assert_nodejs_event_signatures(
-        &result,
-        "tests/history/promise_race_timeout.history.json",
-    );
+    assert_nodejs_event_signatures(&result, "tests/history/promise_race_timeout.history.json");
 }
 
 // ============================================================================
@@ -749,10 +724,16 @@ async fn all_with_wait_handler(
     ctx: DurableContext,
 ) -> Result<Vec<String>, DurableError> {
     // Perform waits before the all! combinator
-    ctx.wait(aws_durable_execution_sdk::Duration::from_seconds(1), Some("wait_1"))
-        .await?;
-    ctx.wait(aws_durable_execution_sdk::Duration::from_seconds(2), Some("wait_2"))
-        .await?;
+    ctx.wait(
+        aws_durable_execution_sdk::Duration::from_seconds(1),
+        Some("wait_1"),
+    )
+    .await?;
+    ctx.wait(
+        aws_durable_execution_sdk::Duration::from_seconds(2),
+        Some("wait_2"),
+    )
+    .await?;
 
     let ctx1 = ctx.clone();
     let ctx2 = ctx.clone();
@@ -761,12 +742,8 @@ async fn all_with_wait_handler(
     let results = all!(
         ctx,
         async move { ctx1.step(|_| Ok("fast".to_string()), None).await },
-        async move {
-            ctx2.step(|_| Ok("after_wait_1".to_string()), None).await
-        },
-        async move {
-            ctx3.step(|_| Ok("after_wait_2".to_string()), None).await
-        },
+        async move { ctx2.step(|_| Ok("after_wait_1".to_string()), None).await },
+        async move { ctx3.step(|_| Ok("after_wait_2".to_string()), None).await },
     )
     .await?;
 
@@ -829,10 +806,7 @@ async fn race_with_timeout_handler(
             ctx1.step(|_| Ok("operation completed".to_string()), None)
                 .await
         },
-        async move {
-            ctx2.step(|_| Ok("timed out".to_string()), None)
-                .await
-        },
+        async move { ctx2.step(|_| Ok("timed out".to_string()), None).await },
     )
     .await?;
 
@@ -948,7 +922,11 @@ async fn test_replay_behavior() {
     );
 
     let replay_result = result.get_result().unwrap();
-    assert_eq!(replay_result.all_results.len(), 3, "Should have 3 all results");
+    assert_eq!(
+        replay_result.all_results.len(),
+        3,
+        "Should have 3 all results"
+    );
     assert!(replay_result.all_results.contains(&"result_a".to_string()));
     assert!(replay_result.all_results.contains(&"result_b".to_string()));
     assert!(replay_result.all_results.contains(&"result_c".to_string()));

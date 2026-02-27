@@ -113,16 +113,13 @@ where
             );
 
             let serdes = JsonSerDes::<T>::new();
-            let serdes_ctx =
-                SerDesContext::new(&op_id.operation_id, state.durable_execution_arn());
-            let serialized = serdes.serialize(&result, &serdes_ctx).map_err(|e| {
-                DurableError::SerDes {
-                    message: format!(
-                        "Failed to serialize wait_for_condition result: {}",
-                        e
-                    ),
-                }
-            })?;
+            let serdes_ctx = SerDesContext::new(&op_id.operation_id, state.durable_execution_arn());
+            let serialized =
+                serdes
+                    .serialize(&result, &serdes_ctx)
+                    .map_err(|e| DurableError::SerDes {
+                        message: format!("Failed to serialize wait_for_condition result: {}", e),
+                    })?;
 
             let succeed_update = create_succeed_update(op_id, Some(serialized));
             state.create_checkpoint(succeed_update, true).await?;
@@ -174,15 +171,11 @@ where
                     let state_serdes = JsonSerDes::<WaitForConditionState<S>>::new();
                     let serdes_ctx =
                         SerDesContext::new(&op_id.operation_id, state.durable_execution_arn());
-                    let serialized_state =
-                        state_serdes
-                            .serialize(&next_state, &serdes_ctx)
-                            .map_err(|e| DurableError::SerDes {
-                                message: format!(
-                                    "Failed to serialize wait_for_condition state: {}",
-                                    e
-                                ),
-                            })?;
+                    let serialized_state = state_serdes
+                        .serialize(&next_state, &serdes_ctx)
+                        .map_err(|e| DurableError::SerDes {
+                            message: format!("Failed to serialize wait_for_condition state: {}", e),
+                        })?;
 
                     let retry_update = create_retry_update(
                         op_id,
@@ -457,12 +450,10 @@ mod tests {
         Arc::new(TracingLogger)
     }
 
-    fn create_test_config<S: Clone + Send + Sync + 'static>(initial_state: S) -> WaitForConditionConfig<S> {
-        WaitForConditionConfig::from_interval(
-            initial_state,
-            Duration::from_seconds(5),
-            Some(3),
-        )
+    fn create_test_config<S: Clone + Send + Sync + 'static>(
+        initial_state: S,
+    ) -> WaitForConditionConfig<S> {
+        WaitForConditionConfig::from_interval(initial_state, Duration::from_seconds(5), Some(3))
     }
 
     // ==========================================================================
@@ -704,11 +695,8 @@ mod tests {
         let logger = create_test_logger();
 
         // Config with max_attempts = 1 (only one try)
-        let config = WaitForConditionConfig::from_interval(
-            0i32,
-            Duration::from_seconds(5),
-            Some(1),
-        );
+        let config =
+            WaitForConditionConfig::from_interval(0i32, Duration::from_seconds(5), Some(1));
 
         // Condition that always fails
         let result = wait_for_condition_handler(
@@ -856,11 +844,8 @@ mod tests {
         let op_id = create_test_op_id();
         let logger = create_test_logger();
 
-        let config = WaitForConditionConfig::from_interval(
-            0i32,
-            Duration::from_seconds(5),
-            Some(3),
-        );
+        let config =
+            WaitForConditionConfig::from_interval(0i32, Duration::from_seconds(5), Some(3));
 
         // Condition that returns an error (not met)
         let result = wait_for_condition_handler(

@@ -34,10 +34,7 @@ pub struct CustomPayload {
 struct CustomPayloadSerDes;
 
 impl SerDesAny for CustomPayloadSerDes {
-    fn serialize_any(
-        &self,
-        value: &dyn std::any::Any,
-    ) -> Result<String, DurableError> {
+    fn serialize_any(&self, value: &dyn std::any::Any) -> Result<String, DurableError> {
         let payload = value
             .downcast_ref::<CustomPayload>()
             .ok_or_else(|| DurableError::execution("Expected CustomPayload type"))?;
@@ -45,10 +42,7 @@ impl SerDesAny for CustomPayloadSerDes {
             .map_err(|e| DurableError::execution(format!("Serialization error: {}", e)))
     }
 
-    fn deserialize_any(
-        &self,
-        data: &str,
-    ) -> Result<Box<dyn std::any::Any + Send>, DurableError> {
+    fn deserialize_any(&self, data: &str) -> Result<Box<dyn std::any::Any + Send>, DurableError> {
         let payload: CustomPayload = serde_json::from_str(data)
             .map_err(|e| DurableError::execution(format!("Deserialization error: {}", e)))?;
         Ok(Box::new(payload))

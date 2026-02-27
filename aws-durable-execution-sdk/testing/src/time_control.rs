@@ -142,7 +142,7 @@ impl TimeControl {
             let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
                 tokio::time::pause();
             }));
-            
+
             if let Err(panic_info) = result {
                 // Check if the panic was because we're not in a current_thread runtime
                 let is_runtime_error = panic_info
@@ -153,7 +153,7 @@ impl TimeControl {
                         .downcast_ref::<String>()
                         .map(|msg| msg.contains("current_thread"))
                         .unwrap_or(false);
-                
+
                 if is_runtime_error {
                     // We're not in a current_thread runtime, so time control won't work
                     // but we can still set the flag to indicate the intent
@@ -174,7 +174,7 @@ impl TimeControl {
     /// Checks if Tokio's time is currently paused (regardless of our tracking flag).
     ///
     /// This is useful for detecting if time was paused by another test or code path.
-    /// 
+    ///
     /// Note: This function uses catch_unwind to detect if time is paused, which
     /// requires the current_thread runtime. If called from a multi-threaded runtime,
     /// it will return false (assuming time is not paused).
@@ -485,7 +485,7 @@ mod tests {
     #[tokio::test]
     async fn test_enable_is_idempotent() {
         // Ensure clean state - first check if time is paused and resume if so
-        // Note: We need to be careful here because is_time_paused_internal() 
+        // Note: We need to be careful here because is_time_paused_internal()
         // uses catch_unwind which may not work well in all test scenarios
         if TIME_CONTROL_ACTIVE.load(Ordering::SeqCst) {
             tokio::time::resume();

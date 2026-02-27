@@ -30,9 +30,7 @@ async fn context_validation_parent_in_child_handler(
                 let parent = parent_ctx;
                 Box::pin(async move {
                     // Misuse: calling step on the PARENT context inside a child context
-                    let val: String = parent
-                        .step(|_| Ok("from_parent".to_string()), None)
-                        .await?;
+                    let val: String = parent.step(|_| Ok("from_parent".to_string()), None).await?;
                     Ok(val)
                 })
             },
@@ -83,7 +81,6 @@ async fn test_context_validation_parent_in_child() {
         .await
         .unwrap();
 }
-
 
 // ============================================================================
 // Context Validation: Parent in Step Example Handler

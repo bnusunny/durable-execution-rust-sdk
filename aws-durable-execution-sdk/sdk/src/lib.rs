@@ -862,10 +862,10 @@ pub mod replay_safe;
 pub mod retry_presets;
 pub mod runtime;
 pub mod serdes;
+pub mod state;
 pub mod structured_json_logger;
 pub mod summary_generators;
 pub mod termination;
-pub mod state;
 pub mod traits;
 pub mod types;
 

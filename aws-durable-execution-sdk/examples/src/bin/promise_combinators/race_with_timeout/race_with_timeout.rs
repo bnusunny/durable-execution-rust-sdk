@@ -25,10 +25,7 @@ pub async fn handler(
             ctx1.step(|_| Ok("operation completed".to_string()), None)
                 .await
         },
-        async move {
-            ctx2.step(|_| Ok("timed out".to_string()), None)
-                .await
-        },
+        async move { ctx2.step(|_| Ok("timed out".to_string()), None).await },
     )
     .await?;
 

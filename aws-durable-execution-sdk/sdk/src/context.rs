@@ -1667,8 +1667,7 @@ impl DurableContext {
         let op_id = self.next_operation_identifier(name.map(|s| s.to_string()));
 
         let logger = self.logger.read().unwrap().clone();
-        let result =
-            crate::handlers::wait_handler(duration, &self.state, &op_id, &logger).await;
+        let result = crate::handlers::wait_handler(duration, &self.state, &op_id, &logger).await;
 
         // Track replay after completion (only if not suspended)
         if result.is_ok() {
@@ -1755,8 +1754,7 @@ impl DurableContext {
         let config = config.unwrap_or_default();
 
         let logger = self.logger.read().unwrap().clone();
-        let result =
-            crate::handlers::callback_handler(&self.state, &op_id, &config, &logger).await;
+        let result = crate::handlers::callback_handler(&self.state, &op_id, &config, &logger).await;
 
         // Track replay after completion
         if result.is_ok() {
@@ -1785,8 +1783,7 @@ impl DurableContext {
         let config = config.unwrap_or_default();
 
         let logger = self.logger.read().unwrap().clone();
-        let result =
-            crate::handlers::callback_handler(&self.state, &op_id, &config, &logger).await;
+        let result = crate::handlers::callback_handler(&self.state, &op_id, &config, &logger).await;
 
         // Track replay after completion
         if result.is_ok() {
@@ -1908,16 +1905,9 @@ impl DurableContext {
         let config = config.unwrap_or_default();
 
         let logger = self.logger.read().unwrap().clone();
-        let result = crate::handlers::map_handler(
-            items,
-            func,
-            &self.state,
-            &op_id,
-            self,
-            &config,
-            &logger,
-        )
-        .await;
+        let result =
+            crate::handlers::map_handler(items, func, &self.state, &op_id, self, &config, &logger)
+                .await;
 
         // Track replay after completion
         if result.is_ok() {
@@ -2033,8 +2023,7 @@ impl DurableContext {
 
         let logger = self.logger.read().unwrap().clone();
         let result =
-            crate::handlers::child_handler(func, &self.state, &op_id, self, &config, &logger)
-                .await;
+            crate::handlers::child_handler(func, &self.state, &op_id, self, &config, &logger).await;
 
         // Track replay after completion
         if result.is_ok() {
@@ -2067,8 +2056,7 @@ impl DurableContext {
 
         let logger = self.logger.read().unwrap().clone();
         let result =
-            crate::handlers::child_handler(func, &self.state, &op_id, self, &config, &logger)
-                .await;
+            crate::handlers::child_handler(func, &self.state, &op_id, self, &config, &logger).await;
 
         // Track replay after completion
         if result.is_ok() {
@@ -2409,8 +2397,7 @@ impl DurableContext {
         let op_id = self.next_operation_identifier(Some("race".to_string()));
 
         let logger = self.logger.read().unwrap().clone();
-        let result =
-            crate::handlers::race_handler(futures, &self.state, &op_id, &logger).await;
+        let result = crate::handlers::race_handler(futures, &self.state, &op_id, &logger).await;
 
         // Track replay after completion
         if result.is_ok() {
@@ -2475,6 +2462,7 @@ impl DurableContext {
 ///
 /// - 4.7: wait_for_condition uses wait_strategy to determine polling delay
 /// - 4.8: Backward-compatible constructor converts interval + max_attempts to a WaitStrategy
+#[allow(clippy::type_complexity)]
 pub struct WaitForConditionConfig<S> {
     /// Initial state to pass to the check function.
     pub initial_state: S,

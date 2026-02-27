@@ -32,9 +32,7 @@ pub async fn handler(
         .map(
             items,
             |child_ctx: DurableContext, item: i32, _index: usize| {
-                Box::pin(async move {
-                    child_ctx.step(|_| Ok(item * 2), None).await
-                })
+                Box::pin(async move { child_ctx.step(|_| Ok(item * 2), None).await })
             },
             Some(config),
         )
@@ -43,7 +41,7 @@ pub async fn handler(
     let result_values: Vec<i32> = results
         .succeeded()
         .iter()
-        .filter_map(|item| item.result.clone())
+        .filter_map(|item| item.result)
         .collect();
 
     Ok(LargeScaleResult {

@@ -97,9 +97,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_run_future_success() {
-        let handle = tokio::spawn(async {
-            Ok(TestResult::<String>::success("hello".to_string(), vec![]))
-        });
+        let handle =
+            tokio::spawn(async { Ok(TestResult::<String>::success("hello".to_string(), vec![])) });
         let future = RunFuture::new(handle);
         let result = future.await.unwrap();
         assert_eq!(result.get_status(), ExecutionStatus::Succeeded);
@@ -108,9 +107,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_run_future_error() {
-        let handle = tokio::spawn(async {
-            Err(TestError::CheckpointServerError("test error".to_string()))
-        });
+        let handle =
+            tokio::spawn(async { Err(TestError::CheckpointServerError("test error".to_string())) });
         let future: RunFuture<String> = RunFuture::new(handle);
         let result = future.await;
         assert!(result.is_err());

@@ -77,23 +77,20 @@ async fn test_single_callback_round_trip() {
     // Drive the run future and the callback interaction concurrently.
     // The callback_interaction task waits for Submitted, sends the response,
     // and the run_future completes once the handler receives the callback result.
-    let (result, _) = tokio::join!(
-        run_future,
-        async {
-            // Wait for the callback operation to reach Submitted status
-            handle
-                .wait_for_data(WaitingOperationStatus::Submitted)
-                .await
-                .unwrap();
+    let (result, _) = tokio::join!(run_future, async {
+        // Wait for the callback operation to reach Submitted status
+        handle
+            .wait_for_data(WaitingOperationStatus::Submitted)
+            .await
+            .unwrap();
 
-            // Send callback success with a result
-            let callback_result = serde_json::json!({"message": "hello from callback"});
-            handle
-                .send_callback_success(&callback_result.to_string())
-                .await
-                .unwrap();
-        }
-    );
+        // Send callback success with a result
+        let callback_result = serde_json::json!({"message": "hello from callback"});
+        handle
+            .send_callback_success(&callback_result.to_string())
+            .await
+            .unwrap();
+    });
 
     let result = result.unwrap();
 
@@ -117,7 +114,6 @@ async fn test_single_callback_round_trip() {
         .await
         .unwrap();
 }
-
 
 // ============================================================================
 // Callback Failure Propagation Test
@@ -152,20 +148,17 @@ async fn test_callback_failure_propagation() {
     let run_future = runner.run(serde_json::json!({}));
 
     // Drive the run future and the callback failure interaction concurrently.
-    let (result, _) = tokio::join!(
-        run_future,
-        async {
-            // Wait for the callback operation to reach Submitted status
-            handle
-                .wait_for_data(WaitingOperationStatus::Submitted)
-                .await
-                .unwrap();
+    let (result, _) = tokio::join!(run_future, async {
+        // Wait for the callback operation to reach Submitted status
+        handle
+            .wait_for_data(WaitingOperationStatus::Submitted)
+            .await
+            .unwrap();
 
-            // Send callback failure with error details
-            let error = TestResultError::new("ValidationError", "Input validation failed");
-            handle.send_callback_failure(&error).await.unwrap();
-        }
-    );
+        // Send callback failure with error details
+        let error = TestResultError::new("ValidationError", "Input validation failed");
+        handle.send_callback_failure(&error).await.unwrap();
+    });
 
     let result = result.unwrap();
 
@@ -177,7 +170,9 @@ async fn test_callback_failure_propagation() {
     );
 
     // Assert the error details are propagated
-    let error = result.get_error().expect("Failed result should have error details");
+    let error = result
+        .get_error()
+        .expect("Failed result should have error details");
     assert!(
         error
             .error_message
@@ -262,32 +257,29 @@ async fn test_multiple_concurrent_callbacks() {
     let run_future = runner.run(serde_json::json!({}));
 
     // Drive the run future and both callback interactions concurrently.
-    let (result, _) = tokio::join!(
-        run_future,
-        async {
-            // Wait for callback-a to reach Submitted status and send its response
-            handle_a
-                .wait_for_data(WaitingOperationStatus::Submitted)
-                .await
-                .unwrap();
-            let response_a = serde_json::json!({"message": "response-for-a"});
-            handle_a
-                .send_callback_success(&response_a.to_string())
-                .await
-                .unwrap();
+    let (result, _) = tokio::join!(run_future, async {
+        // Wait for callback-a to reach Submitted status and send its response
+        handle_a
+            .wait_for_data(WaitingOperationStatus::Submitted)
+            .await
+            .unwrap();
+        let response_a = serde_json::json!({"message": "response-for-a"});
+        handle_a
+            .send_callback_success(&response_a.to_string())
+            .await
+            .unwrap();
 
-            // Wait for callback-b to reach Submitted status and send its response
-            handle_b
-                .wait_for_data(WaitingOperationStatus::Submitted)
-                .await
-                .unwrap();
-            let response_b = serde_json::json!({"message": "response-for-b"});
-            handle_b
-                .send_callback_success(&response_b.to_string())
-                .await
-                .unwrap();
-        }
-    );
+        // Wait for callback-b to reach Submitted status and send its response
+        handle_b
+            .wait_for_data(WaitingOperationStatus::Submitted)
+            .await
+            .unwrap();
+        let response_b = serde_json::json!({"message": "response-for-b"});
+        handle_b
+            .send_callback_success(&response_b.to_string())
+            .await
+            .unwrap();
+    });
 
     let result = result.unwrap();
 
@@ -313,4 +305,3 @@ async fn test_multiple_concurrent_callbacks() {
         .await
         .unwrap();
 }
-

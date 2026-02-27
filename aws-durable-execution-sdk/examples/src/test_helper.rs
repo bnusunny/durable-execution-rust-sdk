@@ -8,6 +8,9 @@
 //!
 //! - `EventSignature`: A simplified representation of history events for comparison
 //! - `assert_event_signatures`: Compare execution history against saved JSON files
+//! - `NodeJsHistoryFile`: Type alias for Node.js-compatible history files (flat JSON array)
+//! - `extract_nodejs_events`: Extract Node.js-compatible events from TestResult
+//! - `assert_nodejs_event_signatures`: Compare events by EventType, SubType, and Name
 //! - History file generation with `GENERATE_HISTORY=true` environment variable
 //!
 //! # Example
@@ -28,10 +31,24 @@
 //! ```
 
 use aws_durable_execution_sdk::{Operation, OperationType};
+use aws_durable_execution_sdk_testing::checkpoint_server::NodeJsHistoryEvent;
+use aws_durable_execution_sdk_testing::TestResult;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs;
 use std::path::Path;
+
+/// A Node.js-compatible history file (flat JSON array).
+///
+/// This type alias represents a history file in the Node.js SDK format,
+/// which is a flat JSON array of history events at the root level
+/// (not wrapped in an object with an "events" key).
+///
+/// # Requirements
+///
+/// - 5.1: THE Event_History output SHALL be a JSON array at the root level (not wrapped in an object)
+/// - 5.2: THE Event_History output SHALL NOT use an "events" wrapper key
+pub type NodeJsHistoryFile = Vec<NodeJsHistoryEvent>;
 
 /// A simplified representation of an operation for comparison purposes.
 ///
@@ -292,6 +309,265 @@ fn generate_history_file(signatures: &[EventSignature], path: &str) {
     println!("Generated history file: {}", path);
 }
 
+// ============================================================================
+// Node.js-Compatible History Functions
+// ============================================================================
+
+/// A simplified signature for Node.js history events used for comparison.
+///
+/// This struct captures the essential identifying characteristics of a Node.js
+/// history event without including volatile data like EventId, Id, EventTimestamp,
+/// or Details payloads.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct NodeJsEventSignature {
+    /// The type of event (e.g., "ExecutionStarted", "StepSucceeded")
+    pub event_type: String,
+    /// Operation sub-type (e.g., "Step")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sub_type: Option<String>,
+    /// Operation name
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+impl NodeJsEventSignature {
+    /// Creates a new NodeJsEventSignature from a NodeJsHistoryEvent.
+    ///
+    /// Extracts only the EventType, SubType, and Name fields, ignoring
+    /// volatile fields like EventId, Id, EventTimestamp, and Details.
+    pub fn from_event(event: &NodeJsHistoryEvent) -> Self {
+        Self {
+            event_type: format!("{:?}", event.event_type),
+            sub_type: event.sub_type.clone(),
+            name: event.name.clone(),
+        }
+    }
+}
+
+/// Extracts Node.js-compatible events from a TestResult.
+///
+/// This function retrieves the Node.js history events that were generated
+/// during execution and stored in the TestResult.
+///
+/// # Arguments
+///
+/// * `result` - The TestResult containing Node.js history events
+///
+/// # Returns
+///
+/// A `NodeJsHistoryFile` (Vec<NodeJsHistoryEvent>) containing all events
+/// in chronological order.
+///
+/// # Requirements
+///
+/// - 5.1: THE Event_History output SHALL be a JSON array at the root level
+/// - 5.3: THE Event_History output SHALL contain History_Event objects in chronological order by EventId
+pub fn extract_nodejs_events<T>(result: &TestResult<T>) -> NodeJsHistoryFile {
+    result.get_nodejs_history_events().to_vec()
+}
+
+/// Asserts that Node.js history event signatures match expected signatures.
+///
+/// This function compares events by EventType, SubType, and Name only,
+/// ignoring volatile fields like:
+/// - EventId (sequential, may differ between runs)
+/// - Id (UUIDs, will differ between runs)
+/// - EventTimestamp (timestamps, will differ between runs)
+/// - Details payloads (may contain UUIDs or timestamps)
+///
+/// If the `GENERATE_HISTORY` environment variable is set to "true", this function
+/// will generate/update the history file instead of comparing against it.
+///
+/// # Arguments
+///
+/// * `result` - The TestResult containing Node.js history events
+/// * `history_file_path` - Path to the history JSON file (relative to workspace root)
+///
+/// # Panics
+///
+/// Panics if the history doesn't match and `GENERATE_HISTORY` is not set.
+///
+/// # Requirements
+///
+/// - 6.4: WHEN comparing history files, THE test_helper SHALL compare events by EventType, SubType, and Name (ignoring volatile fields like EventId, Id, and EventTimestamp)
+pub fn assert_nodejs_event_signatures<T>(result: &TestResult<T>, history_file_path: &str) {
+    let events = extract_nodejs_events(result);
+    let actual_signatures: Vec<NodeJsEventSignature> = events
+        .iter()
+        .map(NodeJsEventSignature::from_event)
+        .collect();
+
+    // Check if we should generate the history file
+    if env::var("GENERATE_HISTORY").map(|v| v == "true").unwrap_or(false) {
+        generate_nodejs_history_file(&events, history_file_path);
+        return;
+    }
+
+    // Load and compare against expected history
+    let expected_events = load_nodejs_history_file(history_file_path);
+    let expected_signatures: Vec<NodeJsEventSignature> = expected_events
+        .iter()
+        .map(NodeJsEventSignature::from_event)
+        .collect();
+
+    assert_eq!(
+        actual_signatures.len(),
+        expected_signatures.len(),
+        "Number of events doesn't match.\nExpected {} events, got {}.\nActual signatures: {:#?}",
+        expected_signatures.len(),
+        actual_signatures.len(),
+        actual_signatures
+    );
+
+    for (i, (actual, expected)) in actual_signatures.iter().zip(expected_signatures.iter()).enumerate()
+    {
+        assert_eq!(
+            actual, expected,
+            "Event {} doesn't match.\nExpected: {:#?}\nActual: {:#?}",
+            i, expected, actual
+        );
+    }
+}
+
+/// Asserts that Node.js history event signatures match expected, regardless of order.
+///
+/// This is useful for testing map operations with concurrency where the order of
+/// operations can vary between runs.
+///
+/// Compares events by EventType, SubType, and Name only, ignoring volatile fields.
+///
+/// # Arguments
+///
+/// * `result` - The TestResult containing Node.js history events
+/// * `history_file_path` - Path to the history JSON file (relative to workspace root)
+///
+/// # Panics
+///
+/// Panics if the history doesn't match and `GENERATE_HISTORY` is not set.
+pub fn assert_nodejs_event_signatures_unordered<T>(result: &TestResult<T>, history_file_path: &str) {
+    let events = extract_nodejs_events(result);
+    let actual_signatures: Vec<NodeJsEventSignature> = events
+        .iter()
+        .map(NodeJsEventSignature::from_event)
+        .collect();
+
+    // Check if we should generate the history file
+    if env::var("GENERATE_HISTORY").map(|v| v == "true").unwrap_or(false) {
+        generate_nodejs_history_file(&events, history_file_path);
+        return;
+    }
+
+    // Load expected history
+    let expected_events = load_nodejs_history_file(history_file_path);
+    let expected_signatures: Vec<NodeJsEventSignature> = expected_events
+        .iter()
+        .map(NodeJsEventSignature::from_event)
+        .collect();
+
+    assert_eq!(
+        actual_signatures.len(),
+        expected_signatures.len(),
+        "Number of events doesn't match.\nExpected {} events, got {}.\nActual signatures: {:#?}",
+        expected_signatures.len(),
+        actual_signatures.len(),
+        actual_signatures
+    );
+
+    // Count occurrences of each event signature
+    let mut expected_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut actual_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+
+    for sig in &expected_signatures {
+        let key = format!("{:?}", sig);
+        *expected_counts.entry(key).or_insert(0) += 1;
+    }
+
+    for sig in &actual_signatures {
+        let key = format!("{:?}", sig);
+        *actual_counts.entry(key).or_insert(0) += 1;
+    }
+
+    // Compare counts
+    for (key, expected_count) in &expected_counts {
+        let actual_count = actual_counts.get(key).unwrap_or(&0);
+        assert_eq!(
+            actual_count, expected_count,
+            "Event count mismatch for {}.\nExpected {} occurrences, got {}.\nExpected signatures: {:#?}\nActual signatures: {:#?}",
+            key, expected_count, actual_count, expected_signatures, actual_signatures
+        );
+    }
+
+    // Check for unexpected events
+    for (key, actual_count) in &actual_counts {
+        if !expected_counts.contains_key(key) {
+            panic!(
+                "Unexpected event found: {} (count: {}).\nExpected signatures: {:#?}\nActual signatures: {:#?}",
+                key, actual_count, expected_signatures, actual_signatures
+            );
+        }
+    }
+}
+
+/// Loads a Node.js-compatible history file from the given path.
+///
+/// The file should contain a flat JSON array of NodeJsHistoryEvent objects.
+///
+/// # Arguments
+///
+/// * `path` - Path to the history JSON file
+///
+/// # Returns
+///
+/// A `NodeJsHistoryFile` (Vec<NodeJsHistoryEvent>) parsed from the file.
+///
+/// # Panics
+///
+/// Panics if the file doesn't exist or can't be parsed.
+///
+/// # Requirements
+///
+/// - 5.1: THE Event_History output SHALL be a JSON array at the root level
+/// - 6.3: THE generated history file SHALL be parseable by the Node.js SDK's history comparison utilities
+pub fn load_nodejs_history_file(path: &str) -> NodeJsHistoryFile {
+    let content = fs::read_to_string(path)
+        .unwrap_or_else(|e| panic!("Failed to read Node.js history file '{}': {}", path, e));
+
+    serde_json::from_str(&content)
+        .unwrap_or_else(|e| panic!("Failed to parse Node.js history file '{}': {}", path, e))
+}
+
+/// Generates a Node.js-compatible history file at the given path.
+///
+/// The file will contain a flat JSON array of NodeJsHistoryEvent objects,
+/// matching the Node.js SDK format exactly.
+///
+/// # Arguments
+///
+/// * `events` - The Node.js history events to write
+/// * `path` - Path where the history file should be written
+///
+/// # Requirements
+///
+/// - 5.1: THE Event_History output SHALL be a JSON array at the root level (not wrapped in an object)
+/// - 5.2: THE Event_History output SHALL NOT use an "events" wrapper key
+/// - 6.1: WHEN GENERATE_HISTORY environment variable is set to "true", THE test_helper SHALL generate a history file in the Node.js-compatible format
+/// - 6.2: THE generated history file SHALL contain all events from the execution in chronological order
+fn generate_nodejs_history_file(events: &[NodeJsHistoryEvent], path: &str) {
+    // Serialize as a flat JSON array (not wrapped in an object)
+    let content = serde_json::to_string_pretty(events)
+        .expect("Failed to serialize Node.js history file");
+
+    // Ensure parent directory exists
+    if let Some(parent) = Path::new(path).parent() {
+        fs::create_dir_all(parent).expect("Failed to create parent directory");
+    }
+
+    fs::write(path, content).unwrap_or_else(|e| panic!("Failed to write Node.js history file '{}': {}", path, e));
+
+    println!("Generated Node.js-compatible history file: {}", path);
+}
+
 /// Helper macro for creating event signatures in tests.
 ///
 /// # Example
@@ -382,5 +658,220 @@ mod tests {
         let sig2 = event_sig!("Wait", "delay");
         assert_eq!(sig2.event_type, "Wait");
         assert_eq!(sig2.name, Some("delay".to_string()));
+    }
+
+    // ========================================================================
+    // Node.js-Compatible History Tests
+    // ========================================================================
+
+    use aws_durable_execution_sdk_testing::checkpoint_server::{
+        ExecutionStartedDetails, ExecutionStartedDetailsWrapper, NodeJsEventDetails,
+        NodeJsEventType, NodeJsHistoryEvent, PayloadWrapper,
+        StepSucceededDetails, StepSucceededDetailsWrapper,
+        RetryDetails,
+    };
+    use aws_durable_execution_sdk_testing::TestResult;
+
+    fn create_test_nodejs_event(
+        event_type: NodeJsEventType,
+        event_id: u64,
+        name: Option<&str>,
+        sub_type: Option<&str>,
+    ) -> NodeJsHistoryEvent {
+        NodeJsHistoryEvent {
+            event_type,
+            event_id,
+            id: Some(format!("id-{}", uuid::Uuid::new_v4())),
+            event_timestamp: "2025-12-03T22:58:35.094Z".to_string(),
+            sub_type: sub_type.map(|s| s.to_string()),
+            name: name.map(|s| s.to_string()),
+            parent_id: None,
+            details: NodeJsEventDetails::default(),
+        }
+    }
+
+    #[test]
+    fn test_nodejs_event_signature_from_event() {
+        let event = create_test_nodejs_event(
+            NodeJsEventType::StepStarted,
+            1,
+            Some("my-step"),
+            Some("Step"),
+        );
+
+        let sig = NodeJsEventSignature::from_event(&event);
+
+        assert_eq!(sig.event_type, "StepStarted");
+        assert_eq!(sig.name, Some("my-step".to_string()));
+        assert_eq!(sig.sub_type, Some("Step".to_string()));
+    }
+
+    #[test]
+    fn test_nodejs_event_signature_ignores_volatile_fields() {
+        // Create two events with same EventType, SubType, Name but different volatile fields
+        let event1 = NodeJsHistoryEvent {
+            event_type: NodeJsEventType::StepSucceeded,
+            event_id: 1,
+            id: Some("id-111".to_string()),
+            event_timestamp: "2025-12-03T22:58:35.094Z".to_string(),
+            sub_type: Some("Step".to_string()),
+            name: Some("process-data".to_string()),
+            parent_id: Some("parent-111".to_string()),
+            details: NodeJsEventDetails::StepSucceeded(StepSucceededDetailsWrapper {
+                step_succeeded_details: StepSucceededDetails {
+                    result: PayloadWrapper::new(r#"{"value": 42}"#),
+                    retry_details: RetryDetails::new(1),
+                },
+            }),
+        };
+
+        let event2 = NodeJsHistoryEvent {
+            event_type: NodeJsEventType::StepSucceeded,
+            event_id: 99, // Different EventId
+            id: Some("id-999".to_string()), // Different Id
+            event_timestamp: "2025-12-04T10:00:00.000Z".to_string(), // Different timestamp
+            sub_type: Some("Step".to_string()),
+            name: Some("process-data".to_string()),
+            parent_id: Some("parent-999".to_string()), // Different parent
+            details: NodeJsEventDetails::StepSucceeded(StepSucceededDetailsWrapper {
+                step_succeeded_details: StepSucceededDetails {
+                    result: PayloadWrapper::new(r#"{"value": 100}"#), // Different result
+                    retry_details: RetryDetails::new(2), // Different retry
+                },
+            }),
+        };
+
+        let sig1 = NodeJsEventSignature::from_event(&event1);
+        let sig2 = NodeJsEventSignature::from_event(&event2);
+
+        // Signatures should be equal because they only compare EventType, SubType, Name
+        assert_eq!(sig1, sig2);
+    }
+
+    #[test]
+    fn test_nodejs_event_signature_different_event_types() {
+        let event1 = create_test_nodejs_event(NodeJsEventType::StepStarted, 1, Some("step"), Some("Step"));
+        let event2 = create_test_nodejs_event(NodeJsEventType::StepSucceeded, 2, Some("step"), Some("Step"));
+
+        let sig1 = NodeJsEventSignature::from_event(&event1);
+        let sig2 = NodeJsEventSignature::from_event(&event2);
+
+        // Different event types should produce different signatures
+        assert_ne!(sig1, sig2);
+    }
+
+    #[test]
+    fn test_nodejs_history_file_type_alias() {
+        // Verify NodeJsHistoryFile is a Vec<NodeJsHistoryEvent>
+        let events: NodeJsHistoryFile = vec![
+            create_test_nodejs_event(NodeJsEventType::ExecutionStarted, 1, None, None),
+            create_test_nodejs_event(NodeJsEventType::StepStarted, 2, Some("step1"), Some("Step")),
+        ];
+
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].event_type, NodeJsEventType::ExecutionStarted);
+        assert_eq!(events[1].event_type, NodeJsEventType::StepStarted);
+    }
+
+    #[test]
+    fn test_nodejs_history_file_serializes_as_flat_array() {
+        let events: NodeJsHistoryFile = vec![
+            NodeJsHistoryEvent {
+                event_type: NodeJsEventType::ExecutionStarted,
+                event_id: 1,
+                id: Some("exec-123".to_string()),
+                event_timestamp: "2025-12-03T22:58:35.094Z".to_string(),
+                sub_type: None,
+                name: None,
+                parent_id: None,
+                details: NodeJsEventDetails::ExecutionStarted(ExecutionStartedDetailsWrapper {
+                    execution_started_details: ExecutionStartedDetails {
+                        input: PayloadWrapper::new("{}"),
+                        execution_timeout: None,
+                    },
+                }),
+            },
+        ];
+
+        let json = serde_json::to_string_pretty(&events).unwrap();
+
+        // Verify it's a flat array (starts with '[', not '{')
+        assert!(json.trim().starts_with('['), "JSON should start with '[' for flat array");
+        assert!(json.trim().ends_with(']'), "JSON should end with ']' for flat array");
+
+        // Verify it does NOT have an "events" wrapper key
+        assert!(!json.contains(r#""events""#), "JSON should not have 'events' wrapper key");
+
+        // Verify it can be parsed back
+        let parsed: NodeJsHistoryFile = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].event_type, NodeJsEventType::ExecutionStarted);
+    }
+
+    #[test]
+    fn test_extract_nodejs_events_from_test_result() {
+        let mut result: TestResult<String> = TestResult::success("done".to_string(), vec![]);
+
+        // Add some Node.js events
+        result.add_nodejs_history_event(create_test_nodejs_event(
+            NodeJsEventType::ExecutionStarted,
+            1,
+            None,
+            None,
+        ));
+        result.add_nodejs_history_event(create_test_nodejs_event(
+            NodeJsEventType::StepStarted,
+            2,
+            Some("my-step"),
+            Some("Step"),
+        ));
+        result.add_nodejs_history_event(create_test_nodejs_event(
+            NodeJsEventType::StepSucceeded,
+            3,
+            Some("my-step"),
+            Some("Step"),
+        ));
+
+        let events = extract_nodejs_events(&result);
+
+        assert_eq!(events.len(), 3);
+        assert_eq!(events[0].event_type, NodeJsEventType::ExecutionStarted);
+        assert_eq!(events[1].event_type, NodeJsEventType::StepStarted);
+        assert_eq!(events[2].event_type, NodeJsEventType::StepSucceeded);
+    }
+
+    #[test]
+    fn test_nodejs_event_signature_serialization() {
+        let sig = NodeJsEventSignature {
+            event_type: "StepSucceeded".to_string(),
+            sub_type: Some("Step".to_string()),
+            name: Some("process-data".to_string()),
+        };
+
+        let json = serde_json::to_string(&sig).unwrap();
+
+        // Verify PascalCase field names
+        assert!(json.contains(r#""EventType""#));
+        assert!(json.contains(r#""SubType""#));
+        assert!(json.contains(r#""Name""#));
+
+        // Verify it can be parsed back
+        let parsed: NodeJsEventSignature = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, sig);
+    }
+
+    #[test]
+    fn test_nodejs_event_signature_skips_none_fields() {
+        let sig = NodeJsEventSignature {
+            event_type: "ExecutionStarted".to_string(),
+            sub_type: None,
+            name: None,
+        };
+
+        let json = serde_json::to_string(&sig).unwrap();
+
+        // Verify None fields are not serialized
+        assert!(!json.contains(r#""SubType""#));
+        assert!(!json.contains(r#""Name""#));
     }
 }

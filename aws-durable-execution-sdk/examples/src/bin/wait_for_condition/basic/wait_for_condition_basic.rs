@@ -30,15 +30,14 @@ pub async fn handler(
     ctx: DurableContext,
 ) -> Result<JobStatus, DurableError> {
     // Configure polling behavior with initial state
-    let config = WaitForConditionConfig {
-        initial_state: PollingState {
+    let config = WaitForConditionConfig::from_interval(
+        PollingState {
             job_id: "job-12345".to_string(),
             check_count: 0,
         },
-        interval: Duration::from_seconds(5), // Poll every 5 seconds
-        max_attempts: Some(10),              // Max 10 attempts
-        timeout: Some(Duration::from_minutes(5)),
-    };
+        Duration::from_seconds(5), // Poll every 5 seconds
+        Some(10),                  // Max 10 attempts
+    );
 
     // Poll until job completes
     // The check function receives (&S, &WaitForConditionContext) and returns Result<T, Error>

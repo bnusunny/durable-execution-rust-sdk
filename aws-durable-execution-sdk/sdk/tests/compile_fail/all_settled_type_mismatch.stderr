@@ -1,12 +1,8 @@
 error[E0271]: expected `Pin<Box<dyn Future<Output = Result<String, DurableError>> + Send>>` to be a future that resolves to `Result<i32, DurableError>`, but it resolves to `Result<String, DurableError>`
-  --> tests/compile_fail/all_settled_type_mismatch.rs:29:13
+  --> tests/compile_fail/all_settled_type_mismatch.rs:33:13
    |
-29 |       let _ = all_settled!(ctx,
-   |  _____________^
-30 | |         Box::pin(async { Ok::<_, DurableError>(42i32) }) as Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>,
-31 | |         Box::pin(async { Ok::<_, DurableError>("hello".to_string()) }) as Pin<Box<dyn Future<Output = Result<String, DurableError>> + Sen...
-32 | |     );
-   | |_____^ expected `Result<i32, DurableError>`, found `Result<String, DurableError>`
+33 |     let _ = all_settled!(ctx, f1, f2);
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<i32, DurableError>`, found `Result<String, DurableError>`
    |
    = note: expected enum `Result<i32, DurableError>`
               found enum `Result<std::string::String, DurableError>`

@@ -43,10 +43,12 @@ use crate::checkpoint_server::{
 };
 use crate::error::TestError;
 use crate::mock_client::MockDurableServiceClient;
+use crate::operation::CallbackSender;
+use crate::operation_handle::{OperationHandle, OperationMatcher};
 use crate::test_result::TestResult;
 use crate::types::{ExecutionStatus, Invocation, TestResultError};
 use aws_durable_execution_sdk::{
-    DurableContext, DurableError, DurableServiceClient, Operation,
+    DurableContext, DurableError, DurableServiceClient, ErrorObject, Operation,
 };
 
 /// Global flag indicating whether the test environment has been set up.
@@ -54,6 +56,53 @@ static TEST_ENVIRONMENT_SETUP: AtomicBool = AtomicBool::new(false);
 
 /// Global flag indicating whether time skipping is enabled.
 static TIME_SKIPPING_ENABLED: AtomicBool = AtomicBool::new(false);
+
+/// A `CallbackSender` implementation that delegates to `CheckpointWorkerManager`.
+///
+/// This bridges the `CallbackSender` trait (used by `OperationHandle`) with the
+/// checkpoint server's callback API, enabling handles to send callback responses
+/// during mid-execution interaction.
+struct CheckpointCallbackSender {
+    checkpoint_worker: Arc<CheckpointWorkerManager>,
+}
+
+impl CheckpointCallbackSender {
+    fn new(checkpoint_worker: Arc<CheckpointWorkerManager>) -> Self {
+        Self { checkpoint_worker }
+    }
+}
+
+#[async_trait::async_trait]
+impl CallbackSender for CheckpointCallbackSender {
+    async fn send_success(&self, callback_id: &str, result: &str) -> Result<(), TestError> {
+        self.checkpoint_worker
+            .send_callback_success(callback_id, result)
+            .await
+            .map_err(|e| TestError::CheckpointServerError(e.to_string()))
+    }
+
+    async fn send_failure(
+        &self,
+        callback_id: &str,
+        error: &TestResultError,
+    ) -> Result<(), TestError> {
+        let error_obj = ErrorObject::new(
+            error.error_type.clone().unwrap_or_default(),
+            error.error_message.clone().unwrap_or_default(),
+        );
+        self.checkpoint_worker
+            .send_callback_failure(callback_id, &error_obj)
+            .await
+            .map_err(|e| TestError::CheckpointServerError(e.to_string()))
+    }
+
+    async fn send_heartbeat(&self, callback_id: &str) -> Result<(), TestError> {
+        self.checkpoint_worker
+            .send_callback_heartbeat(callback_id)
+            .await
+            .map_err(|e| TestError::CheckpointServerError(e.to_string()))
+    }
+}
 
 /// Configuration for setting up the test environment.
 ///
@@ -235,6 +284,10 @@ where
     operation_storage: Arc<RwLock<OperationStorage>>,
     /// Registered functions for chained invoke testing
     registered_functions: Arc<RwLock<HashMap<String, RegisteredFunction>>>,
+    /// Pre-registered operation handles for lazy population during execution
+    registered_handles: Vec<OperationHandle>,
+    /// Shared operations list for child operation enumeration across handles
+    shared_operations: Arc<RwLock<Vec<Operation>>>,
     /// Phantom data for type parameters
     _phantom: PhantomData<(I, O)>,
 }
@@ -432,6 +485,8 @@ where
             mock_client: Arc::new(MockDurableServiceClient::new().with_checkpoint_responses(100)),
             operation_storage: Arc::new(RwLock::new(OperationStorage::new())),
             registered_functions: Arc::new(RwLock::new(HashMap::new())),
+            registered_handles: Vec::new(),
+            shared_operations: Arc::new(RwLock::new(Vec::new())),
             _phantom: PhantomData,
         }
     }
@@ -466,6 +521,8 @@ where
             mock_client: Arc::new(mock_client),
             operation_storage: Arc::new(RwLock::new(OperationStorage::new())),
             registered_functions: Arc::new(RwLock::new(HashMap::new())),
+            registered_handles: Vec::new(),
+            shared_operations: Arc::new(RwLock::new(Vec::new())),
             _phantom: PhantomData,
         }
     }
@@ -503,6 +560,8 @@ where
             mock_client: Arc::new(MockDurableServiceClient::new().with_checkpoint_responses(100)),
             operation_storage: Arc::new(RwLock::new(OperationStorage::new())),
             registered_functions: Arc::new(RwLock::new(HashMap::new())),
+            registered_handles: Vec::new(),
+            shared_operations: Arc::new(RwLock::new(Vec::new())),
             _phantom: PhantomData,
         }
     }
@@ -524,18 +583,16 @@ where
         self.operation_storage.read().await.len()
     }
 
-    /// Executes the handler with the given payload and returns the test result.
+    /// Executes the handler and returns a `RunFuture` that resolves to the test result.
     ///
-    /// This method uses the TestExecutionOrchestrator to manage the full execution
-    /// lifecycle, including:
-    /// - Polling for checkpoint updates
-    /// - Processing wait operations and scheduling re-invocations
-    /// - Handling time skipping for wait operations
-    /// - Managing callback completions
+    /// Accepts either a raw payload or an `InvokeRequest` wrapper (via `impl Into<InvokeRequest<I>>`).
+    /// The execution is spawned as a tokio task so callers can `await` the result
+    /// concurrently with `OperationHandle` interactions (e.g., mid-execution callbacks).
     ///
     /// # Arguments
     ///
-    /// * `payload` - The input payload to pass to the handler
+    /// * `input` - A payload or `InvokeRequest<I>` to pass to the handler.
+    ///   Raw payloads are automatically wrapped via `From<I> for InvokeRequest<I>`.
     ///
     /// # Requirements
     ///
@@ -547,40 +604,170 @@ where
     ///   SHALL contain the error details and status FAILED
     /// - 1.5: WHEN the handler function performs durable operations, THE Local_Test_Runner
     ///   SHALL capture all operations in the Test_Result
-    /// - 9.2: WHEN a checkpoint call is made, THE Checkpoint_Manager SHALL process
-    ///   operation updates and maintain full execution state
-    /// - 16.1: WHEN a wait operation is encountered, THE Test_Execution_Orchestrator
-    ///   SHALL track the wait's scheduled end timestamp
-    /// - 16.2: WHEN time skipping is enabled and a wait's scheduled end time is reached,
-    ///   THE Test_Execution_Orchestrator SHALL mark the wait as SUCCEEDED and schedule
-    ///   handler re-invocation
-    /// - 16.3: WHEN time skipping is enabled, THE Test_Execution_Orchestrator SHALL use
-    ///   tokio::time::advance() to skip wait durations instantly
-    /// - 16.4: WHEN a handler invocation returns PENDING status, THE Test_Execution_Orchestrator
-    ///   SHALL continue polling for operation updates and re-invoke the handler when
-    ///   operations complete
-    /// - 16.5: WHEN a handler invocation returns SUCCEEDED or FAILED status,
-    ///   THE Test_Execution_Orchestrator SHALL resolve the execution and stop polling
-    /// - 16.6: WHEN multiple operations are pending (waits, callbacks, steps with retries),
-    ///   THE Test_Execution_Orchestrator SHALL process them in scheduled order
+    /// - 2.1: WHEN a developer calls run(), THE Local_Test_Runner SHALL return a future
+    ///   that resolves to a Test_Result when the handler completes
+    /// - 9.1: THE Local_Test_Runner SHALL accept an InvokeRequest struct with an optional
+    ///   payload field for the run() method
+    /// - 9.2: WHEN run() is called with an InvokeRequest containing a payload,
+    ///   THE Local_Test_Runner SHALL pass the payload to the handler function
+    /// - 9.3: WHEN run() is called with an InvokeRequest containing no payload,
+    ///   THE Local_Test_Runner SHALL use a default empty payload
     ///
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::LocalDurableTestRunner;
+    /// use aws_durable_execution_sdk_testing::{LocalDurableTestRunner, InvokeRequest};
     ///
     /// let mut runner = LocalDurableTestRunner::new(my_workflow);
+    ///
+    /// // With a raw payload (backward compatible)
     /// let result = runner.run("hello".to_string()).await.unwrap();
     ///
-    /// assert_eq!(result.get_status(), ExecutionStatus::Succeeded);
+    /// // With an InvokeRequest
+    /// let result = runner.run(InvokeRequest::with_payload("hello".to_string())).await.unwrap();
+    ///
+    /// // Concurrent interaction with operation handles
+    /// let handle = runner.get_operation_handle("my-callback");
+    /// let run_future = runner.run("input".to_string());
+    /// handle.wait_for_data(WaitingOperationStatus::Submitted).await.unwrap();
+    /// handle.send_callback_success("result").await.unwrap();
+    /// let result = run_future.await.unwrap();
     /// ```
-    pub async fn run(&mut self, payload: I) -> Result<TestResult<O>, TestError>
+    pub fn run(&mut self, input: impl Into<crate::types::InvokeRequest<I>>) -> crate::run_future::RunFuture<O>
     where
-        I: Clone,
+        I: Clone + Send + Sync + 'static,
+        O: Send + 'static,
     {
-        // Delegate to run_with_orchestrator which handles the full execution lifecycle
-        // including wait operations, callbacks, and re-invocations
-        self.run_with_orchestrator(payload).await
+        let invoke_request: crate::types::InvokeRequest<I> = input.into();
+
+        // Extract payload from InvokeRequest.
+        // When payload is None (InvokeRequest::new()), attempt to create a default
+        // by deserializing from JSON null. This works for types like String (""),
+        // serde_json::Value (Null), Option<T> (None), etc.
+        let payload_result: Result<I, _> = match invoke_request.payload {
+            Some(p) => Ok(p),
+            None => serde_json::from_value(serde_json::Value::Null),
+        };
+
+        // If we can't create a default payload, return an error future immediately
+        let payload = match payload_result {
+            Ok(p) => p,
+            Err(e) => {
+                return crate::run_future::RunFuture::from_future(Box::pin(async move {
+                    Err(TestError::InvalidConfiguration(format!(
+                        "InvokeRequest has no payload and the input type cannot be \
+                         deserialized from null: {}. Use InvokeRequest::with_payload() \
+                         to provide a value.",
+                        e
+                    )))
+                }));
+            }
+        };
+
+        // Clear previous state before starting execution
+        // We use try_write to avoid blocking; the async block will also clear.
+        if let Ok(mut storage) = self.operation_storage.try_write() {
+            storage.clear();
+        }
+        #[allow(deprecated)]
+        self.mock_client.clear_all_calls();
+
+        // Capture all the state we need for the async execution
+        let handler = Arc::clone(&self.handler);
+        let checkpoint_worker = self.checkpoint_worker.clone();
+        let operation_storage = self.operation_storage.clone();
+        let registered_handles = self.registered_handles.clone();
+        let shared_operations = self.shared_operations.clone();
+
+        crate::run_future::RunFuture::from_future(Box::pin(async move {
+            use crate::checkpoint_server::OperationStorage as OrchestratorOperationStorage;
+
+            // Ensure operation storage is cleared
+            operation_storage.write().await.clear();
+
+            // Configure time skipping based on test environment settings
+            let skip_time_config = SkipTimeConfig {
+                enabled: LocalDurableTestRunner::<I, O>::is_time_skipping_enabled(),
+            };
+
+            // Create shared operation storage for the orchestrator
+            let orchestrator_storage = Arc::new(tokio::sync::RwLock::new(OrchestratorOperationStorage::new()));
+
+            // Create the orchestrator with the shared handler
+            let handler_clone = Arc::clone(&handler);
+            let mut orchestrator = TestExecutionOrchestrator::new(
+                move |input: I, ctx: DurableContext| {
+                    let handler = Arc::clone(&handler_clone);
+                    async move { handler(input, ctx).await }
+                },
+                orchestrator_storage.clone(),
+                checkpoint_worker.clone(),
+                skip_time_config,
+            );
+
+            // Pass pre-registered operation handles to the orchestrator
+            if !registered_handles.is_empty() {
+                let callback_sender: Option<Arc<dyn CallbackSender>> = Some(Arc::new(
+                    CheckpointCallbackSender::new(checkpoint_worker.clone()),
+                ));
+                orchestrator = orchestrator.with_handles(
+                    registered_handles,
+                    shared_operations,
+                    callback_sender,
+                );
+            }
+
+            // Execute using the orchestrator
+            let execution_result = orchestrator.execute_handler(payload).await?;
+
+            // Copy operations from orchestrator storage to our storage
+            {
+                let orch_storage = orchestrator_storage.read().await;
+                let mut our_storage = operation_storage.write().await;
+                for op in orch_storage.get_all() {
+                    our_storage.add_operation(op.clone());
+                }
+            }
+
+            // Convert TestExecutionResult to TestResult
+            let mut test_result = match execution_result.status {
+                ExecutionStatus::Succeeded => {
+                    if let Some(result) = execution_result.result {
+                        TestResult::success(result, execution_result.operations)
+                    } else {
+                        TestResult::with_status(ExecutionStatus::Succeeded, execution_result.operations)
+                    }
+                }
+                ExecutionStatus::Failed => {
+                    if let Some(error) = execution_result.error {
+                        TestResult::failure(error, execution_result.operations)
+                    } else {
+                        TestResult::with_status(ExecutionStatus::Failed, execution_result.operations)
+                    }
+                }
+                ExecutionStatus::Running => {
+                    TestResult::with_status(ExecutionStatus::Running, execution_result.operations)
+                }
+                _ => {
+                    TestResult::with_status(execution_result.status, execution_result.operations)
+                }
+            };
+
+            // Add invocations
+            for invocation in execution_result.invocations {
+                test_result.add_invocation(invocation);
+            }
+
+            // Retrieve and add Node.js-compatible history events
+            if let Ok(nodejs_events) = checkpoint_worker
+                .get_nodejs_history_events(&execution_result.execution_id)
+                .await
+            {
+                test_result.set_nodejs_history_events(nodejs_events);
+            }
+
+            Ok(test_result)
+        }))
     }
 
     /// Executes the handler with a single invocation (no re-invocation on suspend).
@@ -796,6 +983,19 @@ where
             skip_time_config,
         );
 
+        // Pass pre-registered operation handles to the orchestrator so it can
+        // populate them as operations are created/updated during execution.
+        if !self.registered_handles.is_empty() {
+            let callback_sender: Option<Arc<dyn CallbackSender>> = Some(Arc::new(
+                CheckpointCallbackSender::new(self.checkpoint_worker.clone()),
+            ));
+            orchestrator = orchestrator.with_handles(
+                self.registered_handles.clone(),
+                self.shared_operations.clone(),
+                callback_sender,
+            );
+        }
+
         // Execute using the orchestrator
         let execution_result = orchestrator.execute_handler(payload.clone()).await?;
 
@@ -837,7 +1037,100 @@ where
             test_result.add_invocation(invocation);
         }
 
+        // Retrieve and add Node.js-compatible history events
+        if let Ok(nodejs_events) = self
+            .checkpoint_worker
+            .get_nodejs_history_events(&execution_result.execution_id)
+            .await
+        {
+            test_result.set_nodejs_history_events(nodejs_events);
+        }
+
         Ok(test_result)
+    }
+
+    /// Returns a lazy `OperationHandle` that populates when an operation
+    /// matching the given name is created during execution.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The operation name to match against
+    ///
+    /// # Requirements
+    ///
+    /// - 1.1: WHEN a developer calls `get_operation_handle(name)` on the Local_Test_Runner
+    ///   before calling `run()`, THE Local_Test_Runner SHALL return an Operation_Handle
+    ///   that is initially unpopulated
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let handle = runner.get_operation_handle("my-callback");
+    /// // handle is unpopulated until run() executes and produces a matching operation
+    /// ```
+    pub fn get_operation_handle(&mut self, name: &str) -> OperationHandle {
+        let handle = OperationHandle::new(
+            OperationMatcher::ByName(name.to_string()),
+            self.shared_operations.clone(),
+        );
+        self.registered_handles.push(handle.clone());
+        handle
+    }
+
+    /// Returns a lazy `OperationHandle` that populates with the operation
+    /// at the given execution order index.
+    ///
+    /// # Arguments
+    ///
+    /// * `index` - The zero-based execution order index
+    ///
+    /// # Requirements
+    ///
+    /// - 1.7: WHEN `get_operation_handle_by_index(index)` is called before `run()`,
+    ///   THE Local_Test_Runner SHALL return an Operation_Handle that populates with
+    ///   the operation at that execution order index
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let handle = runner.get_operation_handle_by_index(0);
+    /// // handle populates with the first operation created during execution
+    /// ```
+    pub fn get_operation_handle_by_index(&mut self, index: usize) -> OperationHandle {
+        let handle = OperationHandle::new(
+            OperationMatcher::ByIndex(index),
+            self.shared_operations.clone(),
+        );
+        self.registered_handles.push(handle.clone());
+        handle
+    }
+
+    /// Returns a lazy `OperationHandle` that populates with the operation
+    /// matching the given unique ID.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The unique operation ID to match against
+    ///
+    /// # Requirements
+    ///
+    /// - 1.8: WHEN `get_operation_handle_by_id(id)` is called before `run()`,
+    ///   THE Local_Test_Runner SHALL return an Operation_Handle that populates with
+    ///   the operation matching that unique ID
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let handle = runner.get_operation_handle_by_id("op-abc-123");
+    /// // handle populates with the operation whose ID matches during execution
+    /// ```
+    pub fn get_operation_handle_by_id(&mut self, id: &str) -> OperationHandle {
+        let handle = OperationHandle::new(
+            OperationMatcher::ById(id.to_string()),
+            self.shared_operations.clone(),
+        );
+        self.registered_handles.push(handle.clone());
+        handle
     }
 
     /// Resets the test runner state for a fresh test run.
@@ -876,6 +1169,10 @@ where
         // Re-acquire the checkpoint worker manager
         self.checkpoint_worker = CheckpointWorkerManager::get_instance(None)
             .expect("Failed to create CheckpointWorkerManager after reset");
+
+        // Clear registered operation handles and shared operations
+        self.registered_handles.clear();
+        self.shared_operations.write().await.clear();
 
         // Also clear mock client state for backward compatibility
         #[allow(deprecated)]
@@ -1870,6 +2167,50 @@ mod tests {
         LocalDurableTestRunner::<String, String>::teardown_test_environment()
             .await
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_run_with_orchestrator_populates_nodejs_history_events() {
+        use crate::checkpoint_server::NodeJsEventType;
+
+        // Ensure clean state
+        LocalDurableTestRunner::<String, String>::teardown_test_environment()
+            .await
+            .unwrap();
+
+        let mut runner = LocalDurableTestRunner::new(simple_handler);
+        let result = runner.run_with_orchestrator("hello".to_string()).await.unwrap();
+
+        // Verify successful execution status
+        assert_eq!(result.get_status(), ExecutionStatus::Succeeded);
+
+        // Verify Node.js history events are populated
+        let nodejs_events = result.get_nodejs_history_events();
+        assert!(!nodejs_events.is_empty(), "Node.js history events should be populated");
+
+        // Verify the first event is ExecutionStarted
+        assert_eq!(
+            nodejs_events[0].event_type,
+            NodeJsEventType::ExecutionStarted,
+            "First event should be ExecutionStarted"
+        );
+
+        // Verify event IDs are sequential starting from 1
+        for (i, event) in nodejs_events.iter().enumerate() {
+            assert_eq!(
+                event.event_id,
+                (i + 1) as u64,
+                "Event IDs should be sequential starting from 1"
+            );
+        }
+
+        // Verify timestamps are in ISO 8601 format
+        for event in nodejs_events {
+            assert!(
+                event.event_timestamp.contains('T') && event.event_timestamp.contains('Z'),
+                "Timestamps should be in ISO 8601 format"
+            );
+        }
     }
 }
 

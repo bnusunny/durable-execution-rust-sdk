@@ -265,6 +265,57 @@ impl std::fmt::Display for WaitingOperationStatus {
     }
 }
 
+/// Structured input wrapper for `run()`, matching the Node.js SDK's `InvokeRequest`.
+///
+/// Wraps an optional payload for handler invocation. Use [`InvokeRequest::with_payload`]
+/// to supply input, or [`InvokeRequest::new`] for a no-payload invocation.
+///
+/// `From<T>` is implemented so that raw payloads can be passed directly to `run()`
+/// without wrapping — backward compatibility is preserved.
+///
+/// # Examples
+///
+/// ```
+/// use aws_durable_execution_sdk_testing::InvokeRequest;
+///
+/// // With a payload
+/// let req = InvokeRequest::with_payload("hello");
+/// assert_eq!(req.payload, Some("hello"));
+///
+/// // Without a payload
+/// let req: InvokeRequest<String> = InvokeRequest::new();
+/// assert!(req.payload.is_none());
+///
+/// // From a raw value (backward compat)
+/// let req: InvokeRequest<i32> = 42.into();
+/// assert_eq!(req.payload, Some(42));
+/// ```
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct InvokeRequest<T = serde_json::Value> {
+    /// Optional payload to pass to the handler.
+    pub payload: Option<T>,
+}
+
+impl<T> InvokeRequest<T> {
+    /// Creates a new `InvokeRequest` with no payload.
+    pub fn new() -> Self {
+        Self { payload: None }
+    }
+
+    /// Creates a new `InvokeRequest` with the given payload.
+    pub fn with_payload(payload: T) -> Self {
+        Self {
+            payload: Some(payload),
+        }
+    }
+}
+
+impl<T> From<T> for InvokeRequest<T> {
+    fn from(value: T) -> Self {
+        Self::with_payload(value)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -334,5 +385,46 @@ mod tests {
             format!("{}", WaitingOperationStatus::Completed),
             "Completed"
         );
+    }
+
+    #[test]
+    fn test_invoke_request_new_has_no_payload() {
+        let req: InvokeRequest<String> = InvokeRequest::new();
+        assert!(req.payload.is_none());
+    }
+
+    #[test]
+    fn test_invoke_request_with_payload() {
+        let req = InvokeRequest::with_payload(42);
+        assert_eq!(req.payload, Some(42));
+    }
+
+    #[test]
+    fn test_invoke_request_default_has_no_payload() {
+        let req: InvokeRequest<String> = InvokeRequest::default();
+        assert!(req.payload.is_none());
+    }
+
+    #[test]
+    fn test_invoke_request_from_raw_value() {
+        let req: InvokeRequest<String> = "hello".to_string().into();
+        assert_eq!(req.payload, Some("hello".to_string()));
+    }
+
+    #[test]
+    fn test_invoke_request_serde_round_trip() {
+        let req = InvokeRequest::with_payload(serde_json::json!({"key": "value"}));
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: InvokeRequest<serde_json::Value> =
+            serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req.payload, deserialized.payload);
+    }
+
+    #[test]
+    fn test_invoke_request_serde_no_payload() {
+        let req: InvokeRequest<String> = InvokeRequest::new();
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: InvokeRequest<String> = serde_json::from_str(&serialized).unwrap();
+        assert!(deserialized.payload.is_none());
     }
 }

@@ -515,17 +515,11 @@ mod tests {
         assert!(!TimeControl::is_enabled());
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_advance_time() {
-        // Ensure clean state
-        TimeControl::disable().await.unwrap();
-
-        // Enable time control
-        TimeControl::enable().await.unwrap();
-
         let start = Instant::now();
 
-        // Advance by 1 second
+        // Advance by 1 second (clock is already paused by the runtime)
         TimeControl::advance_secs(1).await;
 
         // The wall clock time should be very small (not 1 second)
@@ -535,9 +529,6 @@ mod tests {
             "Time advance should be instant, but took {:?}",
             elapsed
         );
-
-        // Cleanup
-        TimeControl::disable().await.unwrap();
     }
 
     #[tokio::test]

@@ -228,6 +228,8 @@ pub struct DurableOperation {
     callback_sender: Option<Arc<dyn CallbackSender>>,
     /// Optional status watcher for async waiting
     status_watcher: Option<watch::Receiver<OperationStatus>>,
+    /// Shared reference to all operations for child enumeration
+    all_operations: Option<Arc<Vec<Operation>>>,
 }
 
 impl std::fmt::Debug for DurableOperation {
@@ -236,6 +238,7 @@ impl std::fmt::Debug for DurableOperation {
             .field("operation", &self.operation)
             .field("callback_sender", &self.callback_sender.is_some())
             .field("status_watcher", &self.status_watcher.is_some())
+            .field("all_operations", &self.all_operations.as_ref().map(|ops| ops.len()))
             .finish()
     }
 }
@@ -246,6 +249,7 @@ impl Clone for DurableOperation {
             operation: self.operation.clone(),
             callback_sender: self.callback_sender.clone(),
             status_watcher: self.status_watcher.clone(),
+            all_operations: self.all_operations.clone(),
         }
     }
 }
@@ -257,6 +261,7 @@ impl DurableOperation {
             operation,
             callback_sender: None,
             status_watcher: None,
+            all_operations: None,
         }
     }
 
@@ -269,6 +274,7 @@ impl DurableOperation {
             operation,
             callback_sender: Some(callback_sender),
             status_watcher: None,
+            all_operations: None,
         }
     }
 
@@ -281,6 +287,7 @@ impl DurableOperation {
             operation,
             callback_sender: None,
             status_watcher: Some(status_watcher),
+            all_operations: None,
         }
     }
 
@@ -294,6 +301,7 @@ impl DurableOperation {
             operation,
             callback_sender,
             status_watcher,
+            all_operations: None,
         }
     }
 
@@ -419,6 +427,51 @@ impl DurableOperation {
     /// True if the operation status is Failed, Cancelled, or TimedOut.
     pub fn is_failed(&self) -> bool {
         self.operation.is_failed()
+    }
+
+    /// Sets the shared reference to all operations for child enumeration.
+    pub fn with_operations(mut self, all_operations: Arc<Vec<Operation>>) -> Self {
+        self.all_operations = Some(all_operations);
+        self
+    }
+}
+
+impl DurableOperation {
+    // =========================================================================
+    // Child Operation Methods (Requirements 8.1, 8.2, 8.3)
+    // =========================================================================
+
+    /// Returns all child operations nested under this operation.
+    ///
+    /// Child operations are those whose `parent_id` matches this operation's `id`.
+    /// The returned operations are ordered by their position in the operations list.
+    ///
+    /// # Returns
+    ///
+    /// A vector of `DurableOperation` instances representing child operations.
+    /// Returns an empty vector if no children exist or if the operations list
+    /// is not available.
+    ///
+    /// # Requirements
+    ///
+    /// - 8.1: Returns all operations whose parent_id matches this operation's id
+    /// - 8.2: Returns empty Vec when no children exist
+    /// - 8.3: Returned operations ordered by their position in the operations list
+    pub fn get_child_operations(&self) -> Vec<DurableOperation> {
+        let Some(all_ops) = &self.all_operations else {
+            return Vec::new();
+        };
+
+        let my_id = &self.operation.operation_id;
+
+        all_ops
+            .iter()
+            .filter(|op| op.parent_id.as_deref() == Some(my_id))
+            .map(|op| {
+                DurableOperation::new(op.clone())
+                    .with_operations(Arc::clone(all_ops))
+            })
+            .collect()
     }
 }
 
@@ -1244,6 +1297,113 @@ mod tests {
             .wait_for_data(WaitingOperationStatus::Completed)
             .await;
         assert!(result.is_err());
+    }
+
+    // =========================================================================
+    // Child Operation Tests (Requirements 8.1, 8.2, 8.3)
+    // =========================================================================
+
+    /// Helper to create an operation with a specific id and optional parent_id.
+    fn create_operation_with_parent(id: &str, name: &str, parent_id: Option<&str>) -> Operation {
+        let mut op = Operation::new(id.to_string(), OperationType::Step);
+        op.name = Some(name.to_string());
+        op.status = OperationStatus::Succeeded;
+        op.parent_id = parent_id.map(|s| s.to_string());
+        op
+    }
+
+    #[test]
+    fn test_get_child_operations_matching_parent_id() {
+        let parent = create_operation_with_parent("parent-1", "parent", None);
+        let child1 = create_operation_with_parent("child-1", "child_a", Some("parent-1"));
+        let child2 = create_operation_with_parent("child-2", "child_b", Some("parent-1"));
+        let unrelated = create_operation_with_parent("other-1", "other", Some("parent-2"));
+
+        let all_ops = Arc::new(vec![
+            parent.clone(),
+            child1.clone(),
+            child2.clone(),
+            unrelated.clone(),
+        ]);
+
+        let durable_parent = DurableOperation::new(parent).with_operations(all_ops);
+        let children = durable_parent.get_child_operations();
+
+        assert_eq!(children.len(), 2);
+        assert_eq!(children[0].get_id(), "child-1");
+        assert_eq!(children[1].get_id(), "child-2");
+    }
+
+    #[test]
+    fn test_get_child_operations_empty_when_no_children() {
+        let parent = create_operation_with_parent("parent-1", "parent", None);
+        let unrelated = create_operation_with_parent("other-1", "other", Some("parent-2"));
+
+        let all_ops = Arc::new(vec![parent.clone(), unrelated.clone()]);
+
+        let durable_parent = DurableOperation::new(parent).with_operations(all_ops);
+        let children = durable_parent.get_child_operations();
+
+        assert!(children.is_empty());
+    }
+
+    #[test]
+    fn test_get_child_operations_preserves_order() {
+        let parent = create_operation_with_parent("parent-1", "parent", None);
+        let child_c = create_operation_with_parent("child-c", "third", Some("parent-1"));
+        let child_a = create_operation_with_parent("child-a", "first", Some("parent-1"));
+        let child_b = create_operation_with_parent("child-b", "second", Some("parent-1"));
+
+        // Order in the list: child_c, child_a, child_b
+        let all_ops = Arc::new(vec![
+            parent.clone(),
+            child_c.clone(),
+            child_a.clone(),
+            child_b.clone(),
+        ]);
+
+        let durable_parent = DurableOperation::new(parent).with_operations(all_ops);
+        let children = durable_parent.get_child_operations();
+
+        assert_eq!(children.len(), 3);
+        // Should preserve insertion order from the operations list
+        assert_eq!(children[0].get_id(), "child-c");
+        assert_eq!(children[1].get_id(), "child-a");
+        assert_eq!(children[2].get_id(), "child-b");
+    }
+
+    #[test]
+    fn test_get_child_operations_without_all_operations() {
+        // When all_operations is not set, should return empty
+        let parent = create_operation_with_parent("parent-1", "parent", None);
+        let durable_parent = DurableOperation::new(parent);
+        let children = durable_parent.get_child_operations();
+
+        assert!(children.is_empty());
+    }
+
+    #[test]
+    fn test_get_child_operations_children_can_enumerate_grandchildren() {
+        let parent = create_operation_with_parent("parent-1", "parent", None);
+        let child = create_operation_with_parent("child-1", "child", Some("parent-1"));
+        let grandchild = create_operation_with_parent("grandchild-1", "grandchild", Some("child-1"));
+
+        let all_ops = Arc::new(vec![
+            parent.clone(),
+            child.clone(),
+            grandchild.clone(),
+        ]);
+
+        let durable_parent = DurableOperation::new(parent).with_operations(all_ops);
+        let children = durable_parent.get_child_operations();
+
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0].get_id(), "child-1");
+
+        // Children should also be able to enumerate their own children
+        let grandchildren = children[0].get_child_operations();
+        assert_eq!(grandchildren.len(), 1);
+        assert_eq!(grandchildren[0].get_id(), "grandchild-1");
     }
 
     // =========================================================================

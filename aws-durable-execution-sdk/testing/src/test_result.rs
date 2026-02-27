@@ -5,6 +5,7 @@
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+use crate::checkpoint_server::NodeJsHistoryEvent;
 use crate::error::TestError;
 use crate::types::{ExecutionStatus, Invocation, TestResultError};
 use aws_durable_execution_sdk::{Operation, OperationStatus};
@@ -51,6 +52,11 @@ pub struct TestResult<T> {
     invocations: Vec<Invocation>,
     /// History events from the execution
     history_events: Vec<HistoryEvent>,
+    /// Node.js SDK compatible history events
+    ///
+    /// These events match the Node.js SDK's event history format exactly,
+    /// enabling cross-SDK history comparison.
+    nodejs_history_events: Vec<NodeJsHistoryEvent>,
 }
 
 /// A history event from the execution.
@@ -108,6 +114,7 @@ impl<T> TestResult<T> {
             operations,
             invocations: Vec::new(),
             history_events: Vec::new(),
+            nodejs_history_events: Vec::new(),
         }
     }
 
@@ -120,6 +127,7 @@ impl<T> TestResult<T> {
             operations,
             invocations: Vec::new(),
             history_events: Vec::new(),
+            nodejs_history_events: Vec::new(),
         }
     }
 
@@ -132,6 +140,7 @@ impl<T> TestResult<T> {
             operations,
             invocations: Vec::new(),
             history_events: Vec::new(),
+            nodejs_history_events: Vec::new(),
         }
     }
 
@@ -163,6 +172,19 @@ impl<T> TestResult<T> {
     /// Adds a history event.
     pub fn add_history_event(&mut self, event: HistoryEvent) {
         self.history_events.push(event);
+    }
+
+    /// Sets the Node.js SDK compatible history events.
+    ///
+    /// These events match the Node.js SDK's event history format exactly,
+    /// enabling cross-SDK history comparison.
+    pub fn set_nodejs_history_events(&mut self, events: Vec<NodeJsHistoryEvent>) {
+        self.nodejs_history_events = events;
+    }
+
+    /// Adds a Node.js SDK compatible history event.
+    pub fn add_nodejs_history_event(&mut self, event: NodeJsHistoryEvent) {
+        self.nodejs_history_events.push(event);
     }
 
     /// Gets the execution status.
@@ -284,6 +306,23 @@ impl<T> TestResult<T> {
     /// A slice of history events that occurred during execution.
     pub fn get_history_events(&self) -> &[HistoryEvent] {
         &self.history_events
+    }
+
+    /// Gets Node.js SDK compatible history events from the execution.
+    ///
+    /// Returns events in the Node.js SDK compatible format, suitable for
+    /// cross-SDK history comparison. These events use PascalCase field names
+    /// and include detailed event-specific information.
+    ///
+    /// # Returns
+    ///
+    /// A slice of Node.js-compatible history events that occurred during execution.
+    ///
+    /// # Requirements
+    ///
+    /// - 5.3: THE Event_History output SHALL contain History_Event objects in chronological order by EventId
+    pub fn get_nodejs_history_events(&self) -> &[NodeJsHistoryEvent] {
+        &self.nodejs_history_events
     }
 
     /// Checks if the execution succeeded.
@@ -785,6 +824,72 @@ mod tests {
             result.get_history_events()[1].operation_id,
             Some("step-001".to_string())
         );
+    }
+
+    #[test]
+    fn test_nodejs_history_events() {
+        use crate::checkpoint_server::{
+            ExecutionStartedDetails, ExecutionStartedDetailsWrapper, NodeJsEventDetails,
+            NodeJsEventType, NodeJsHistoryEvent, PayloadWrapper,
+        };
+
+        let mut result: TestResult<String> = TestResult::success("done".to_string(), vec![]);
+
+        // Initially empty
+        assert_eq!(result.get_nodejs_history_events().len(), 0);
+
+        // Create Node.js-compatible events
+        let event1 = NodeJsHistoryEvent {
+            event_type: NodeJsEventType::ExecutionStarted,
+            event_id: 1,
+            id: Some("exec-123".to_string()),
+            event_timestamp: "2025-12-03T22:58:35.094Z".to_string(),
+            sub_type: None,
+            name: None,
+            parent_id: None,
+            details: NodeJsEventDetails::ExecutionStarted(ExecutionStartedDetailsWrapper {
+                execution_started_details: ExecutionStartedDetails {
+                    input: PayloadWrapper::new("{}"),
+                    execution_timeout: None,
+                },
+            }),
+        };
+
+        let event2 = NodeJsHistoryEvent {
+            event_type: NodeJsEventType::StepStarted,
+            event_id: 2,
+            id: Some("step-456".to_string()),
+            event_timestamp: "2025-12-03T22:58:35.096Z".to_string(),
+            sub_type: Some("Step".to_string()),
+            name: Some("my-step".to_string()),
+            parent_id: Some("exec-123".to_string()),
+            details: NodeJsEventDetails::default(),
+        };
+
+        // Add events using add method
+        result.add_nodejs_history_event(event1.clone());
+        result.add_nodejs_history_event(event2.clone());
+
+        assert_eq!(result.get_nodejs_history_events().len(), 2);
+        assert_eq!(
+            result.get_nodejs_history_events()[0].event_type,
+            NodeJsEventType::ExecutionStarted
+        );
+        assert_eq!(result.get_nodejs_history_events()[0].event_id, 1);
+        assert_eq!(
+            result.get_nodejs_history_events()[1].event_type,
+            NodeJsEventType::StepStarted
+        );
+        assert_eq!(result.get_nodejs_history_events()[1].event_id, 2);
+        assert_eq!(
+            result.get_nodejs_history_events()[1].name,
+            Some("my-step".to_string())
+        );
+
+        // Test set_nodejs_history_events
+        let mut result2: TestResult<String> = TestResult::success("done".to_string(), vec![]);
+        result2.set_nodejs_history_events(vec![event1, event2]);
+        assert_eq!(result2.get_nodejs_history_events().len(), 2);
     }
 
     #[test]

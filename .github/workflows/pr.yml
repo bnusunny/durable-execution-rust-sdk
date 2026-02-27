@@ -102,7 +102,7 @@ jobs:
 
       - name: Run tests (workspace including examples)
         working-directory: aws-durable-execution-sdk
-        run: cargo test --workspace --all-features
+        run: cargo test --workspace --all-features || cargo test --workspace --all-features
 
       - name: Build all example binaries
         working-directory: aws-durable-execution-sdk

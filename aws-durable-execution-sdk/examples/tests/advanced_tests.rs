@@ -3,7 +3,9 @@
 //! These tests verify advanced SDK features including checkpointing modes,
 //! retry exhaustion, large payloads, and handler-level errors.
 
-use aws_durable_execution_sdk::{DurableContext, DurableError, Duration, ExponentialBackoff, StepConfig};
+use aws_durable_execution_sdk::{
+    DurableContext, DurableError, Duration, ExponentialBackoff, StepConfig,
+};
 use aws_durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures;
 use aws_durable_execution_sdk_testing::{
     ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig,
@@ -61,10 +63,7 @@ async fn test_checkpointing_eager() {
     let operations = result.get_operations();
     assert!(!operations.is_empty(), "Should have operations");
 
-    assert_nodejs_event_signatures(
-        &result,
-        "tests/history/checkpointing_eager.history.json",
-    );
+    assert_nodejs_event_signatures(&result, "tests/history/checkpointing_eager.history.json");
 
     LocalDurableTestRunner::<serde_json::Value, String>::teardown_test_environment()
         .await
@@ -130,10 +129,7 @@ async fn test_checkpointing_batched() {
     let operations = result.get_operations();
     assert!(!operations.is_empty(), "Should have operations");
 
-    assert_nodejs_event_signatures(
-        &result,
-        "tests/history/checkpointing_batched.history.json",
-    );
+    assert_nodejs_event_signatures(&result, "tests/history/checkpointing_batched.history.json");
 
     LocalDurableTestRunner::<serde_json::Value, String>::teardown_test_environment()
         .await
@@ -219,9 +215,10 @@ async fn retry_exhaustion_handler(
     ctx: DurableContext,
 ) -> Result<String, DurableError> {
     let config = StepConfig {
-        retry_strategy: Some(Box::new(
-            ExponentialBackoff::new(2, Duration::from_seconds(1)),
-        )),
+        retry_strategy: Some(Box::new(ExponentialBackoff::new(
+            2,
+            Duration::from_seconds(1),
+        ))),
         ..Default::default()
     };
 
@@ -253,10 +250,7 @@ async fn test_retry_exhaustion() {
     // The step exhausts all retries, so the execution should fail
     assert_eq!(result.get_status(), ExecutionStatus::Failed);
 
-    assert_nodejs_event_signatures(
-        &result,
-        "tests/history/retry_exhaustion.history.json",
-    );
+    assert_nodejs_event_signatures(&result, "tests/history/retry_exhaustion.history.json");
 
     LocalDurableTestRunner::<serde_json::Value, String>::teardown_test_environment()
         .await
@@ -330,10 +324,7 @@ async fn test_large_payload() {
     let operations = result.get_operations();
     assert!(!operations.is_empty(), "Should have operations");
 
-    assert_nodejs_event_signatures(
-        &result,
-        "tests/history/large_payload.history.json",
-    );
+    assert_nodejs_event_signatures(&result, "tests/history/large_payload.history.json");
 
     LocalDurableTestRunner::<LargeInput, LargeOutput>::teardown_test_environment()
         .await
@@ -350,11 +341,7 @@ async fn handler_error_handler(
     ctx: DurableContext,
 ) -> Result<String, DurableError> {
     let _setup: String = ctx
-        .step_named(
-            "setup_step",
-            |_step_ctx| Ok("setup_done".to_string()),
-            None,
-        )
+        .step_named("setup_step", |_step_ctx| Ok("setup_done".to_string()), None)
         .await?;
 
     Err(DurableError::execution("handler_level_failure"))
@@ -377,10 +364,7 @@ async fn test_handler_error() {
     // The handler returns an error, so execution should fail
     assert_eq!(result.get_status(), ExecutionStatus::Failed);
 
-    assert_nodejs_event_signatures(
-        &result,
-        "tests/history/handler_error.history.json",
-    );
+    assert_nodejs_event_signatures(&result, "tests/history/handler_error.history.json");
 
     LocalDurableTestRunner::<serde_json::Value, String>::teardown_test_environment()
         .await

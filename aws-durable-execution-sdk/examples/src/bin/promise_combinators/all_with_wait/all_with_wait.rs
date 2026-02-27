@@ -34,12 +34,8 @@ pub async fn handler(
     let results = all!(
         ctx,
         async move { ctx1.step(|_| Ok("fast".to_string()), None).await },
-        async move {
-            ctx2.step(|_| Ok("after_wait_1".to_string()), None).await
-        },
-        async move {
-            ctx3.step(|_| Ok("after_wait_2".to_string()), None).await
-        },
+        async move { ctx2.step(|_| Ok("after_wait_1".to_string()), None).await },
+        async move { ctx3.step(|_| Ok("after_wait_2".to_string()), None).await },
     )
     .await?;
 

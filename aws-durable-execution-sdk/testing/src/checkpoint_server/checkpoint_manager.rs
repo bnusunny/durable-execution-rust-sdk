@@ -106,7 +106,8 @@ impl CheckpointManager {
             update: None,
         };
 
-        self.operation_data_map.insert(initial_id.clone(), events.clone());
+        self.operation_data_map
+            .insert(initial_id.clone(), events.clone());
         self.operation_order.push(initial_id.clone());
         self.dirty_operation_ids.insert(initial_id);
 
@@ -206,14 +207,15 @@ impl CheckpointManager {
         );
 
         // Generate Node.js-compatible InvocationCompleted event
-        let nodejs_details = NodeJsEventDetails::InvocationCompleted(InvocationCompletedDetailsWrapper {
-            invocation_completed_details: InvocationCompletedDetails {
-                start_timestamp: EventProcessor::format_timestamp(start_timestamp),
-                end_timestamp: EventProcessor::format_timestamp(end_timestamp),
-                request_id: invocation_id.to_string(),
-                error: ErrorWrapper::empty(),
-            },
-        });
+        let nodejs_details =
+            NodeJsEventDetails::InvocationCompleted(InvocationCompletedDetailsWrapper {
+                invocation_completed_details: InvocationCompletedDetails {
+                    start_timestamp: EventProcessor::format_timestamp(start_timestamp),
+                    end_timestamp: EventProcessor::format_timestamp(end_timestamp),
+                    request_id: invocation_id.to_string(),
+                    error: ErrorWrapper::empty(),
+                },
+            });
         self.event_processor.create_nodejs_event(
             NodeJsEventType::InvocationCompleted,
             None,
@@ -270,8 +272,10 @@ impl CheckpointManager {
                             .callback_options
                             .as_ref()
                             .and_then(|opts| opts.timeout_seconds)
-                            .map(|secs| std::time::Duration::from_secs(secs as u64));
-                        let _ = self.callback_manager.register_callback(callback_id, timeout);
+                            .map(std::time::Duration::from_secs);
+                        let _ = self
+                            .callback_manager
+                            .register_callback(callback_id, timeout);
                     }
                 }
             }
@@ -297,7 +301,8 @@ impl CheckpointManager {
         );
 
         // Generate Node.js-compatible events using the EventProcessor's process_operation_update method
-        self.event_processor.process_operation_update(&update, &operation);
+        self.event_processor
+            .process_operation_update(&update, &operation);
 
         // Check if this completes the execution
         if operation.operation_type == OperationType::Execution
@@ -324,7 +329,12 @@ impl CheckpointManager {
     }
 
     /// Merge an operation update into an existing operation.
-    fn merge_operation_update(&self, operation: &mut Operation, update: &OperationUpdate, now: i64) {
+    fn merge_operation_update(
+        &self,
+        operation: &mut Operation,
+        update: &OperationUpdate,
+        now: i64,
+    ) {
         // Update status based on action
         operation.status = match update.action {
             OperationAction::Start => OperationStatus::Started,
@@ -335,7 +345,10 @@ impl CheckpointManager {
         };
 
         // Set end timestamp for completion actions
-        if matches!(update.action, OperationAction::Succeed | OperationAction::Fail | OperationAction::Cancel) {
+        if matches!(
+            update.action,
+            OperationAction::Succeed | OperationAction::Fail | OperationAction::Cancel
+        ) {
             operation.end_timestamp = Some(now);
         }
 
@@ -349,11 +362,15 @@ impl CheckpointManager {
 
         // Handle step retry - update step_details with next_attempt_timestamp
         if update.action == OperationAction::Retry && update.operation_type == OperationType::Step {
-            let next_attempt_timestamp = update.step_options.as_ref()
+            let next_attempt_timestamp = update
+                .step_options
+                .as_ref()
                 .and_then(|opts| opts.next_attempt_delay_seconds)
                 .map(|delay| now + (delay as i64 * 1000));
 
-            let current_attempt = operation.step_details.as_ref()
+            let current_attempt = operation
+                .step_details
+                .as_ref()
                 .and_then(|d| d.attempt)
                 .unwrap_or(0);
 
@@ -377,7 +394,10 @@ impl CheckpointManager {
             OperationAction::Retry => OperationStatus::Pending, // Retry sets status to Pending
         };
 
-        let end_timestamp = if matches!(update.action, OperationAction::Succeed | OperationAction::Fail | OperationAction::Cancel) {
+        let end_timestamp = if matches!(
+            update.action,
+            OperationAction::Succeed | OperationAction::Fail | OperationAction::Cancel
+        ) {
             Some(now)
         } else {
             None
@@ -417,7 +437,8 @@ impl CheckpointManager {
         let step_details = if update.operation_type == OperationType::Step {
             if let Some(ref step_options) = update.step_options {
                 // Calculate next_attempt_timestamp as now + (delay_seconds * 1000) milliseconds
-                let next_attempt_timestamp = step_options.next_attempt_delay_seconds
+                let next_attempt_timestamp = step_options
+                    .next_attempt_delay_seconds
                     .map(|delay| now + (delay as i64 * 1000));
                 Some(aws_durable_execution_sdk::StepDetails {
                     result: None,
@@ -540,17 +561,17 @@ impl CheckpointManager {
     }
 
     /// Update operation data directly.
-    /// 
+    ///
     /// This method is used by the orchestrator to update operation state
     /// (e.g., marking wait operations as SUCCEEDED after time advancement).
     pub fn update_operation_data(&mut self, operation_id: &str, updated_operation: Operation) {
         if let Some(existing) = self.operation_data_map.get_mut(operation_id) {
             // Update the operation
             existing.operation = updated_operation;
-            
+
             // Mark as dirty so it's returned in the next get_state call
             self.dirty_operation_ids.insert(operation_id.to_string());
-            
+
             // Check if this completes the execution
             if existing.operation.operation_type == OperationType::Execution
                 && (existing.operation.status == OperationStatus::Succeeded
@@ -564,7 +585,8 @@ impl CheckpointManager {
                 operation: updated_operation,
                 update: None,
             };
-            self.operation_data_map.insert(operation_id.to_string(), events);
+            self.operation_data_map
+                .insert(operation_id.to_string(), events);
             self.operation_order.push(operation_id.to_string());
             self.dirty_operation_ids.insert(operation_id.to_string());
         }
@@ -628,8 +650,7 @@ mod tests {
         manager.initialize("{}");
         manager.get_dirty_operations(); // Clear dirty
 
-        let update = OperationUpdate::start("op-1", OperationType::Step)
-            .with_name("test-step");
+        let update = OperationUpdate::start("op-1", OperationType::Step).with_name("test-step");
 
         let dirty = manager.process_checkpoint(vec![update]).unwrap();
         assert_eq!(dirty.len(), 1);
@@ -687,9 +708,15 @@ mod tests {
 
         let nodejs_events = manager.get_nodejs_history_events();
         assert_eq!(nodejs_events.len(), 1);
-        assert_eq!(nodejs_events[0].event_type, NodeJsEventType::ExecutionStarted);
+        assert_eq!(
+            nodejs_events[0].event_type,
+            NodeJsEventType::ExecutionStarted
+        );
         assert_eq!(nodejs_events[0].event_id, 1);
-        assert_eq!(nodejs_events[0].id, Some(events.operation.operation_id.clone()));
+        assert_eq!(
+            nodejs_events[0].id,
+            Some(events.operation.operation_id.clone())
+        );
     }
 
     #[test]
@@ -698,13 +725,15 @@ mod tests {
         manager.initialize("{}");
 
         // Process a step start
-        let update = OperationUpdate::start("step-1", OperationType::Step)
-            .with_name("my-step");
+        let update = OperationUpdate::start("step-1", OperationType::Step).with_name("my-step");
         manager.process_checkpoint(vec![update]).unwrap();
 
         let nodejs_events = manager.get_nodejs_history_events();
         assert_eq!(nodejs_events.len(), 2); // ExecutionStarted + StepStarted
-        assert_eq!(nodejs_events[0].event_type, NodeJsEventType::ExecutionStarted);
+        assert_eq!(
+            nodejs_events[0].event_type,
+            NodeJsEventType::ExecutionStarted
+        );
         assert_eq!(nodejs_events[1].event_type, NodeJsEventType::StepStarted);
         assert_eq!(nodejs_events[1].name, Some("my-step".to_string()));
     }
@@ -719,7 +748,10 @@ mod tests {
 
         let nodejs_events = manager.get_nodejs_history_events();
         assert_eq!(nodejs_events.len(), 2); // ExecutionStarted + InvocationCompleted
-        assert_eq!(nodejs_events[1].event_type, NodeJsEventType::InvocationCompleted);
+        assert_eq!(
+            nodejs_events[1].event_type,
+            NodeJsEventType::InvocationCompleted
+        );
     }
 
     #[test]
@@ -728,17 +760,21 @@ mod tests {
         manager.initialize("{}");
 
         // Start step
-        let start_update = OperationUpdate::start("step-1", OperationType::Step)
-            .with_name("compute");
+        let start_update =
+            OperationUpdate::start("step-1", OperationType::Step).with_name("compute");
         manager.process_checkpoint(vec![start_update]).unwrap();
 
         // Succeed step
-        let succeed_update = OperationUpdate::succeed("step-1", OperationType::Step, Some("42".to_string()));
+        let succeed_update =
+            OperationUpdate::succeed("step-1", OperationType::Step, Some("42".to_string()));
         manager.process_checkpoint(vec![succeed_update]).unwrap();
 
         let nodejs_events = manager.get_nodejs_history_events();
         assert_eq!(nodejs_events.len(), 3); // ExecutionStarted + StepStarted + StepSucceeded
-        assert_eq!(nodejs_events[0].event_type, NodeJsEventType::ExecutionStarted);
+        assert_eq!(
+            nodejs_events[0].event_type,
+            NodeJsEventType::ExecutionStarted
+        );
         assert_eq!(nodejs_events[1].event_type, NodeJsEventType::StepStarted);
         assert_eq!(nodejs_events[2].event_type, NodeJsEventType::StepSucceeded);
     }
@@ -750,13 +786,23 @@ mod tests {
         let exec_id = init_events.operation.operation_id.clone();
 
         // Succeed execution
-        let succeed_update = OperationUpdate::succeed(&exec_id, OperationType::Execution, Some("result".to_string()));
+        let succeed_update = OperationUpdate::succeed(
+            &exec_id,
+            OperationType::Execution,
+            Some("result".to_string()),
+        );
         manager.process_checkpoint(vec![succeed_update]).unwrap();
 
         let nodejs_events = manager.get_nodejs_history_events();
         assert_eq!(nodejs_events.len(), 2); // ExecutionStarted + ExecutionSucceeded
-        assert_eq!(nodejs_events[0].event_type, NodeJsEventType::ExecutionStarted);
-        assert_eq!(nodejs_events[1].event_type, NodeJsEventType::ExecutionSucceeded);
+        assert_eq!(
+            nodejs_events[0].event_type,
+            NodeJsEventType::ExecutionStarted
+        );
+        assert_eq!(
+            nodejs_events[1].event_type,
+            NodeJsEventType::ExecutionSucceeded
+        );
     }
 
     #[test]

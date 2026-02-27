@@ -8,7 +8,9 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use super::checkpoint_manager::{CheckpointManager, OperationEvents};
-use super::checkpoint_token::{decode_checkpoint_token, encode_checkpoint_token, CheckpointTokenData};
+use super::checkpoint_token::{
+    decode_checkpoint_token, encode_checkpoint_token, CheckpointTokenData,
+};
 use super::event_processor::{EventType, HistoryEvent};
 use super::types::{
     CompleteInvocationRequest, ExecutionId, InvocationId, StartDurableExecutionRequest,
@@ -37,7 +39,6 @@ pub struct CompleteInvocationResponse {
     /// Whether there are dirty operations
     pub has_dirty_operations: bool,
 }
-
 
 /// Parameters for starting an execution.
 #[derive(Debug, Clone)]
@@ -86,7 +87,8 @@ impl ExecutionManager {
             invocation_id: invocation_id.clone(),
         });
 
-        self.executions.insert(execution_id.clone(), checkpoint_manager);
+        self.executions
+            .insert(execution_id.clone(), checkpoint_manager);
 
         InvocationResult {
             checkpoint_token,
@@ -95,7 +97,6 @@ impl ExecutionManager {
             operation_events: vec![initial_operation],
         }
     }
-
 
     /// Start a new execution from a request.
     pub fn start_execution_from_request(
@@ -176,12 +177,8 @@ impl ExecutionManager {
         })
     }
 
-
     /// Get checkpoint manager for an execution.
-    pub fn get_checkpoints_by_execution(
-        &self,
-        execution_id: &str,
-    ) -> Option<&CheckpointManager> {
+    pub fn get_checkpoints_by_execution(&self, execution_id: &str) -> Option<&CheckpointManager> {
         self.executions.get(execution_id)
     }
 

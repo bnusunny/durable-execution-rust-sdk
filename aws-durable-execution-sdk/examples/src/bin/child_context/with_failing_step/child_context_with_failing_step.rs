@@ -18,7 +18,7 @@ pub async fn handler(
     ctx: DurableContext,
 ) -> Result<String, DurableError> {
     let config = ChildConfig::new().set_error_mapper(Arc::new(|err: DurableError| {
-        DurableError::execution(&format!("mapped_error: {}", err))
+        DurableError::execution(format!("mapped_error: {}", err))
     }));
 
     let result = ctx

@@ -40,7 +40,6 @@ pub struct CallbackState {
     pub error: Option<ErrorObject>,
 }
 
-
 impl CallbackState {
     /// Create a new callback state.
     pub fn new(callback_id: String, timeout: Option<Duration>) -> Self {
@@ -107,7 +106,6 @@ impl CallbackManager {
         Ok(())
     }
 
-
     /// Send callback success.
     pub fn send_success(&mut self, callback_id: &str, result: &str) -> Result<(), TestError> {
         let state = self
@@ -125,7 +123,11 @@ impl CallbackManager {
     }
 
     /// Send callback failure.
-    pub fn send_failure(&mut self, callback_id: &str, error: &ErrorObject) -> Result<(), TestError> {
+    pub fn send_failure(
+        &mut self,
+        callback_id: &str,
+        error: &ErrorObject,
+    ) -> Result<(), TestError> {
         let state = self
             .callbacks
             .get_mut(callback_id)
@@ -188,7 +190,6 @@ impl CallbackManager {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -220,7 +221,10 @@ mod tests {
 
         let state = manager.get_callback_state("cb-1").unwrap();
         assert!(state.is_completed());
-        assert_eq!(state.completion_status, Some(CompleteCallbackStatus::Success));
+        assert_eq!(
+            state.completion_status,
+            Some(CompleteCallbackStatus::Success)
+        );
         assert_eq!(state.result, Some(r#"{"result": "ok"}"#.to_string()));
     }
 
@@ -234,14 +238,19 @@ mod tests {
 
         let state = manager.get_callback_state("cb-1").unwrap();
         assert!(state.is_completed());
-        assert_eq!(state.completion_status, Some(CompleteCallbackStatus::Failure));
+        assert_eq!(
+            state.completion_status,
+            Some(CompleteCallbackStatus::Failure)
+        );
         assert!(state.error.is_some());
     }
 
     #[test]
     fn test_send_heartbeat() {
         let mut manager = CallbackManager::new("exec-1");
-        manager.register_callback("cb-1", Some(Duration::from_secs(60))).unwrap();
+        manager
+            .register_callback("cb-1", Some(Duration::from_secs(60)))
+            .unwrap();
 
         // Wait a tiny bit
         std::thread::sleep(Duration::from_millis(10));

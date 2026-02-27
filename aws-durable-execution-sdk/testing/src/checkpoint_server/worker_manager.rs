@@ -16,10 +16,10 @@ use aws_durable_execution_sdk::{
 
 use super::execution_manager::ExecutionManager;
 use super::types::{
-    ApiType, CheckpointWorkerParams, CompleteInvocationRequest,
-    SendCallbackFailureRequest, SendCallbackHeartbeatRequest, SendCallbackSuccessRequest,
-    StartDurableExecutionRequest, StartInvocationRequest, WorkerApiRequest, WorkerApiResponse,
-    WorkerCommand, WorkerCommandType, WorkerResponse, WorkerResponseType,
+    ApiType, CheckpointWorkerParams, CompleteInvocationRequest, SendCallbackFailureRequest,
+    SendCallbackHeartbeatRequest, SendCallbackSuccessRequest, StartDurableExecutionRequest,
+    StartInvocationRequest, WorkerApiRequest, WorkerApiResponse, WorkerCommand, WorkerCommandType,
+    WorkerResponse, WorkerResponseType,
 };
 use crate::error::TestError;
 
@@ -36,7 +36,6 @@ enum WorkerMessage {
     /// Shutdown signal
     Shutdown,
 }
-
 
 /// Manages the checkpoint server thread lifecycle.
 pub struct CheckpointWorkerManager {
@@ -73,7 +72,7 @@ impl CheckpointWorkerManager {
     }
 
     /// Reset the singleton instance (for testing).
-    /// 
+    ///
     /// Note: This method should be called from a non-async context or at the start
     /// of a test before any async operations. If called from within an async context,
     /// it will skip the graceful shutdown and just clear the instance.
@@ -112,7 +111,6 @@ impl CheckpointWorkerManager {
             params,
         })
     }
-
 
     /// Run the worker thread.
     fn run_worker(mut command_rx: mpsc::Receiver<WorkerMessage>, params: CheckpointWorkerParams) {
@@ -153,21 +151,13 @@ impl CheckpointWorkerManager {
         }
 
         let api_response = match command.data.api_type {
-            ApiType::StartDurableExecution => {
-                Self::handle_start_execution(state, &command.data)
-            }
-            ApiType::StartInvocation => {
-                Self::handle_start_invocation(state, &command.data)
-            }
-            ApiType::CompleteInvocation => {
-                Self::handle_complete_invocation(state, &command.data)
-            }
+            ApiType::StartDurableExecution => Self::handle_start_execution(state, &command.data),
+            ApiType::StartInvocation => Self::handle_start_invocation(state, &command.data),
+            ApiType::CompleteInvocation => Self::handle_complete_invocation(state, &command.data),
             ApiType::CheckpointDurableExecutionState => {
                 Self::handle_checkpoint(state, &command.data)
             }
-            ApiType::GetDurableExecutionState => {
-                Self::handle_get_state(state, &command.data)
-            }
+            ApiType::GetDurableExecutionState => Self::handle_get_state(state, &command.data),
             ApiType::SendDurableExecutionCallbackSuccess => {
                 Self::handle_callback_success(state, &command.data)
             }
@@ -375,7 +365,10 @@ impl CheckpointWorkerManager {
             Ok(req) => {
                 // Extract execution ID from ARN (simplified - just use the ARN as ID for testing)
                 let execution_id = &req.durable_execution_arn;
-                match state.execution_manager.get_checkpoints_by_execution(execution_id) {
+                match state
+                    .execution_manager
+                    .get_checkpoints_by_execution(execution_id)
+                {
                     Some(checkpoint_manager) => {
                         let operations = checkpoint_manager.get_state();
                         let response = GetOperationsResponse {
@@ -618,7 +611,7 @@ impl CheckpointWorkerManager {
     }
 
     /// Handle UpdateCheckpointData request.
-    /// 
+    ///
     /// This method updates the state of a specific operation in the checkpoint server.
     /// It's used by the orchestrator to mark wait operations as SUCCEEDED after time
     /// has been advanced in time-skipping mode.
@@ -638,10 +631,8 @@ impl CheckpointWorkerManager {
                 {
                     Some(checkpoint_manager) => {
                         // Update the operation data
-                        checkpoint_manager.update_operation_data(
-                            &req.operation_id,
-                            req.operation_data,
-                        );
+                        checkpoint_manager
+                            .update_operation_data(&req.operation_id, req.operation_data);
                         WorkerApiResponse::success(
                             request.api_type,
                             request.request_id.clone(),
@@ -664,7 +655,7 @@ impl CheckpointWorkerManager {
     }
 
     /// Handle GetNodeJsHistoryEvents request.
-    /// 
+    ///
     /// This method retrieves the Node.js-compatible history events for an execution.
     /// These events match the Node.js SDK's event history format exactly,
     /// enabling cross-SDK history comparison.
@@ -812,7 +803,9 @@ impl DurableServiceClient for CheckpointWorkerManager {
         let response = self
             .send_api_request(ApiType::CheckpointDurableExecutionState, payload)
             .await
-            .map_err(|e| DurableError::checkpoint_retriable(format!("Communication error: {}", e)))?;
+            .map_err(|e| {
+                DurableError::checkpoint_retriable(format!("Communication error: {}", e))
+            })?;
 
         if let Some(error) = response.error {
             return Err(DurableError::checkpoint_retriable(error));
@@ -841,7 +834,9 @@ impl DurableServiceClient for CheckpointWorkerManager {
         let response = self
             .send_api_request(ApiType::GetDurableExecutionState, payload)
             .await
-            .map_err(|e| DurableError::checkpoint_retriable(format!("Communication error: {}", e)))?;
+            .map_err(|e| {
+                DurableError::checkpoint_retriable(format!("Communication error: {}", e))
+            })?;
 
         if let Some(error) = response.error {
             return Err(DurableError::checkpoint_retriable(error));
@@ -875,7 +870,9 @@ impl CheckpointWorkerManager {
         let response = self
             .send_api_request(ApiType::SendDurableExecutionCallbackSuccess, payload)
             .await
-            .map_err(|e| DurableError::checkpoint_retriable(format!("Communication error: {}", e)))?;
+            .map_err(|e| {
+                DurableError::checkpoint_retriable(format!("Communication error: {}", e))
+            })?;
 
         if let Some(error) = response.error {
             return Err(DurableError::execution(error));
@@ -901,7 +898,9 @@ impl CheckpointWorkerManager {
         let response = self
             .send_api_request(ApiType::SendDurableExecutionCallbackFailure, payload)
             .await
-            .map_err(|e| DurableError::checkpoint_retriable(format!("Communication error: {}", e)))?;
+            .map_err(|e| {
+                DurableError::checkpoint_retriable(format!("Communication error: {}", e))
+            })?;
 
         if let Some(error) = response.error {
             return Err(DurableError::execution(error));
@@ -922,7 +921,9 @@ impl CheckpointWorkerManager {
         let response = self
             .send_api_request(ApiType::SendDurableExecutionCallbackHeartbeat, payload)
             .await
-            .map_err(|e| DurableError::checkpoint_retriable(format!("Communication error: {}", e)))?;
+            .map_err(|e| {
+                DurableError::checkpoint_retriable(format!("Communication error: {}", e))
+            })?;
 
         if let Some(error) = response.error {
             return Err(DurableError::execution(error));
@@ -960,7 +961,9 @@ impl CheckpointWorkerManager {
         let response = self
             .send_api_request(ApiType::GetNodeJsHistoryEvents, payload)
             .await
-            .map_err(|e| DurableError::checkpoint_retriable(format!("Communication error: {}", e)))?;
+            .map_err(|e| {
+                DurableError::checkpoint_retriable(format!("Communication error: {}", e))
+            })?;
 
         if let Some(error) = response.error {
             return Err(DurableError::checkpoint_retriable(error));
@@ -1044,10 +1047,11 @@ mod tests {
         let checkpoint_request = CheckpointDurableExecutionStateRequest {
             durable_execution_arn: result.execution_id.clone(),
             checkpoint_token: result.checkpoint_token.clone(),
-            operations: vec![
-                OperationUpdate::start("op-1", aws_durable_execution_sdk::OperationType::Step)
-                    .with_name("test-step")
-            ],
+            operations: vec![OperationUpdate::start(
+                "op-1",
+                aws_durable_execution_sdk::OperationType::Step,
+            )
+            .with_name("test-step")],
         };
 
         let payload = serde_json::to_string(&checkpoint_request).unwrap();

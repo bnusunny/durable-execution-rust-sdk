@@ -165,7 +165,7 @@ async fn test_callback_concurrent() {
         .iter()
         .filter(|op| op.operation_type == OperationType::Callback)
         .collect();
-    
+
     // Should have at least one callback (credit_check)
     // The second callback (fraud_check) may or may not be created depending on
     // whether the first callback suspends before the second is created
@@ -860,23 +860,15 @@ pub struct WfcCustomSerdesPayload {
 struct WfcCustomPayloadSerDes;
 
 impl aws_durable_execution_sdk::SerDesAny for WfcCustomPayloadSerDes {
-    fn serialize_any(
-        &self,
-        value: &dyn std::any::Any,
-    ) -> Result<String, DurableError> {
+    fn serialize_any(&self, value: &dyn std::any::Any) -> Result<String, DurableError> {
         let payload = value
             .downcast_ref::<WfcCustomSerdesPayload>()
-            .ok_or_else(|| {
-                DurableError::execution("Expected WfcCustomSerdesPayload type")
-            })?;
+            .ok_or_else(|| DurableError::execution("Expected WfcCustomSerdesPayload type"))?;
         serde_json::to_string(payload)
             .map_err(|e| DurableError::execution(format!("Serialization error: {}", e)))
     }
 
-    fn deserialize_any(
-        &self,
-        data: &str,
-    ) -> Result<Box<dyn std::any::Any + Send>, DurableError> {
+    fn deserialize_any(&self, data: &str) -> Result<Box<dyn std::any::Any + Send>, DurableError> {
         let payload: WfcCustomSerdesPayload = serde_json::from_str(data)
             .map_err(|e| DurableError::execution(format!("Deserialization error: {}", e)))?;
         Ok(Box::new(payload))
@@ -933,9 +925,10 @@ async fn test_wfc_custom_serdes() {
     // Check event signatures (Node.js-compatible format)
     assert_nodejs_event_signatures(&result, "tests/history/wfc_custom_serdes.history.json");
 
-    LocalDurableTestRunner::<serde_json::Value, WfcCustomSerdesPayload>::teardown_test_environment()
-        .await
-        .unwrap();
+    LocalDurableTestRunner::<serde_json::Value, WfcCustomSerdesPayload>::teardown_test_environment(
+    )
+    .await
+    .unwrap();
 }
 
 // ============================================================================
@@ -1108,23 +1101,15 @@ pub struct CallbackCustomSerdesPayload {
 struct CallbackCustomPayloadSerDes;
 
 impl aws_durable_execution_sdk::SerDesAny for CallbackCustomPayloadSerDes {
-    fn serialize_any(
-        &self,
-        value: &dyn std::any::Any,
-    ) -> Result<String, DurableError> {
+    fn serialize_any(&self, value: &dyn std::any::Any) -> Result<String, DurableError> {
         let payload = value
             .downcast_ref::<CallbackCustomSerdesPayload>()
-            .ok_or_else(|| {
-                DurableError::execution("Expected CallbackCustomSerdesPayload type")
-            })?;
+            .ok_or_else(|| DurableError::execution("Expected CallbackCustomSerdesPayload type"))?;
         serde_json::to_string(payload)
             .map_err(|e| DurableError::execution(format!("Serialization error: {}", e)))
     }
 
-    fn deserialize_any(
-        &self,
-        data: &str,
-    ) -> Result<Box<dyn std::any::Any + Send>, DurableError> {
+    fn deserialize_any(&self, data: &str) -> Result<Box<dyn std::any::Any + Send>, DurableError> {
         let payload: CallbackCustomSerdesPayload = serde_json::from_str(data)
             .map_err(|e| DurableError::execution(format!("Deserialization error: {}", e)))?;
         Ok(Box::new(payload))
@@ -1145,7 +1130,10 @@ async fn callback_custom_serdes_handler(
     };
 
     let callback = ctx
-        .create_callback_named::<CallbackCustomSerdesPayload>("custom_serdes_callback", Some(config))
+        .create_callback_named::<CallbackCustomSerdesPayload>(
+            "custom_serdes_callback",
+            Some(config),
+        )
         .await?;
 
     println!("Callback ID (custom serdes): {}", callback.callback_id);
@@ -1222,11 +1210,7 @@ async fn callback_mixed_ops_handler(
 ) -> Result<MixedOpsResult, DurableError> {
     // Step 1: Prepare data
     let prepared_data = ctx
-        .step_named(
-            "prepare",
-            |_| Ok("prepared_payload".to_string()),
-            None,
-        )
+        .step_named("prepare", |_| Ok("prepared_payload".to_string()), None)
         .await?;
 
     // Step 2: Wait before creating callback

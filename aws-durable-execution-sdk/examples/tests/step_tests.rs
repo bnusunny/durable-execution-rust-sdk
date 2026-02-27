@@ -5,7 +5,9 @@
 
 use aws_durable_execution_sdk::{DurableContext, DurableError, StepConfig, StepSemantics};
 use aws_durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures;
-use aws_durable_execution_sdk_testing::{ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig};
+use aws_durable_execution_sdk_testing::{
+    ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig,
+};
 use serde::{Deserialize, Serialize};
 
 // ============================================================================
@@ -46,10 +48,7 @@ async fn test_step_basic() {
     assert!(!operations.is_empty(), "Should have at least one operation");
 
     // Check event signatures (Node.js-compatible format)
-    assert_nodejs_event_signatures(
-        &result,
-        "tests/history/step_basic.history.json",
-    );
+    assert_nodejs_event_signatures(&result, "tests/history/step_basic.history.json");
 
     LocalDurableTestRunner::<serde_json::Value, String>::teardown_test_environment()
         .await
@@ -128,7 +127,7 @@ async fn test_step_named() {
     let result = runner.run(serde_json::json!({})).await.unwrap();
 
     assert_eq!(result.get_status(), ExecutionStatus::Succeeded);
-    
+
     let results: &Vec<ProcessingResult> = result.get_result().unwrap();
     assert_eq!(results.len(), 3);
     assert_eq!(results[0].step_name, "fetch_data");
@@ -143,10 +142,7 @@ async fn test_step_named() {
     assert!(!operations.is_empty(), "Should have operations");
 
     // Check event signatures (Node.js-compatible format)
-    assert_nodejs_event_signatures(
-        &result,
-        "tests/history/step_named.history.json",
-    );
+    assert_nodejs_event_signatures(&result, "tests/history/step_named.history.json");
 
     LocalDurableTestRunner::<serde_json::Value, Vec<ProcessingResult>>::teardown_test_environment()
         .await
@@ -189,11 +185,7 @@ async fn step_with_config_handler(
         .await?;
 
     let _logged: bool = ctx
-        .step_named(
-            "log_transaction",
-            |_step_ctx| Ok(true),
-            None,
-        )
+        .step_named("log_transaction", |_step_ctx| Ok(true), None)
         .await?;
 
     Ok(payment)
@@ -214,7 +206,7 @@ async fn test_step_with_config() {
     let result = runner.run(serde_json::json!({})).await.unwrap();
 
     assert_eq!(result.get_status(), ExecutionStatus::Succeeded);
-    
+
     let payment = result.get_result().unwrap();
     assert_eq!(payment.transaction_id, "txn_abc123");
     assert_eq!(payment.amount, 9999);
@@ -225,10 +217,7 @@ async fn test_step_with_config() {
     assert!(!operations.is_empty(), "Should have operations");
 
     // Check event signatures (Node.js-compatible format)
-    assert_nodejs_event_signatures(
-        &result,
-        "tests/history/step_with_config.history.json",
-    );
+    assert_nodejs_event_signatures(&result, "tests/history/step_with_config.history.json");
 
     LocalDurableTestRunner::<serde_json::Value, PaymentResult>::teardown_test_environment()
         .await
@@ -350,10 +339,7 @@ async fn test_step_retry_with_filter() {
     let operations = result.get_operations();
     assert!(!operations.is_empty(), "Should have at least one operation");
 
-    assert_nodejs_event_signatures(
-        &result,
-        "tests/history/step_retry_with_filter.history.json",
-    );
+    assert_nodejs_event_signatures(&result, "tests/history/step_retry_with_filter.history.json");
 
     LocalDurableTestRunner::<serde_json::Value, String>::teardown_test_environment()
         .await
@@ -397,10 +383,7 @@ async fn test_step_error_determinism() {
     // The step always fails, so the execution should fail
     assert_eq!(result.get_status(), ExecutionStatus::Failed);
 
-    assert_nodejs_event_signatures(
-        &result,
-        "tests/history/step_error_determinism.history.json",
-    );
+    assert_nodejs_event_signatures(&result, "tests/history/step_error_determinism.history.json");
 
     LocalDurableTestRunner::<serde_json::Value, String>::teardown_test_environment()
         .await

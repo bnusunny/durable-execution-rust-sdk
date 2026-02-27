@@ -18,16 +18,15 @@ mod tests {
     use serde_json::Value;
 
     use crate::checkpoint_server::{
-        EventProcessor, NodeJsEventDetails, NodeJsEventType, NodeJsHistoryEvent,
-        ExecutionStartedDetails, ExecutionStartedDetailsWrapper,
-        ExecutionSucceededDetails, ExecutionSucceededDetailsWrapper,
-        StepSucceededDetails, StepSucceededDetailsWrapper,
-        InvocationCompletedDetails, InvocationCompletedDetailsWrapper,
-        PayloadWrapper, RetryDetails, ErrorWrapper,
+        ErrorWrapper, EventProcessor, ExecutionStartedDetails, ExecutionStartedDetailsWrapper,
+        ExecutionSucceededDetails, ExecutionSucceededDetailsWrapper, InvocationCompletedDetails,
+        InvocationCompletedDetailsWrapper, NodeJsEventDetails, NodeJsEventType, NodeJsHistoryEvent,
+        PayloadWrapper, RetryDetails, StepSucceededDetails, StepSucceededDetailsWrapper,
     };
-    use aws_durable_execution_sdk::operation::{Operation, OperationAction, OperationType, OperationUpdate};
+    use aws_durable_execution_sdk::operation::{
+        Operation, OperationAction, OperationType, OperationUpdate,
+    };
     use aws_durable_execution_sdk::ErrorObject;
-
 
     // ============================================================================
     // Proptest Strategies for Generating Test Data
@@ -59,10 +58,12 @@ mod tests {
     }
 
     /// Strategy for generating a sequence of valid (Action, Type) combinations.
-    fn action_type_sequence_strategy(min_len: usize, max_len: usize) -> impl Strategy<Value = Vec<(OperationAction, OperationType)>> {
+    fn action_type_sequence_strategy(
+        min_len: usize,
+        max_len: usize,
+    ) -> impl Strategy<Value = Vec<(OperationAction, OperationType)>> {
         prop::collection::vec(valid_action_type_strategy(), min_len..=max_len)
     }
-
 
     // ============================================================================
     // Property 1: Event ID Monotonicity
@@ -124,7 +125,11 @@ mod tests {
     }
 
     /// Helper function to create an OperationUpdate for testing.
-    fn create_operation_update(op_id: &str, action: OperationAction, op_type: OperationType) -> OperationUpdate {
+    fn create_operation_update(
+        op_id: &str,
+        action: OperationAction,
+        op_type: OperationType,
+    ) -> OperationUpdate {
         match action {
             OperationAction::Start => {
                 if op_type == OperationType::Wait {
@@ -138,18 +143,15 @@ mod tests {
             OperationAction::Succeed => {
                 OperationUpdate::succeed(op_id, op_type, Some("{}".to_string()))
             }
-            OperationAction::Fail => {
-                OperationUpdate::fail(op_id, op_type, ErrorObject::new("TestError", "Test error message"))
-            }
-            OperationAction::Retry => {
-                OperationUpdate::retry(op_id, op_type, None, Some(5))
-            }
-            OperationAction::Cancel => {
-                OperationUpdate::cancel(op_id, op_type)
-            }
+            OperationAction::Fail => OperationUpdate::fail(
+                op_id,
+                op_type,
+                ErrorObject::new("TestError", "Test error message"),
+            ),
+            OperationAction::Retry => OperationUpdate::retry(op_id, op_type, None, Some(5)),
+            OperationAction::Cancel => OperationUpdate::cancel(op_id, op_type),
         }
     }
-
 
     // ============================================================================
     // Property 2: Event Type Mapping Consistency
@@ -161,12 +163,21 @@ mod tests {
 
     /// Returns the expected NodeJsEventType for a given (Action, Type) combination.
     /// Returns None if the combination doesn't produce an event.
-    fn expected_event_type(action: OperationAction, op_type: OperationType) -> Option<NodeJsEventType> {
+    fn expected_event_type(
+        action: OperationAction,
+        op_type: OperationType,
+    ) -> Option<NodeJsEventType> {
         match (action, op_type) {
             // Execution events
-            (OperationAction::Start, OperationType::Execution) => Some(NodeJsEventType::ExecutionStarted),
-            (OperationAction::Succeed, OperationType::Execution) => Some(NodeJsEventType::ExecutionSucceeded),
-            (OperationAction::Fail, OperationType::Execution) => Some(NodeJsEventType::ExecutionFailed),
+            (OperationAction::Start, OperationType::Execution) => {
+                Some(NodeJsEventType::ExecutionStarted)
+            }
+            (OperationAction::Succeed, OperationType::Execution) => {
+                Some(NodeJsEventType::ExecutionSucceeded)
+            }
+            (OperationAction::Fail, OperationType::Execution) => {
+                Some(NodeJsEventType::ExecutionFailed)
+            }
             // Step events
             (OperationAction::Start, OperationType::Step) => Some(NodeJsEventType::StepStarted),
             (OperationAction::Succeed, OperationType::Step) => Some(NodeJsEventType::StepSucceeded),
@@ -176,10 +187,16 @@ mod tests {
             (OperationAction::Start, OperationType::Wait) => Some(NodeJsEventType::WaitStarted),
             (OperationAction::Succeed, OperationType::Wait) => Some(NodeJsEventType::WaitSucceeded),
             // Callback events
-            (OperationAction::Start, OperationType::Callback) => Some(NodeJsEventType::CallbackStarted),
+            (OperationAction::Start, OperationType::Callback) => {
+                Some(NodeJsEventType::CallbackStarted)
+            }
             // Context events
-            (OperationAction::Start, OperationType::Context) => Some(NodeJsEventType::ContextStarted),
-            (OperationAction::Succeed, OperationType::Context) => Some(NodeJsEventType::ContextSucceeded),
+            (OperationAction::Start, OperationType::Context) => {
+                Some(NodeJsEventType::ContextStarted)
+            }
+            (OperationAction::Succeed, OperationType::Context) => {
+                Some(NodeJsEventType::ContextSucceeded)
+            }
             (OperationAction::Fail, OperationType::Context) => Some(NodeJsEventType::ContextFailed),
             // Other combinations don't produce events
             _ => None,
@@ -238,23 +255,62 @@ mod tests {
     fn test_all_event_type_mappings() {
         let mappings = vec![
             // Execution events
-            ((OperationAction::Start, OperationType::Execution), NodeJsEventType::ExecutionStarted),
-            ((OperationAction::Succeed, OperationType::Execution), NodeJsEventType::ExecutionSucceeded),
-            ((OperationAction::Fail, OperationType::Execution), NodeJsEventType::ExecutionFailed),
+            (
+                (OperationAction::Start, OperationType::Execution),
+                NodeJsEventType::ExecutionStarted,
+            ),
+            (
+                (OperationAction::Succeed, OperationType::Execution),
+                NodeJsEventType::ExecutionSucceeded,
+            ),
+            (
+                (OperationAction::Fail, OperationType::Execution),
+                NodeJsEventType::ExecutionFailed,
+            ),
             // Step events
-            ((OperationAction::Start, OperationType::Step), NodeJsEventType::StepStarted),
-            ((OperationAction::Succeed, OperationType::Step), NodeJsEventType::StepSucceeded),
-            ((OperationAction::Fail, OperationType::Step), NodeJsEventType::StepFailed),
-            ((OperationAction::Retry, OperationType::Step), NodeJsEventType::StepFailed),
+            (
+                (OperationAction::Start, OperationType::Step),
+                NodeJsEventType::StepStarted,
+            ),
+            (
+                (OperationAction::Succeed, OperationType::Step),
+                NodeJsEventType::StepSucceeded,
+            ),
+            (
+                (OperationAction::Fail, OperationType::Step),
+                NodeJsEventType::StepFailed,
+            ),
+            (
+                (OperationAction::Retry, OperationType::Step),
+                NodeJsEventType::StepFailed,
+            ),
             // Wait events
-            ((OperationAction::Start, OperationType::Wait), NodeJsEventType::WaitStarted),
-            ((OperationAction::Succeed, OperationType::Wait), NodeJsEventType::WaitSucceeded),
+            (
+                (OperationAction::Start, OperationType::Wait),
+                NodeJsEventType::WaitStarted,
+            ),
+            (
+                (OperationAction::Succeed, OperationType::Wait),
+                NodeJsEventType::WaitSucceeded,
+            ),
             // Callback events
-            ((OperationAction::Start, OperationType::Callback), NodeJsEventType::CallbackStarted),
+            (
+                (OperationAction::Start, OperationType::Callback),
+                NodeJsEventType::CallbackStarted,
+            ),
             // Context events
-            ((OperationAction::Start, OperationType::Context), NodeJsEventType::ContextStarted),
-            ((OperationAction::Succeed, OperationType::Context), NodeJsEventType::ContextSucceeded),
-            ((OperationAction::Fail, OperationType::Context), NodeJsEventType::ContextFailed),
+            (
+                (OperationAction::Start, OperationType::Context),
+                NodeJsEventType::ContextStarted,
+            ),
+            (
+                (OperationAction::Succeed, OperationType::Context),
+                NodeJsEventType::ContextSucceeded,
+            ),
+            (
+                (OperationAction::Fail, OperationType::Context),
+                NodeJsEventType::ContextFailed,
+            ),
         ];
 
         for ((action, op_type), expected_type) in mappings {
@@ -265,9 +321,12 @@ mod tests {
             let events = processor.process_operation_update(&update, &operation);
 
             assert_eq!(
-                events.len(), 1,
+                events.len(),
+                1,
                 "Expected 1 event for ({:?}, {:?}), got {}",
-                action, op_type, events.len()
+                action,
+                op_type,
+                events.len()
             );
             assert_eq!(
                 events[0].event_type, expected_type,
@@ -276,7 +335,6 @@ mod tests {
             );
         }
     }
-
 
     // ============================================================================
     // Property 3: Timestamp Format Validity
@@ -331,9 +389,11 @@ mod tests {
 
         // Test various timestamps
         let test_cases = vec![
-            Utc.with_ymd_and_hms(2025, 12, 3, 22, 58, 35).unwrap() + chrono::Duration::milliseconds(94),
+            Utc.with_ymd_and_hms(2025, 12, 3, 22, 58, 35).unwrap()
+                + chrono::Duration::milliseconds(94),
             Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).unwrap(),
-            Utc.with_ymd_and_hms(2099, 12, 31, 23, 59, 59).unwrap() + chrono::Duration::milliseconds(999),
+            Utc.with_ymd_and_hms(2099, 12, 31, 23, 59, 59).unwrap()
+                + chrono::Duration::milliseconds(999),
         ];
 
         for timestamp in test_cases {
@@ -362,7 +422,6 @@ mod tests {
         }
     }
 
-
     // ============================================================================
     // Property 4: PascalCase Field Names
     // **Validates: Correctness Property 4, Requirements 1.1, 5.4**
@@ -376,7 +435,11 @@ mod tests {
     const PASCAL_CASE_PATTERN: &str = r"^[A-Z][a-zA-Z0-9]*$";
 
     /// Recursively check that all keys in a JSON value are PascalCase.
-    fn verify_pascal_case_keys(value: &Value, path: &str, pascal_regex: &Regex) -> Result<(), String> {
+    fn verify_pascal_case_keys(
+        value: &Value,
+        path: &str,
+        pascal_regex: &Regex,
+    ) -> Result<(), String> {
         match value {
             Value::Object(map) => {
                 for (key, val) in map {
@@ -443,39 +506,43 @@ mod tests {
 
         // Create events with various detail types
         let events = vec![
-            create_test_event(NodeJsEventType::ExecutionStarted, NodeJsEventDetails::ExecutionStarted(
-                ExecutionStartedDetailsWrapper {
+            create_test_event(
+                NodeJsEventType::ExecutionStarted,
+                NodeJsEventDetails::ExecutionStarted(ExecutionStartedDetailsWrapper {
                     execution_started_details: ExecutionStartedDetails {
                         input: PayloadWrapper::new("{}"),
                         execution_timeout: Some(300),
                     },
-                }
-            )),
-            create_test_event(NodeJsEventType::ExecutionSucceeded, NodeJsEventDetails::ExecutionSucceeded(
-                ExecutionSucceededDetailsWrapper {
+                }),
+            ),
+            create_test_event(
+                NodeJsEventType::ExecutionSucceeded,
+                NodeJsEventDetails::ExecutionSucceeded(ExecutionSucceededDetailsWrapper {
                     execution_succeeded_details: ExecutionSucceededDetails {
                         result: PayloadWrapper::new("{}"),
                     },
-                }
-            )),
-            create_test_event(NodeJsEventType::StepSucceeded, NodeJsEventDetails::StepSucceeded(
-                StepSucceededDetailsWrapper {
+                }),
+            ),
+            create_test_event(
+                NodeJsEventType::StepSucceeded,
+                NodeJsEventDetails::StepSucceeded(StepSucceededDetailsWrapper {
                     step_succeeded_details: StepSucceededDetails {
                         result: PayloadWrapper::new("{}"),
                         retry_details: RetryDetails::new(1),
                     },
-                }
-            )),
-            create_test_event(NodeJsEventType::InvocationCompleted, NodeJsEventDetails::InvocationCompleted(
-                InvocationCompletedDetailsWrapper {
+                }),
+            ),
+            create_test_event(
+                NodeJsEventType::InvocationCompleted,
+                NodeJsEventDetails::InvocationCompleted(InvocationCompletedDetailsWrapper {
                     invocation_completed_details: InvocationCompletedDetails {
                         start_timestamp: "2025-12-03T22:58:35.094Z".to_string(),
                         end_timestamp: "2025-12-03T22:58:36.094Z".to_string(),
                         request_id: "req-123".to_string(),
                         error: ErrorWrapper::empty(),
                     },
-                }
-            )),
+                }),
+            ),
         ];
 
         for event in events {
@@ -489,7 +556,10 @@ mod tests {
     }
 
     /// Helper function to create a test event with specific details.
-    fn create_test_event(event_type: NodeJsEventType, details: NodeJsEventDetails) -> NodeJsHistoryEvent {
+    fn create_test_event(
+        event_type: NodeJsEventType,
+        details: NodeJsEventDetails,
+    ) -> NodeJsHistoryEvent {
         NodeJsHistoryEvent {
             event_type,
             event_id: 1,
@@ -501,7 +571,6 @@ mod tests {
             details,
         }
     }
-
 
     // ============================================================================
     // Property 5: JSON Array Output Format
@@ -625,7 +694,8 @@ mod tests {
     fn test_no_events_wrapper() {
         let mut processor = EventProcessor::new();
         let operation = Operation::new("exec-1", OperationType::Execution);
-        let update = create_operation_update("exec-1", OperationAction::Start, OperationType::Execution);
+        let update =
+            create_operation_update("exec-1", OperationAction::Start, OperationType::Execution);
 
         let events = processor.process_operation_update(&update, &operation);
         let json_str = serde_json::to_string(&events).expect("Failed to serialize");

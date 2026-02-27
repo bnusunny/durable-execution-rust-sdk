@@ -131,10 +131,7 @@ impl OperationStorage {
         self.operations_by_id.insert(id, index);
 
         if let Some(name) = name {
-            self.operations_by_name
-                .entry(name)
-                .or_default()
-                .push(index);
+            self.operations_by_name.entry(name).or_default().push(index);
         }
     }
 
@@ -239,18 +236,16 @@ impl HistoryApiClient for LambdaHistoryApiClient {
     /// Detects terminal state by examining EXECUTION-type operations: when an execution
     /// operation has a terminal status (Succeeded, Failed, Cancelled, TimedOut), the page
     /// is marked as terminal with the corresponding status, result, and error.
-    async fn get_history(
-        &self,
-        arn: &str,
-        marker: Option<&str>,
-    ) -> Result<HistoryPage, TestError> {
+    async fn get_history(&self, arn: &str, marker: Option<&str>) -> Result<HistoryPage, TestError> {
         let marker_str = marker.unwrap_or("");
 
         let response = self
             .service_client
             .get_operations(arn, marker_str)
             .await
-            .map_err(|e| TestError::aws_error(format!("GetDurableExecutionHistory failed: {}", e)))?;
+            .map_err(|e| {
+                TestError::aws_error(format!("GetDurableExecutionHistory failed: {}", e))
+            })?;
 
         // Detect terminal state from EXECUTION-type operations
         let mut is_terminal = false;
@@ -265,10 +260,8 @@ impl HistoryApiClient for LambdaHistoryApiClient {
                     terminal_status = Some(exec_status);
                     terminal_result = op.result.clone();
                     if let Some(ref err) = op.error {
-                        terminal_error = Some(TestResultError::new(
-                            &err.error_type,
-                            &err.error_message,
-                        ));
+                        terminal_error =
+                            Some(TestResultError::new(&err.error_type, &err.error_message));
                     }
                     break;
                 }
@@ -467,7 +460,6 @@ where
     }
 }
 
-
 impl<O> CloudDurableTestRunner<O>
 where
     O: DeserializeOwned + Send,
@@ -611,7 +603,6 @@ where
     }
 }
 
-
 impl<O> CloudDurableTestRunner<O>
 where
     O: DeserializeOwned + Send,
@@ -678,11 +669,7 @@ where
 
         // Requirement 1.1: Create HistoryPoller with the ARN
         let history_client = self.create_history_client();
-        let mut poller = HistoryPoller::new(
-            history_client,
-            arn.clone(),
-            self.config.poll_interval,
-        );
+        let mut poller = HistoryPoller::new(history_client, arn.clone(), self.config.poll_interval);
 
         // Requirement 6.4: Create CloudCallbackSender and configure handles
         let callback_sender: Arc<dyn CallbackSender> = Arc::new(CloudCallbackSender::new(
@@ -728,9 +715,8 @@ where
                 let mut result = match terminal.status {
                     ExecutionStatus::Succeeded => {
                         // Requirement 8.2: Parse result from terminal event
-                        let output: O = serde_json::from_str(
-                            terminal.result.as_deref().unwrap_or("null"),
-                        )?;
+                        let output: O =
+                            serde_json::from_str(terminal.result.as_deref().unwrap_or("null"))?;
                         TestResult::success(output, self.operation_storage.get_all().to_vec())
                     }
                     status => {
@@ -824,7 +810,6 @@ where
     }
 }
 
-
 impl<O> CloudDurableTestRunner<O>
 where
     O: DeserializeOwned + Send,
@@ -906,7 +891,11 @@ where
     /// let handle = runner.get_operation_handle_by_name_and_index("process", 1);
     /// // handle populates with the second "process" operation during execution
     /// ```
-    pub fn get_operation_handle_by_name_and_index(&mut self, name: &str, index: usize) -> OperationHandle {
+    pub fn get_operation_handle_by_name_and_index(
+        &mut self,
+        name: &str,
+        index: usize,
+    ) -> OperationHandle {
         let handle = OperationHandle::new(
             OperationMatcher::ByNameAndIndex(name.to_string(), index),
             self.all_operations.clone(),
@@ -957,21 +946,18 @@ where
     pub(crate) async fn notify_handles(&self) {
         for handle in &self.handles {
             let matched_op = match &handle.matcher {
-                OperationMatcher::ByName(name) => {
-                    self.operation_storage.get_by_name(name).cloned()
-                }
+                OperationMatcher::ByName(name) => self.operation_storage.get_by_name(name).cloned(),
                 OperationMatcher::ByIndex(idx) => {
                     self.operation_storage.get_by_index(*idx).cloned()
                 }
-                OperationMatcher::ById(id) => {
-                    self.operation_storage.get_by_id(id).cloned()
-                }
-                OperationMatcher::ByNameAndIndex(name, idx) => {
-                    self.operation_storage.get_by_name_and_index(name, *idx).cloned()
-                }
+                OperationMatcher::ById(id) => self.operation_storage.get_by_id(id).cloned(),
+                OperationMatcher::ByNameAndIndex(name, idx) => self
+                    .operation_storage
+                    .get_by_name_and_index(name, *idx)
+                    .cloned(),
             };
             if let Some(op) = matched_op {
-                let status = op.status.clone();
+                let status = op.status;
                 let mut inner = handle.inner.write().await;
                 *inner = Some(op);
                 drop(inner);
@@ -983,7 +969,6 @@ where
         *all_ops = self.operation_storage.get_all().to_vec();
     }
 }
-
 
 impl<O> CloudDurableTestRunner<O>
 where
@@ -1103,7 +1088,11 @@ where
     ///     println!("Second process operation: {:?}", op.get_status());
     /// }
     /// ```
-    pub fn get_operation_by_name_and_index(&self, name: &str, index: usize) -> Option<DurableOperation> {
+    pub fn get_operation_by_name_and_index(
+        &self,
+        name: &str,
+        index: usize,
+    ) -> Option<DurableOperation> {
         let all_ops = Arc::new(self.operation_storage.get_all().to_vec());
         self.operation_storage
             .get_by_name_and_index(name, index)

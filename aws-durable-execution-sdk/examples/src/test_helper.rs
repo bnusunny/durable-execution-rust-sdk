@@ -181,7 +181,10 @@ pub fn assert_event_signatures(operations: &[Operation], history_file_path: &str
     let actual_signatures = extract_event_signatures(operations);
 
     // Check if we should generate the history file
-    if env::var("GENERATE_HISTORY").map(|v| v == "true").unwrap_or(false) {
+    if env::var("GENERATE_HISTORY")
+        .map(|v| v == "true")
+        .unwrap_or(false)
+    {
         generate_history_file(&actual_signatures, history_file_path);
         return;
     }
@@ -198,7 +201,10 @@ pub fn assert_event_signatures(operations: &[Operation], history_file_path: &str
         actual_signatures
     );
 
-    for (i, (actual, expected)) in actual_signatures.iter().zip(expected.events.iter()).enumerate()
+    for (i, (actual, expected)) in actual_signatures
+        .iter()
+        .zip(expected.events.iter())
+        .enumerate()
     {
         assert_eq!(
             actual, expected,
@@ -228,7 +234,10 @@ pub fn assert_event_signatures_unordered(operations: &[Operation], history_file_
     let actual_signatures = extract_event_signatures(operations);
 
     // Check if we should generate the history file
-    if env::var("GENERATE_HISTORY").map(|v| v == "true").unwrap_or(false) {
+    if env::var("GENERATE_HISTORY")
+        .map(|v| v == "true")
+        .unwrap_or(false)
+    {
         generate_history_file(&actual_signatures, history_file_path);
         return;
     }
@@ -246,8 +255,10 @@ pub fn assert_event_signatures_unordered(operations: &[Operation], history_file_
     );
 
     // Count occurrences of each event signature
-    let mut expected_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
-    let mut actual_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut expected_counts: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
+    let mut actual_counts: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
 
     for sig in &expected.events {
         let key = format!("{:?}", sig);
@@ -296,15 +307,15 @@ pub fn load_history_file(path: &str) -> HistoryFile {
 /// Generates a history file at the given path.
 fn generate_history_file(signatures: &[EventSignature], path: &str) {
     let history = HistoryFile::new(signatures.to_vec());
-    let content = serde_json::to_string_pretty(&history)
-        .expect("Failed to serialize history file");
+    let content = serde_json::to_string_pretty(&history).expect("Failed to serialize history file");
 
     // Ensure parent directory exists
     if let Some(parent) = Path::new(path).parent() {
         fs::create_dir_all(parent).expect("Failed to create parent directory");
     }
 
-    fs::write(path, content).unwrap_or_else(|e| panic!("Failed to write history file '{}': {}", path, e));
+    fs::write(path, content)
+        .unwrap_or_else(|e| panic!("Failed to write history file '{}': {}", path, e));
 
     println!("Generated history file: {}", path);
 }
@@ -356,7 +367,7 @@ impl NodeJsEventSignature {
 ///
 /// # Returns
 ///
-/// A `NodeJsHistoryFile` (Vec<NodeJsHistoryEvent>) containing all events
+/// A `NodeJsHistoryFile` (`Vec<NodeJsHistoryEvent>`) containing all events
 /// in chronological order.
 ///
 /// # Requirements
@@ -399,7 +410,10 @@ pub fn assert_nodejs_event_signatures<T>(result: &TestResult<T>, history_file_pa
         .collect();
 
     // Check if we should generate the history file
-    if env::var("GENERATE_HISTORY").map(|v| v == "true").unwrap_or(false) {
+    if env::var("GENERATE_HISTORY")
+        .map(|v| v == "true")
+        .unwrap_or(false)
+    {
         generate_nodejs_history_file(&events, history_file_path);
         return;
     }
@@ -420,7 +434,10 @@ pub fn assert_nodejs_event_signatures<T>(result: &TestResult<T>, history_file_pa
         actual_signatures
     );
 
-    for (i, (actual, expected)) in actual_signatures.iter().zip(expected_signatures.iter()).enumerate()
+    for (i, (actual, expected)) in actual_signatures
+        .iter()
+        .zip(expected_signatures.iter())
+        .enumerate()
     {
         assert_eq!(
             actual, expected,
@@ -445,7 +462,10 @@ pub fn assert_nodejs_event_signatures<T>(result: &TestResult<T>, history_file_pa
 /// # Panics
 ///
 /// Panics if the history doesn't match and `GENERATE_HISTORY` is not set.
-pub fn assert_nodejs_event_signatures_unordered<T>(result: &TestResult<T>, history_file_path: &str) {
+pub fn assert_nodejs_event_signatures_unordered<T>(
+    result: &TestResult<T>,
+    history_file_path: &str,
+) {
     let events = extract_nodejs_events(result);
     let actual_signatures: Vec<NodeJsEventSignature> = events
         .iter()
@@ -453,7 +473,10 @@ pub fn assert_nodejs_event_signatures_unordered<T>(result: &TestResult<T>, histo
         .collect();
 
     // Check if we should generate the history file
-    if env::var("GENERATE_HISTORY").map(|v| v == "true").unwrap_or(false) {
+    if env::var("GENERATE_HISTORY")
+        .map(|v| v == "true")
+        .unwrap_or(false)
+    {
         generate_nodejs_history_file(&events, history_file_path);
         return;
     }
@@ -475,8 +498,10 @@ pub fn assert_nodejs_event_signatures_unordered<T>(result: &TestResult<T>, histo
     );
 
     // Count occurrences of each event signature
-    let mut expected_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
-    let mut actual_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut expected_counts: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
+    let mut actual_counts: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
 
     for sig in &expected_signatures {
         let key = format!("{:?}", sig);
@@ -519,7 +544,7 @@ pub fn assert_nodejs_event_signatures_unordered<T>(result: &TestResult<T>, histo
 ///
 /// # Returns
 ///
-/// A `NodeJsHistoryFile` (Vec<NodeJsHistoryEvent>) parsed from the file.
+/// A `NodeJsHistoryFile` (`Vec<NodeJsHistoryEvent>`) parsed from the file.
 ///
 /// # Panics
 ///
@@ -555,15 +580,16 @@ pub fn load_nodejs_history_file(path: &str) -> NodeJsHistoryFile {
 /// - 6.2: THE generated history file SHALL contain all events from the execution in chronological order
 fn generate_nodejs_history_file(events: &[NodeJsHistoryEvent], path: &str) {
     // Serialize as a flat JSON array (not wrapped in an object)
-    let content = serde_json::to_string_pretty(events)
-        .expect("Failed to serialize Node.js history file");
+    let content =
+        serde_json::to_string_pretty(events).expect("Failed to serialize Node.js history file");
 
     // Ensure parent directory exists
     if let Some(parent) = Path::new(path).parent() {
         fs::create_dir_all(parent).expect("Failed to create parent directory");
     }
 
-    fs::write(path, content).unwrap_or_else(|e| panic!("Failed to write Node.js history file '{}': {}", path, e));
+    fs::write(path, content)
+        .unwrap_or_else(|e| panic!("Failed to write Node.js history file '{}': {}", path, e));
 
     println!("Generated Node.js-compatible history file: {}", path);
 }
@@ -595,10 +621,7 @@ mod tests {
     use aws_durable_execution_sdk::{Operation, OperationType};
 
     fn create_test_operation(name: Option<&str>, op_type: OperationType) -> Operation {
-        let mut op = Operation::new(
-            format!("op-{}", uuid::Uuid::new_v4()),
-            op_type,
-        );
+        let mut op = Operation::new(format!("op-{}", uuid::Uuid::new_v4()), op_type);
         op.name = name.map(|s| s.to_string());
         op
     }
@@ -666,9 +689,8 @@ mod tests {
 
     use aws_durable_execution_sdk_testing::checkpoint_server::{
         ExecutionStartedDetails, ExecutionStartedDetailsWrapper, NodeJsEventDetails,
-        NodeJsEventType, NodeJsHistoryEvent, PayloadWrapper,
-        StepSucceededDetails, StepSucceededDetailsWrapper,
-        RetryDetails,
+        NodeJsEventType, NodeJsHistoryEvent, PayloadWrapper, RetryDetails, StepSucceededDetails,
+        StepSucceededDetailsWrapper,
     };
     use aws_durable_execution_sdk_testing::TestResult;
 
@@ -727,8 +749,8 @@ mod tests {
 
         let event2 = NodeJsHistoryEvent {
             event_type: NodeJsEventType::StepSucceeded,
-            event_id: 99, // Different EventId
-            id: Some("id-999".to_string()), // Different Id
+            event_id: 99,                                            // Different EventId
+            id: Some("id-999".to_string()),                          // Different Id
             event_timestamp: "2025-12-04T10:00:00.000Z".to_string(), // Different timestamp
             sub_type: Some("Step".to_string()),
             name: Some("process-data".to_string()),
@@ -736,7 +758,7 @@ mod tests {
             details: NodeJsEventDetails::StepSucceeded(StepSucceededDetailsWrapper {
                 step_succeeded_details: StepSucceededDetails {
                     result: PayloadWrapper::new(r#"{"value": 100}"#), // Different result
-                    retry_details: RetryDetails::new(2), // Different retry
+                    retry_details: RetryDetails::new(2),              // Different retry
                 },
             }),
         };
@@ -750,8 +772,14 @@ mod tests {
 
     #[test]
     fn test_nodejs_event_signature_different_event_types() {
-        let event1 = create_test_nodejs_event(NodeJsEventType::StepStarted, 1, Some("step"), Some("Step"));
-        let event2 = create_test_nodejs_event(NodeJsEventType::StepSucceeded, 2, Some("step"), Some("Step"));
+        let event1 =
+            create_test_nodejs_event(NodeJsEventType::StepStarted, 1, Some("step"), Some("Step"));
+        let event2 = create_test_nodejs_event(
+            NodeJsEventType::StepSucceeded,
+            2,
+            Some("step"),
+            Some("Step"),
+        );
 
         let sig1 = NodeJsEventSignature::from_event(&event1);
         let sig2 = NodeJsEventSignature::from_event(&event2);
@@ -775,32 +803,39 @@ mod tests {
 
     #[test]
     fn test_nodejs_history_file_serializes_as_flat_array() {
-        let events: NodeJsHistoryFile = vec![
-            NodeJsHistoryEvent {
-                event_type: NodeJsEventType::ExecutionStarted,
-                event_id: 1,
-                id: Some("exec-123".to_string()),
-                event_timestamp: "2025-12-03T22:58:35.094Z".to_string(),
-                sub_type: None,
-                name: None,
-                parent_id: None,
-                details: NodeJsEventDetails::ExecutionStarted(ExecutionStartedDetailsWrapper {
-                    execution_started_details: ExecutionStartedDetails {
-                        input: PayloadWrapper::new("{}"),
-                        execution_timeout: None,
-                    },
-                }),
-            },
-        ];
+        let events: NodeJsHistoryFile = vec![NodeJsHistoryEvent {
+            event_type: NodeJsEventType::ExecutionStarted,
+            event_id: 1,
+            id: Some("exec-123".to_string()),
+            event_timestamp: "2025-12-03T22:58:35.094Z".to_string(),
+            sub_type: None,
+            name: None,
+            parent_id: None,
+            details: NodeJsEventDetails::ExecutionStarted(ExecutionStartedDetailsWrapper {
+                execution_started_details: ExecutionStartedDetails {
+                    input: PayloadWrapper::new("{}"),
+                    execution_timeout: None,
+                },
+            }),
+        }];
 
         let json = serde_json::to_string_pretty(&events).unwrap();
 
         // Verify it's a flat array (starts with '[', not '{')
-        assert!(json.trim().starts_with('['), "JSON should start with '[' for flat array");
-        assert!(json.trim().ends_with(']'), "JSON should end with ']' for flat array");
+        assert!(
+            json.trim().starts_with('['),
+            "JSON should start with '[' for flat array"
+        );
+        assert!(
+            json.trim().ends_with(']'),
+            "JSON should end with ']' for flat array"
+        );
 
         // Verify it does NOT have an "events" wrapper key
-        assert!(!json.contains(r#""events""#), "JSON should not have 'events' wrapper key");
+        assert!(
+            !json.contains(r#""events""#),
+            "JSON should not have 'events' wrapper key"
+        );
 
         // Verify it can be parsed back
         let parsed: NodeJsHistoryFile = serde_json::from_str(&json).unwrap();

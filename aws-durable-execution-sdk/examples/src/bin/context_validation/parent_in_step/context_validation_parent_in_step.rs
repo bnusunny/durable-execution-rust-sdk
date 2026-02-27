@@ -35,7 +35,11 @@ pub async fn handler(
                 Box::pin(async move {
                     // Misuse: calling step on the PARENT context inside a child context
                     let val: String = parent
-                        .step_named("parent_step_in_child", |_| Ok("from_parent".to_string()), None)
+                        .step_named(
+                            "parent_step_in_child",
+                            |_| Ok("from_parent".to_string()),
+                            None,
+                        )
                         .await?;
                     Ok(val)
                 })

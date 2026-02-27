@@ -36,11 +36,7 @@ pub trait HistoryApiClient: Send + Sync {
     ///
     /// A `HistoryPage` containing events, operations, and pagination/terminal info,
     /// or a `TestError` if the API call fails.
-    async fn get_history(
-        &self,
-        arn: &str,
-        marker: Option<&str>,
-    ) -> Result<HistoryPage, TestError>;
+    async fn get_history(&self, arn: &str, marker: Option<&str>) -> Result<HistoryPage, TestError>;
 }
 
 /// A single page of results from the `GetDurableExecutionHistory` API.
@@ -200,9 +196,7 @@ impl<C: HistoryApiClient> HistoryPoller<C> {
         let mut current_marker = self.last_marker.clone();
 
         loop {
-            let page = self
-                .call_with_retries(current_marker.as_deref())
-                .await?;
+            let page = self.call_with_retries(current_marker.as_deref()).await?;
 
             all_operations.extend(page.operations);
             all_events.extend(page.events);
@@ -210,9 +204,7 @@ impl<C: HistoryApiClient> HistoryPoller<C> {
             // Capture terminal state from any page (first one wins)
             if page.is_terminal && terminal.is_none() {
                 terminal = Some(TerminalState {
-                    status: page
-                        .terminal_status
-                        .unwrap_or(ExecutionStatus::Failed),
+                    status: page.terminal_status.unwrap_or(ExecutionStatus::Failed),
                     result: page.terminal_result,
                     error: page.terminal_error,
                 });
@@ -398,11 +390,8 @@ pub(crate) mod tests {
     #[test]
     fn new_sets_defaults() {
         let mock = MockHistoryApiClient::new(VecDeque::new());
-        let poller = HistoryPoller::new(
-            mock,
-            "arn:test:123".to_string(),
-            Duration::from_millis(500),
-        );
+        let poller =
+            HistoryPoller::new(mock, "arn:test:123".to_string(), Duration::from_millis(500));
 
         assert_eq!(poller.durable_execution_arn, "arn:test:123");
         assert_eq!(poller.poll_interval, Duration::from_millis(500));
@@ -416,11 +405,7 @@ pub(crate) mod tests {
         responses.push_back(Ok(empty_page()));
 
         let mock = MockHistoryApiClient::new(responses);
-        let poller = HistoryPoller::new(
-            mock,
-            "arn:test".to_string(),
-            Duration::from_millis(100),
-        );
+        let poller = HistoryPoller::new(mock, "arn:test".to_string(), Duration::from_millis(100));
 
         let result = poller.call_with_retries(None).await;
         assert!(result.is_ok());
@@ -440,11 +425,7 @@ pub(crate) mod tests {
         responses.push_back(Ok(empty_page()));
 
         let mock = MockHistoryApiClient::new(responses);
-        let poller = HistoryPoller::new(
-            mock,
-            "arn:test".to_string(),
-            Duration::from_millis(100),
-        );
+        let poller = HistoryPoller::new(mock, "arn:test".to_string(), Duration::from_millis(100));
 
         let result = poller.call_with_retries(None).await;
         assert!(result.is_ok());
@@ -465,11 +446,7 @@ pub(crate) mod tests {
         responses.push_back(Err(TestError::aws_error("fail 4")));
 
         let mock = MockHistoryApiClient::new(responses);
-        let poller = HistoryPoller::new(
-            mock,
-            "arn:test".to_string(),
-            Duration::from_millis(100),
-        );
+        let poller = HistoryPoller::new(mock, "arn:test".to_string(), Duration::from_millis(100));
 
         let result = poller.call_with_retries(None).await;
         assert!(result.is_err());
@@ -486,11 +463,7 @@ pub(crate) mod tests {
         responses.push_back(Ok(empty_page()));
 
         let mock = MockHistoryApiClient::new(responses);
-        let poller = HistoryPoller::new(
-            mock,
-            "arn:test".to_string(),
-            Duration::from_millis(100),
-        );
+        let poller = HistoryPoller::new(mock, "arn:test".to_string(), Duration::from_millis(100));
 
         let result = poller.call_with_retries(Some("my-marker")).await;
         assert!(result.is_ok());
@@ -529,11 +502,7 @@ pub(crate) mod tests {
         responses.push_back(Ok(empty_page()));
 
         let mock = MockHistoryApiClient::new(responses);
-        let poller = HistoryPoller::new(
-            mock,
-            "arn:test".to_string(),
-            Duration::from_millis(100),
-        );
+        let poller = HistoryPoller::new(mock, "arn:test".to_string(), Duration::from_millis(100));
 
         let start = tokio::time::Instant::now();
         let result = poller.call_with_retries(None).await;
@@ -582,7 +551,8 @@ pub(crate) mod tests {
         }));
 
         let mock = MockHistoryApiClient::new(responses);
-        let mut poller = HistoryPoller::new(mock, "arn:test".to_string(), Duration::from_millis(10));
+        let mut poller =
+            HistoryPoller::new(mock, "arn:test".to_string(), Duration::from_millis(10));
 
         let result = poller.poll_once().await.unwrap();
         assert_eq!(result.operations.len(), 1);
@@ -630,7 +600,8 @@ pub(crate) mod tests {
         }));
 
         let mock = MockHistoryApiClient::new(responses);
-        let mut poller = HistoryPoller::new(mock, "arn:test".to_string(), Duration::from_millis(50));
+        let mut poller =
+            HistoryPoller::new(mock, "arn:test".to_string(), Duration::from_millis(50));
 
         let result = poller.poll_once().await.unwrap();
 
@@ -665,7 +636,8 @@ pub(crate) mod tests {
         }));
 
         let mock = MockHistoryApiClient::new(responses);
-        let mut poller = HistoryPoller::new(mock, "arn:test".to_string(), Duration::from_millis(10));
+        let mut poller =
+            HistoryPoller::new(mock, "arn:test".to_string(), Duration::from_millis(10));
 
         let result = poller.poll_once().await.unwrap();
         assert!(result.terminal.is_some());
@@ -689,13 +661,17 @@ pub(crate) mod tests {
         }));
 
         let mock = MockHistoryApiClient::new(responses);
-        let mut poller = HistoryPoller::new(mock, "arn:test".to_string(), Duration::from_millis(10));
+        let mut poller =
+            HistoryPoller::new(mock, "arn:test".to_string(), Duration::from_millis(10));
 
         let result = poller.poll_once().await.unwrap();
         let terminal = result.terminal.unwrap();
         assert_eq!(terminal.status, crate::types::ExecutionStatus::Failed);
         assert!(terminal.error.is_some());
-        assert_eq!(terminal.error.unwrap().error_type, Some("RuntimeError".to_string()));
+        assert_eq!(
+            terminal.error.unwrap().error_type,
+            Some("RuntimeError".to_string())
+        );
     }
 
     #[tokio::test]
@@ -735,7 +711,8 @@ pub(crate) mod tests {
         }));
 
         let mock = MockHistoryApiClient::new(responses);
-        let mut poller = HistoryPoller::new(mock, "arn:test".to_string(), Duration::from_millis(10));
+        let mut poller =
+            HistoryPoller::new(mock, "arn:test".to_string(), Duration::from_millis(10));
 
         // Cycle 1
         let _r1 = poller.poll_once().await.unwrap();
@@ -760,7 +737,8 @@ pub(crate) mod tests {
         }
 
         let mock = MockHistoryApiClient::new(responses);
-        let mut poller = HistoryPoller::new(mock, "arn:test".to_string(), Duration::from_millis(10));
+        let mut poller =
+            HistoryPoller::new(mock, "arn:test".to_string(), Duration::from_millis(10));
 
         let result = poller.poll_once().await;
         assert!(result.is_err());
@@ -772,7 +750,8 @@ pub(crate) mod tests {
         responses.push_back(Ok(empty_page()));
 
         let mock = MockHistoryApiClient::new(responses);
-        let mut poller = HistoryPoller::new(mock, "arn:test".to_string(), Duration::from_millis(10));
+        let mut poller =
+            HistoryPoller::new(mock, "arn:test".to_string(), Duration::from_millis(10));
 
         let result = poller.poll_once().await.unwrap();
         assert!(result.operations.is_empty());

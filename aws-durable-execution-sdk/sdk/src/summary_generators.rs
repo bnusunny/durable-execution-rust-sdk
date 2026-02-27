@@ -66,8 +66,7 @@ pub fn map_summary() -> impl Fn(&str) -> String {
 fn build_summary(summary_type: &str) -> impl Fn(&str) -> String {
     let summary_type = summary_type.to_string();
     move |serialized: &str| {
-        let items: Vec<serde_json::Value> =
-            serde_json::from_str(serialized).unwrap_or_default();
+        let items: Vec<serde_json::Value> = serde_json::from_str(serialized).unwrap_or_default();
 
         let total = items.len();
         let failure_count = items
@@ -272,8 +271,14 @@ mod tests {
 
         assert!(parsed.get("type").is_some(), "missing 'type' field");
         assert!(parsed.get("totalCount").is_some(), "missing 'totalCount'");
-        assert!(parsed.get("successCount").is_some(), "missing 'successCount'");
-        assert!(parsed.get("failureCount").is_some(), "missing 'failureCount'");
+        assert!(
+            parsed.get("successCount").is_some(),
+            "missing 'successCount'"
+        );
+        assert!(
+            parsed.get("failureCount").is_some(),
+            "missing 'failureCount'"
+        );
         assert!(parsed.get("status").is_some(), "missing 'status' field");
     }
 
@@ -285,8 +290,14 @@ mod tests {
 
         assert!(parsed.get("type").is_some(), "missing 'type' field");
         assert!(parsed.get("totalCount").is_some(), "missing 'totalCount'");
-        assert!(parsed.get("successCount").is_some(), "missing 'successCount'");
-        assert!(parsed.get("failureCount").is_some(), "missing 'failureCount'");
+        assert!(
+            parsed.get("successCount").is_some(),
+            "missing 'successCount'"
+        );
+        assert!(
+            parsed.get("failureCount").is_some(),
+            "missing 'failureCount'"
+        );
         assert!(parsed.get("status").is_some(), "missing 'status' field");
     }
 }

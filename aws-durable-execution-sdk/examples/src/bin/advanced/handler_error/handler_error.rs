@@ -18,11 +18,7 @@ pub async fn handler(
 ) -> Result<String, DurableError> {
     // Perform a step before failing
     let _setup: String = ctx
-        .step_named(
-            "setup_step",
-            |_step_ctx| Ok("setup_done".to_string()),
-            None,
-        )
+        .step_named("setup_step", |_step_ctx| Ok("setup_done".to_string()), None)
         .await?;
 
     // Return a top-level handler error

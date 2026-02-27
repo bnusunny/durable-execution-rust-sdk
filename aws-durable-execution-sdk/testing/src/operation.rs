@@ -238,7 +238,10 @@ impl std::fmt::Debug for DurableOperation {
             .field("operation", &self.operation)
             .field("callback_sender", &self.callback_sender.is_some())
             .field("status_watcher", &self.status_watcher.is_some())
-            .field("all_operations", &self.all_operations.as_ref().map(|ops| ops.len()))
+            .field(
+                "all_operations",
+                &self.all_operations.as_ref().map(|ops| ops.len()),
+            )
             .finish()
     }
 }
@@ -467,10 +470,7 @@ impl DurableOperation {
         all_ops
             .iter()
             .filter(|op| op.parent_id.as_deref() == Some(my_id))
-            .map(|op| {
-                DurableOperation::new(op.clone())
-                    .with_operations(Arc::clone(all_ops))
-            })
+            .map(|op| DurableOperation::new(op.clone()).with_operations(Arc::clone(all_ops)))
             .collect()
     }
 }
@@ -1386,13 +1386,10 @@ mod tests {
     fn test_get_child_operations_children_can_enumerate_grandchildren() {
         let parent = create_operation_with_parent("parent-1", "parent", None);
         let child = create_operation_with_parent("child-1", "child", Some("parent-1"));
-        let grandchild = create_operation_with_parent("grandchild-1", "grandchild", Some("child-1"));
+        let grandchild =
+            create_operation_with_parent("grandchild-1", "grandchild", Some("child-1"));
 
-        let all_ops = Arc::new(vec![
-            parent.clone(),
-            child.clone(),
-            grandchild.clone(),
-        ]);
+        let all_ops = Arc::new(vec![parent.clone(), child.clone(), grandchild.clone()]);
 
         let durable_parent = DurableOperation::new(parent).with_operations(all_ops);
         let children = durable_parent.get_child_operations();

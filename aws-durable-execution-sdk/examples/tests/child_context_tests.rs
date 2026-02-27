@@ -271,10 +271,7 @@ async fn test_child_context_large_data() {
         .iter()
         .filter(|op| op.operation_type == OperationType::Context)
         .collect();
-    assert!(
-        !context_ops.is_empty(),
-        "Should have context operations"
-    );
+    assert!(!context_ops.is_empty(), "Should have context operations");
 
     assert_nodejs_event_signatures(
         &result,
@@ -359,10 +356,7 @@ async fn test_child_context_checkpoint_size_limit() {
         .iter()
         .filter(|op| op.operation_type == OperationType::Context)
         .collect();
-    assert!(
-        !context_ops.is_empty(),
-        "Should have context operations"
-    );
+    assert!(!context_ops.is_empty(), "Should have context operations");
 
     assert_nodejs_event_signatures(
         &result,

@@ -31,14 +31,14 @@ pub async fn handler(
         ..Default::default()
     };
 
-    let (step_result, callback_result) = tokio::join!(
-        ctx1.step(|_| Ok("step_done".to_string()), None),
-        async {
-            let cb = ctx2.create_callback_named::<String>("concurrent_cb", Some(config)).await?;
+    let (step_result, callback_result) =
+        tokio::join!(ctx1.step(|_| Ok("step_done".to_string()), None), async {
+            let cb = ctx2
+                .create_callback_named::<String>("concurrent_cb", Some(config))
+                .await?;
             println!("Callback ID: {}", cb.callback_id);
             cb.result().await
-        },
-    );
+        },);
 
     Ok(CallbackWaitResult {
         step_result: step_result?,

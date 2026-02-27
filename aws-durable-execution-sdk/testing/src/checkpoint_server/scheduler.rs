@@ -95,7 +95,6 @@ pub trait Scheduler: Send {
     fn process_next(&mut self) -> Pin<Box<dyn Future<Output = bool> + Send + '_>>;
 }
 
-
 /// Queue-based scheduler for time-skipping mode.
 ///
 /// Executes functions sequentially in FIFO order, ignoring timestamps.
@@ -191,7 +190,6 @@ impl Scheduler for QueueScheduler {
         })
     }
 }
-
 
 /// Timer-based scheduler for real-time mode.
 ///

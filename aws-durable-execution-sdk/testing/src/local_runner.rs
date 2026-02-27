@@ -38,8 +38,8 @@ use serde::Serialize;
 use tokio::sync::RwLock;
 
 use crate::checkpoint_server::{
-    ApiType, CheckpointWorkerManager, CheckpointWorkerParams, InvocationResult,
-    SkipTimeConfig, StartDurableExecutionRequest, TestExecutionOrchestrator,
+    ApiType, CheckpointWorkerManager, CheckpointWorkerParams, InvocationResult, SkipTimeConfig,
+    StartDurableExecutionRequest, TestExecutionOrchestrator,
 };
 use crate::error::TestError;
 use crate::mock_client::MockDurableServiceClient;
@@ -163,10 +163,7 @@ impl OperationStorage {
         self.operations_by_id.insert(id, index);
 
         if let Some(name) = name {
-            self.operations_by_name
-                .entry(name)
-                .or_default()
-                .push(index);
+            self.operations_by_name.entry(name).or_default().push(index);
         }
     }
 
@@ -224,7 +221,10 @@ type SharedAsyncFn<I, O> = Arc<
 
 /// Type alias for a boxed durable function to reduce type complexity.
 type BoxedDurableFn = Box<
-    dyn Fn(serde_json::Value, DurableContext) -> Pin<Box<dyn Future<Output = Result<serde_json::Value, DurableError>> + Send>>
+    dyn Fn(
+            serde_json::Value,
+            DurableContext,
+        ) -> Pin<Box<dyn Future<Output = Result<serde_json::Value, DurableError>> + Send>>
         + Send
         + Sync,
 >;
@@ -237,7 +237,9 @@ enum RegisteredFunction {
     /// A durable function that takes a DurableContext
     Durable(BoxedDurableFn),
     /// A regular function that doesn't need a DurableContext
-    Regular(Box<dyn Fn(serde_json::Value) -> Result<serde_json::Value, DurableError> + Send + Sync>),
+    Regular(
+        Box<dyn Fn(serde_json::Value) -> Result<serde_json::Value, DurableError> + Send + Sync>,
+    ),
 }
 
 /// Local test runner for durable executions.
@@ -336,7 +338,7 @@ where
             let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
                 tokio::time::pause();
             }));
-            
+
             if let Err(panic_info) = result {
                 // Check if the panic was because we're not in a current_thread runtime
                 let is_runtime_error = panic_info
@@ -347,7 +349,7 @@ where
                         .downcast_ref::<String>()
                         .map(|msg| msg.contains("current_thread"))
                         .unwrap_or(false);
-                
+
                 // Check if time is already frozen (this is fine, just continue)
                 let is_already_frozen = panic_info
                     .downcast_ref::<&str>()
@@ -357,7 +359,7 @@ where
                         .downcast_ref::<String>()
                         .map(|msg| msg.contains("already frozen") || msg.contains("already paused"))
                         .unwrap_or(false);
-                
+
                 if is_runtime_error {
                     // We're not in a current_thread runtime, so time control won't work
                     tracing::warn!(
@@ -490,7 +492,6 @@ where
             _phantom: PhantomData,
         }
     }
-
 
     /// Creates a new local test runner with a custom mock client.
     ///
@@ -633,7 +634,10 @@ where
     /// handle.send_callback_success("result").await.unwrap();
     /// let result = run_future.await.unwrap();
     /// ```
-    pub fn run(&mut self, input: impl Into<crate::types::InvokeRequest<I>>) -> crate::run_future::RunFuture<O>
+    pub fn run(
+        &mut self,
+        input: impl Into<crate::types::InvokeRequest<I>>,
+    ) -> crate::run_future::RunFuture<O>
     where
         I: Clone + Send + Sync + 'static,
         O: Send + 'static,
@@ -691,7 +695,8 @@ where
             };
 
             // Create shared operation storage for the orchestrator
-            let orchestrator_storage = Arc::new(tokio::sync::RwLock::new(OrchestratorOperationStorage::new()));
+            let orchestrator_storage =
+                Arc::new(tokio::sync::RwLock::new(OrchestratorOperationStorage::new()));
 
             // Create the orchestrator with the shared handler
             let handler_clone = Arc::clone(&handler);
@@ -735,22 +740,26 @@ where
                     if let Some(result) = execution_result.result {
                         TestResult::success(result, execution_result.operations)
                     } else {
-                        TestResult::with_status(ExecutionStatus::Succeeded, execution_result.operations)
+                        TestResult::with_status(
+                            ExecutionStatus::Succeeded,
+                            execution_result.operations,
+                        )
                     }
                 }
                 ExecutionStatus::Failed => {
                     if let Some(error) = execution_result.error {
                         TestResult::failure(error, execution_result.operations)
                     } else {
-                        TestResult::with_status(ExecutionStatus::Failed, execution_result.operations)
+                        TestResult::with_status(
+                            ExecutionStatus::Failed,
+                            execution_result.operations,
+                        )
                     }
                 }
                 ExecutionStatus::Running => {
                     TestResult::with_status(ExecutionStatus::Running, execution_result.operations)
                 }
-                _ => {
-                    TestResult::with_status(execution_result.status, execution_result.operations)
-                }
+                _ => TestResult::with_status(execution_result.status, execution_result.operations),
             };
 
             // Add invocations
@@ -800,7 +809,7 @@ where
 
         // Clear previous operations
         self.operation_storage.write().await.clear();
-        
+
         // Also clear mock client state for backward compatibility
         #[allow(deprecated)]
         self.mock_client.clear_all_calls();
@@ -816,20 +825,22 @@ where
             payload: Some(payload_json),
         };
         let start_payload = serde_json::to_string(&start_request)?;
-        
-        let start_response = self.checkpoint_worker
+
+        let start_response = self
+            .checkpoint_worker
             .send_api_request(ApiType::StartDurableExecution, start_payload)
             .await?;
-        
+
         if let Some(error) = start_response.error {
             return Err(TestError::CheckpointServerError(error));
         }
-        
-        let invocation_result: InvocationResult = serde_json::from_str(
-            &start_response.payload.ok_or_else(|| {
-                TestError::CheckpointServerError("Empty response from checkpoint server".to_string())
-            })?
-        )?;
+
+        let invocation_result: InvocationResult =
+            serde_json::from_str(&start_response.payload.ok_or_else(|| {
+                TestError::CheckpointServerError(
+                    "Empty response from checkpoint server".to_string(),
+                )
+            })?)?;
 
         let execution_arn = invocation_result.execution_id;
         let checkpoint_token = invocation_result.checkpoint_token;
@@ -861,7 +872,11 @@ where
         invocation = invocation.with_end(end_time);
 
         // Retrieve operations from the checkpoint server
-        let operations = match self.checkpoint_worker.get_operations(&execution_arn, "").await {
+        let operations = match self
+            .checkpoint_worker
+            .get_operations(&execution_arn, "")
+            .await
+        {
             Ok(response) => {
                 let mut storage = self.operation_storage.write().await;
                 for op in &response.operations {
@@ -892,10 +907,7 @@ where
                 } else {
                     // Convert DurableError to ErrorObject to get the error type
                     let error_obj = aws_durable_execution_sdk::ErrorObject::from(&error);
-                    let test_error = TestResultError::new(
-                        error_obj.error_type,
-                        error.to_string(),
-                    );
+                    let test_error = TestResultError::new(error_obj.error_type, error.to_string());
                     invocation = invocation.with_error(test_error.clone());
                     let mut test_result = TestResult::failure(test_error, operations);
                     test_result.add_invocation(invocation);
@@ -966,7 +978,8 @@ where
         };
 
         // Create shared operation storage for the orchestrator
-        let orchestrator_storage = Arc::new(tokio::sync::RwLock::new(OrchestratorOperationStorage::new()));
+        let orchestrator_storage =
+            Arc::new(tokio::sync::RwLock::new(OrchestratorOperationStorage::new()));
 
         // Clone the handler Arc for use in the orchestrator
         let handler = Arc::clone(&self.handler);
@@ -1027,9 +1040,7 @@ where
             ExecutionStatus::Running => {
                 TestResult::with_status(ExecutionStatus::Running, execution_result.operations)
             }
-            _ => {
-                TestResult::with_status(execution_result.status, execution_result.operations)
-            }
+            _ => TestResult::with_status(execution_result.status, execution_result.operations),
         };
 
         // Add invocations
@@ -1240,7 +1251,11 @@ where
     /// }
     /// ```
     pub async fn get_operation(&self, name: &str) -> Option<Operation> {
-        self.operation_storage.read().await.get_by_name(name).cloned()
+        self.operation_storage
+            .read()
+            .await
+            .get_by_name(name)
+            .cloned()
     }
 
     /// Gets an operation by its index in the execution order.
@@ -1272,7 +1287,11 @@ where
     /// }
     /// ```
     pub async fn get_operation_by_index(&self, index: usize) -> Option<Operation> {
-        self.operation_storage.read().await.get_by_index(index).cloned()
+        self.operation_storage
+            .read()
+            .await
+            .get_by_index(index)
+            .cloned()
     }
 
     /// Gets an operation by name and occurrence index.
@@ -1307,8 +1326,16 @@ where
     ///     println!("Second process operation: {:?}", op);
     /// }
     /// ```
-    pub async fn get_operation_by_name_and_index(&self, name: &str, index: usize) -> Option<Operation> {
-        self.operation_storage.read().await.get_by_name_and_index(name, index).cloned()
+    pub async fn get_operation_by_name_and_index(
+        &self,
+        name: &str,
+        index: usize,
+    ) -> Option<Operation> {
+        self.operation_storage
+            .read()
+            .await
+            .get_by_name_and_index(name, index)
+            .cloned()
     }
 
     /// Gets all captured operations.
@@ -1374,7 +1401,8 @@ where
     {
         let boxed_func = Box::new(move |input: serde_json::Value, ctx: DurableContext| {
             let fut = func(input, ctx);
-            Box::pin(fut) as Pin<Box<dyn Future<Output = Result<serde_json::Value, DurableError>> + Send>>
+            Box::pin(fut)
+                as Pin<Box<dyn Future<Output = Result<serde_json::Value, DurableError>> + Send>>
         });
 
         self.registered_functions
@@ -1763,7 +1791,11 @@ mod tests {
 
         // Verify error is captured
         let error = result.get_error().unwrap();
-        assert!(error.error_message.as_ref().unwrap().contains("Test failure"));
+        assert!(error
+            .error_message
+            .as_ref()
+            .unwrap()
+            .contains("Test failure"));
 
         // Verify invocation was recorded with error
         let invocations = result.get_invocations();
@@ -1995,7 +2027,9 @@ mod tests {
             LocalDurableTestRunner::new(simple_handler);
 
         // Register a durable function
-        runner.register_durable_function("helper", helper_func).await;
+        runner
+            .register_durable_function("helper", helper_func)
+            .await;
 
         // Verify it's registered
         assert!(runner.has_registered_function("helper").await);
@@ -2036,9 +2070,13 @@ mod tests {
             LocalDurableTestRunner::new(simple_handler);
 
         // Register multiple functions
-        runner.register_durable_function("durable1", durable_func).await;
+        runner
+            .register_durable_function("durable1", durable_func)
+            .await;
         runner.register_function("regular1", regular_func).await;
-        runner.register_durable_function("durable2", durable_func).await;
+        runner
+            .register_durable_function("durable2", durable_func)
+            .await;
 
         // Verify all are registered
         assert!(runner.has_registered_function("durable1").await);
@@ -2104,7 +2142,10 @@ mod tests {
             .unwrap();
 
         let mut runner = LocalDurableTestRunner::new(simple_handler);
-        let result = runner.run_with_orchestrator("hello".to_string()).await.unwrap();
+        let result = runner
+            .run_with_orchestrator("hello".to_string())
+            .await
+            .unwrap();
 
         // Verify successful execution status
         assert_eq!(result.get_status(), ExecutionStatus::Succeeded);
@@ -2132,14 +2173,21 @@ mod tests {
             .unwrap();
 
         let mut runner = LocalDurableTestRunner::new(failing_handler);
-        let result = runner.run_with_orchestrator("hello".to_string()).await.unwrap();
+        let result = runner
+            .run_with_orchestrator("hello".to_string())
+            .await
+            .unwrap();
 
         // Verify failed execution status
         assert_eq!(result.get_status(), ExecutionStatus::Failed);
 
         // Verify error is captured
         let error = result.get_error().unwrap();
-        assert!(error.error_message.as_ref().unwrap().contains("Test failure"));
+        assert!(error
+            .error_message
+            .as_ref()
+            .unwrap()
+            .contains("Test failure"));
     }
 
     #[tokio::test]
@@ -2158,7 +2206,10 @@ mod tests {
         .unwrap();
 
         let mut runner = LocalDurableTestRunner::new(simple_handler);
-        let result = runner.run_with_orchestrator("hello".to_string()).await.unwrap();
+        let result = runner
+            .run_with_orchestrator("hello".to_string())
+            .await
+            .unwrap();
 
         // Verify successful execution status
         assert_eq!(result.get_status(), ExecutionStatus::Succeeded);
@@ -2179,14 +2230,20 @@ mod tests {
             .unwrap();
 
         let mut runner = LocalDurableTestRunner::new(simple_handler);
-        let result = runner.run_with_orchestrator("hello".to_string()).await.unwrap();
+        let result = runner
+            .run_with_orchestrator("hello".to_string())
+            .await
+            .unwrap();
 
         // Verify successful execution status
         assert_eq!(result.get_status(), ExecutionStatus::Succeeded);
 
         // Verify Node.js history events are populated
         let nodejs_events = result.get_nodejs_history_events();
-        assert!(!nodejs_events.is_empty(), "Node.js history events should be populated");
+        assert!(
+            !nodejs_events.is_empty(),
+            "Node.js history events should be populated"
+        );
 
         // Verify the first event is ExecutionStarted
         assert_eq!(

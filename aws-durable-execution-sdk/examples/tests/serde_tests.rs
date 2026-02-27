@@ -66,10 +66,7 @@ async fn test_custom_serialization() {
     let process_step = step_ops.first().unwrap();
     assert_eq!(process_step.name, Some("process_data".to_string()));
 
-    assert_nodejs_event_signatures(
-        &result,
-        "tests/history/custom_serialization.history.json",
-    );
+    assert_nodejs_event_signatures(&result, "tests/history/custom_serialization.history.json");
 
     LocalDurableTestRunner::<serde_json::Value, SensitiveData>::teardown_test_environment()
         .await

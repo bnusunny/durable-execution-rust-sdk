@@ -6,7 +6,9 @@
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 
-use aws_durable_execution_sdk::operation::{Operation, OperationAction, OperationType, OperationUpdate};
+use aws_durable_execution_sdk::operation::{
+    Operation, OperationAction, OperationType, OperationUpdate,
+};
 
 use super::nodejs_event_types::{
     CallbackStartedDetails, CallbackStartedDetailsWrapper, ContextFailedDetails,
@@ -171,12 +173,13 @@ impl EventProcessor {
         match (update.action, update.operation_type) {
             // Execution events
             (OperationAction::Start, OperationType::Execution) => {
-                let details = NodeJsEventDetails::ExecutionStarted(ExecutionStartedDetailsWrapper {
-                    execution_started_details: ExecutionStartedDetails {
-                        input: PayloadWrapper::new(update.result.clone().unwrap_or_default()),
-                        execution_timeout: None,
-                    },
-                });
+                let details =
+                    NodeJsEventDetails::ExecutionStarted(ExecutionStartedDetailsWrapper {
+                        execution_started_details: ExecutionStartedDetails {
+                            input: PayloadWrapper::new(update.result.clone().unwrap_or_default()),
+                            execution_timeout: None,
+                        },
+                    });
                 events.push(self.create_nodejs_event(
                     NodeJsEventType::ExecutionStarted,
                     Some(operation),
@@ -184,11 +187,12 @@ impl EventProcessor {
                 ));
             }
             (OperationAction::Succeed, OperationType::Execution) => {
-                let details = NodeJsEventDetails::ExecutionSucceeded(ExecutionSucceededDetailsWrapper {
-                    execution_succeeded_details: ExecutionSucceededDetails {
-                        result: PayloadWrapper::new(update.result.clone().unwrap_or_default()),
-                    },
-                });
+                let details =
+                    NodeJsEventDetails::ExecutionSucceeded(ExecutionSucceededDetailsWrapper {
+                        execution_succeeded_details: ExecutionSucceededDetails {
+                            result: PayloadWrapper::new(update.result.clone().unwrap_or_default()),
+                        },
+                    });
                 events.push(self.create_nodejs_event(
                     NodeJsEventType::ExecutionSucceeded,
                     Some(operation),
@@ -335,11 +339,12 @@ impl EventProcessor {
                 ));
             }
             (OperationAction::Succeed, OperationType::Context) => {
-                let details = NodeJsEventDetails::ContextSucceeded(ContextSucceededDetailsWrapper {
-                    context_succeeded_details: ContextSucceededDetails {
-                        result: PayloadWrapper::new(update.result.clone().unwrap_or_default()),
-                    },
-                });
+                let details =
+                    NodeJsEventDetails::ContextSucceeded(ContextSucceededDetailsWrapper {
+                        context_succeeded_details: ContextSucceededDetails {
+                            result: PayloadWrapper::new(update.result.clone().unwrap_or_default()),
+                        },
+                    });
                 events.push(self.create_nodejs_event(
                     NodeJsEventType::ContextSucceeded,
                     Some(operation),
@@ -415,13 +420,19 @@ impl EventProcessor {
             .and_then(|d| d.callback_id.clone())
             .unwrap_or_else(|| operation.operation_id.clone());
 
-        let timeout = update.callback_options.as_ref().and_then(|o| o.timeout_seconds);
+        let timeout = update
+            .callback_options
+            .as_ref()
+            .and_then(|o| o.timeout_seconds);
         let heartbeat_timeout = update
             .callback_options
             .as_ref()
             .and_then(|o| o.heartbeat_timeout_seconds);
 
-        let input = update.result.as_ref().map(|r| PayloadWrapper::new(r.clone()));
+        let input = update
+            .result
+            .as_ref()
+            .map(|r| PayloadWrapper::new(r.clone()));
 
         (callback_id, timeout, heartbeat_timeout, input)
     }
@@ -508,7 +519,7 @@ impl EventProcessor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aws_durable_execution_sdk::operation::{StepDetails, CallbackOptions, CallbackDetails};
+    use aws_durable_execution_sdk::operation::{CallbackDetails, CallbackOptions, StepDetails};
 
     #[derive(Serialize)]
     struct TestDetails {
@@ -632,7 +643,11 @@ mod tests {
         let timestamp = EventProcessor::current_timestamp();
         // Verify ISO 8601 format with milliseconds and Z suffix
         let re = regex::Regex::new(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$").unwrap();
-        assert!(re.is_match(&timestamp), "Timestamp '{}' does not match ISO 8601 format", timestamp);
+        assert!(
+            re.is_match(&timestamp),
+            "Timestamp '{}' does not match ISO 8601 format",
+            timestamp
+        );
     }
 
     #[test]
@@ -720,7 +735,11 @@ mod tests {
         let mut processor = EventProcessor::new();
 
         let operation = Operation::new("exec-001", OperationType::Execution);
-        let update = OperationUpdate::succeed("exec-001", OperationType::Execution, Some("result".to_string()));
+        let update = OperationUpdate::succeed(
+            "exec-001",
+            OperationType::Execution,
+            Some("result".to_string()),
+        );
 
         let events = processor.process_operation_update(&update, &operation);
 
@@ -754,7 +773,8 @@ mod tests {
             payload: None,
         });
 
-        let update = OperationUpdate::succeed("step-001", OperationType::Step, Some("42".to_string()));
+        let update =
+            OperationUpdate::succeed("step-001", OperationType::Step, Some("42".to_string()));
 
         let events = processor.process_operation_update(&update, &operation);
 
@@ -829,7 +849,11 @@ mod tests {
         let mut processor = EventProcessor::new();
 
         let operation = Operation::new("ctx-001", OperationType::Context);
-        let update = OperationUpdate::succeed("ctx-001", OperationType::Context, Some("result".to_string()));
+        let update = OperationUpdate::succeed(
+            "ctx-001",
+            OperationType::Context,
+            Some("result".to_string()),
+        );
 
         let events = processor.process_operation_update(&update, &operation);
 
@@ -912,18 +936,66 @@ mod tests {
 
         // Test all documented (Action, Type) -> EventType mappings
         let test_cases = vec![
-            (OperationAction::Start, OperationType::Execution, NodeJsEventType::ExecutionStarted),
-            (OperationAction::Succeed, OperationType::Execution, NodeJsEventType::ExecutionSucceeded),
-            (OperationAction::Fail, OperationType::Execution, NodeJsEventType::ExecutionFailed),
-            (OperationAction::Start, OperationType::Step, NodeJsEventType::StepStarted),
-            (OperationAction::Succeed, OperationType::Step, NodeJsEventType::StepSucceeded),
-            (OperationAction::Fail, OperationType::Step, NodeJsEventType::StepFailed),
-            (OperationAction::Start, OperationType::Wait, NodeJsEventType::WaitStarted),
-            (OperationAction::Succeed, OperationType::Wait, NodeJsEventType::WaitSucceeded),
-            (OperationAction::Start, OperationType::Callback, NodeJsEventType::CallbackStarted),
-            (OperationAction::Start, OperationType::Context, NodeJsEventType::ContextStarted),
-            (OperationAction::Succeed, OperationType::Context, NodeJsEventType::ContextSucceeded),
-            (OperationAction::Fail, OperationType::Context, NodeJsEventType::ContextFailed),
+            (
+                OperationAction::Start,
+                OperationType::Execution,
+                NodeJsEventType::ExecutionStarted,
+            ),
+            (
+                OperationAction::Succeed,
+                OperationType::Execution,
+                NodeJsEventType::ExecutionSucceeded,
+            ),
+            (
+                OperationAction::Fail,
+                OperationType::Execution,
+                NodeJsEventType::ExecutionFailed,
+            ),
+            (
+                OperationAction::Start,
+                OperationType::Step,
+                NodeJsEventType::StepStarted,
+            ),
+            (
+                OperationAction::Succeed,
+                OperationType::Step,
+                NodeJsEventType::StepSucceeded,
+            ),
+            (
+                OperationAction::Fail,
+                OperationType::Step,
+                NodeJsEventType::StepFailed,
+            ),
+            (
+                OperationAction::Start,
+                OperationType::Wait,
+                NodeJsEventType::WaitStarted,
+            ),
+            (
+                OperationAction::Succeed,
+                OperationType::Wait,
+                NodeJsEventType::WaitSucceeded,
+            ),
+            (
+                OperationAction::Start,
+                OperationType::Callback,
+                NodeJsEventType::CallbackStarted,
+            ),
+            (
+                OperationAction::Start,
+                OperationType::Context,
+                NodeJsEventType::ContextStarted,
+            ),
+            (
+                OperationAction::Succeed,
+                OperationType::Context,
+                NodeJsEventType::ContextSucceeded,
+            ),
+            (
+                OperationAction::Fail,
+                OperationType::Context,
+                NodeJsEventType::ContextFailed,
+            ),
         ];
 
         for (action, op_type, expected_event_type) in test_cases {

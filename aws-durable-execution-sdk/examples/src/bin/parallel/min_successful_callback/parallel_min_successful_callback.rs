@@ -42,10 +42,7 @@ pub async fn handler(
             |child_ctx: DurableContext, item: String, _index: usize| {
                 Box::pin(async move {
                     let callback = child_ctx
-                        .create_callback_named::<String>(
-                            &format!("{}_callback", item),
-                            None,
-                        )
+                        .create_callback_named::<String>(&format!("{}_callback", item), None)
                         .await?;
                     println!("Callback for {}: {}", item, callback.callback_id);
                     callback.result().await

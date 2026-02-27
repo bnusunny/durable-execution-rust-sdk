@@ -24,10 +24,7 @@ pub struct LargeOutput {
 /// - Using `ctx.complete_execution_if_large()` to handle oversized results
 /// - If the result exceeds Lambda's response size limit, it is checkpointed
 #[durable_execution]
-pub async fn handler(
-    event: LargeInput,
-    ctx: DurableContext,
-) -> Result<LargeOutput, DurableError> {
+pub async fn handler(event: LargeInput, ctx: DurableContext) -> Result<LargeOutput, DurableError> {
     let processed: String = ctx
         .step_named(
             "process_large_data",

@@ -1,11 +1,8 @@
 name: Security Scorecard
 
 on:
-  branch_protection_rule:
   schedule:
     - cron: '0 2 * * 0'  # Weekly on Sunday at 2am UTC
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions: read-all
@@ -26,7 +23,7 @@ jobs:
           persist-credentials: false
 
       - name: Run Scorecard
-        uses: ossf/scorecard-action@v2
+        uses: ossf/scorecard-action@v2.4.0
         with:
           results_file: results.sarif
           results_format: sarif

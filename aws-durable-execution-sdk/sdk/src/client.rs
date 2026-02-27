@@ -201,6 +201,36 @@ impl LambdaDurableServiceClient {
         }
     }
 
+    /// Creates a new LambdaDurableServiceClient from AWS SDK config with a custom
+    /// user-agent string appended to HTTP requests for SDK identification.
+    pub fn from_aws_config_with_user_agent(
+        aws_config: &aws_config::SdkConfig,
+        sdk_name: &str,
+        sdk_version: &str,
+    ) -> Self {
+        let credentials_provider = aws_config
+            .credentials_provider()
+            .expect("No credentials provider configured")
+            .clone();
+
+        let user_agent = format!("{}/{}", sdk_name, sdk_version);
+        let mut headers = reqwest::header::HeaderMap::new();
+        if let Ok(value) = reqwest::header::HeaderValue::from_str(&user_agent) {
+            headers.insert(reqwest::header::USER_AGENT, value);
+        }
+
+        let http_client = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
+
+        Self {
+            http_client,
+            credentials_provider: Arc::from(credentials_provider),
+            config: LambdaClientConfig::from_aws_config(aws_config),
+        }
+    }
+
     /// Creates a new LambdaDurableServiceClient with custom configuration.
     pub fn with_config(
         credentials_provider: Arc<dyn ProvideCredentials>,
@@ -957,5 +987,95 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.is_resource_not_found());
+    }
+
+    /// Helper to build a test SdkConfig with fake credentials.
+    fn test_sdk_config() -> aws_config::SdkConfig {
+        let creds = aws_credential_types::Credentials::new(
+            "test-key",
+            "test-secret",
+            None,
+            None,
+            "test",
+        );
+        let provider =
+            aws_credential_types::provider::SharedCredentialsProvider::new(creds);
+        aws_config::SdkConfig::builder()
+            .credentials_provider(provider)
+            .region(aws_config::Region::new("us-east-1"))
+            .build()
+    }
+
+    #[test]
+    fn test_from_aws_config_with_user_agent_constructs_client() {
+        // Verify from_aws_config_with_user_agent creates a client successfully (Req 14.1)
+        let config = test_sdk_config();
+        let client = LambdaDurableServiceClient::from_aws_config_with_user_agent(
+            &config,
+            "my-sdk",
+            "1.0.0",
+        );
+        // Client should be constructed with the correct region config
+        assert_eq!(client.config.region, "us-east-1");
+    }
+
+    #[test]
+    fn test_from_aws_config_unchanged() {
+        // Verify existing from_aws_config still works without user-agent (Req 14.2)
+        let config = test_sdk_config();
+        let client = LambdaDurableServiceClient::from_aws_config(&config);
+        assert_eq!(client.config.region, "us-east-1");
+    }
+
+    #[tokio::test]
+    async fn test_user_agent_header_is_sent() {
+        // Verify the user-agent header is actually included in HTTP requests (Req 14.1)
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+
+        // Start a local TCP server that captures the User-Agent header
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let server_handle = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut buf = vec![0u8; 4096];
+            let n = socket.read(&mut buf).await.unwrap();
+            let request = String::from_utf8_lossy(&buf[..n]).to_string();
+
+            // Send a minimal HTTP response
+            let response = "HTTP/1.1 400 Bad Request\r\nContent-Length: 2\r\n\r\n{}";
+            let _ = socket.write_all(response.as_bytes()).await;
+            let _ = socket.shutdown().await;
+
+            request
+        });
+
+        // Create client with custom user-agent pointing at our local server
+        let sdk_name = "test-sdk";
+        let sdk_version = "2.3.4";
+        let user_agent = format!("{}/{}", sdk_name, sdk_version);
+
+        let config = test_sdk_config();
+        let mut client = LambdaDurableServiceClient::from_aws_config_with_user_agent(
+            &config,
+            sdk_name,
+            sdk_version,
+        );
+        client.config.endpoint_url = Some(format!("http://{}", addr));
+
+        // Make a request (it will fail, but we just need to capture the headers)
+        let _ = client
+            .checkpoint("arn:test:execution", "token", vec![])
+            .await;
+
+        // Check the captured request contains our user-agent
+        let captured_request = server_handle.await.unwrap();
+        assert!(
+            captured_request.contains(&user_agent),
+            "Expected User-Agent '{}' in request headers, got:\n{}",
+            user_agent,
+            captured_request
+        );
     }
 }

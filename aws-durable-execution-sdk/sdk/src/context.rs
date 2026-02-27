@@ -4,7 +4,7 @@
 //! as well as the `OperationIdentifier` type for deterministic operation ID generation.
 
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use blake2::{Blake2b512, Digest};
 
@@ -891,8 +891,8 @@ pub struct DurableContext {
     parent_id: Option<String>,
     /// Operation ID generator for this context
     id_generator: Arc<OperationIdGenerator>,
-    /// Logger for structured logging
-    logger: Arc<dyn Logger>,
+    /// Logger for structured logging (wrapped in RwLock for runtime reconfiguration)
+    logger: Arc<RwLock<Arc<dyn Logger>>>,
 }
 
 // Ensure DurableContext is Send + Sync
@@ -911,7 +911,7 @@ impl DurableContext {
             lambda_context: None,
             parent_id: None,
             id_generator: Arc::new(OperationIdGenerator::new(base_id)),
-            logger: Arc::new(TracingLogger),
+            logger: Arc::new(RwLock::new(Arc::new(TracingLogger))),
         }
     }
 
@@ -933,7 +933,7 @@ impl DurableContext {
             lambda_context: Some(lambda_context),
             parent_id: None,
             id_generator: Arc::new(OperationIdGenerator::new(base_id)),
-            logger: Arc::new(TracingLogger),
+            logger: Arc::new(RwLock::new(Arc::new(TracingLogger))),
         }
     }
 
@@ -963,7 +963,7 @@ impl DurableContext {
     ///
     /// * `logger` - The logger implementation to use
     pub fn set_logger(&mut self, logger: Arc<dyn Logger>) {
-        self.logger = logger;
+        *self.logger.write().unwrap() = logger;
     }
 
     /// Returns a new context with the specified logger.
@@ -971,9 +971,26 @@ impl DurableContext {
     /// # Arguments
     ///
     /// * `logger` - The logger implementation to use
-    pub fn with_logger(mut self, logger: Arc<dyn Logger>) -> Self {
-        self.logger = logger;
+    pub fn with_logger(self, logger: Arc<dyn Logger>) -> Self {
+        *self.logger.write().unwrap() = logger;
         self
+    }
+
+    /// Reconfigures the logger for this context at runtime.
+    ///
+    /// All subsequent log calls on this context (and any clones sharing the
+    /// same underlying `RwLock`) will use the new logger.
+    ///
+    /// # Arguments
+    ///
+    /// * `logger` - The new logger implementation to use
+    ///
+    /// # Requirements
+    ///
+    /// - 13.1: configure_logger swaps the logger, subsequent calls use new logger
+    /// - 13.2: Original logger used when configure_logger not called
+    pub fn configure_logger(&self, logger: Arc<dyn Logger>) {
+        *self.logger.write().unwrap() = logger;
     }
 
     /// Returns a reference to the execution state.
@@ -997,8 +1014,8 @@ impl DurableContext {
     }
 
     /// Returns a reference to the logger.
-    pub fn logger(&self) -> &Arc<dyn Logger> {
-        &self.logger
+    pub fn logger(&self) -> Arc<dyn Logger> {
+        self.logger.read().unwrap().clone()
     }
 
     /// Generates the next operation ID for this context.
@@ -1286,11 +1303,12 @@ impl DurableContext {
             log_info = log_info.with_extra(*key, *value);
         }
 
+        let logger = self.logger.read().unwrap();
         match level {
-            LogLevel::Debug => self.logger.debug(message, &log_info),
-            LogLevel::Info => self.logger.info(message, &log_info),
-            LogLevel::Warn => self.logger.warn(message, &log_info),
-            LogLevel::Error => self.logger.error(message, &log_info),
+            LogLevel::Debug => logger.debug(message, &log_info),
+            LogLevel::Info => logger.info(message, &log_info),
+            LogLevel::Warn => logger.warn(message, &log_info),
+            LogLevel::Error => logger.error(message, &log_info),
         }
     }
 
@@ -1553,8 +1571,9 @@ impl DurableContext {
         let op_id = self.next_operation_identifier(None);
         let config = config.unwrap_or_default();
 
+        let logger = self.logger.read().unwrap().clone();
         let result =
-            crate::handlers::step_handler(func, &self.state, &op_id, &config, &self.logger).await;
+            crate::handlers::step_handler(func, &self.state, &op_id, &config, &logger).await;
 
         // Track replay after completion
         if result.is_ok() {
@@ -1599,8 +1618,9 @@ impl DurableContext {
         let op_id = self.next_operation_identifier(Some(name.to_string()));
         let config = config.unwrap_or_default();
 
+        let logger = self.logger.read().unwrap().clone();
         let result =
-            crate::handlers::step_handler(func, &self.state, &op_id, &config, &self.logger).await;
+            crate::handlers::step_handler(func, &self.state, &op_id, &config, &logger).await;
 
         // Track replay after completion
         if result.is_ok() {
@@ -1646,8 +1666,9 @@ impl DurableContext {
     ) -> DurableResult<()> {
         let op_id = self.next_operation_identifier(name.map(|s| s.to_string()));
 
+        let logger = self.logger.read().unwrap().clone();
         let result =
-            crate::handlers::wait_handler(duration, &self.state, &op_id, &self.logger).await;
+            crate::handlers::wait_handler(duration, &self.state, &op_id, &logger).await;
 
         // Track replay after completion (only if not suspended)
         if result.is_ok() {
@@ -1689,7 +1710,8 @@ impl DurableContext {
     /// - 5.5: THE Wait_Operation SHALL support cancellation of active waits via CANCEL action
     /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn cancel_wait(&self, operation_id: &str) -> DurableResult<()> {
-        crate::handlers::wait_cancel_handler(&self.state, operation_id, &self.logger).await
+        let logger = self.logger.read().unwrap().clone();
+        crate::handlers::wait_cancel_handler(&self.state, operation_id, &logger).await
     }
 
     /// Creates a callback and returns a handle to wait for the result.
@@ -1732,8 +1754,9 @@ impl DurableContext {
         let op_id = self.next_operation_identifier(None);
         let config = config.unwrap_or_default();
 
+        let logger = self.logger.read().unwrap().clone();
         let result =
-            crate::handlers::callback_handler(&self.state, &op_id, &config, &self.logger).await;
+            crate::handlers::callback_handler(&self.state, &op_id, &config, &logger).await;
 
         // Track replay after completion
         if result.is_ok() {
@@ -1761,8 +1784,9 @@ impl DurableContext {
         let op_id = self.next_operation_identifier(Some(name.to_string()));
         let config = config.unwrap_or_default();
 
+        let logger = self.logger.read().unwrap().clone();
         let result =
-            crate::handlers::callback_handler(&self.state, &op_id, &config, &self.logger).await;
+            crate::handlers::callback_handler(&self.state, &op_id, &config, &logger).await;
 
         // Track replay after completion
         if result.is_ok() {
@@ -1815,13 +1839,14 @@ impl DurableContext {
         let op_id = self.next_operation_identifier(Some(format!("invoke:{}", function_name)));
         let config = config.unwrap_or_default();
 
+        let logger = self.logger.read().unwrap().clone();
         let result = crate::handlers::invoke_handler(
             function_name,
             payload,
             &self.state,
             &op_id,
             &config,
-            &self.logger,
+            &logger,
         )
         .await;
 
@@ -1882,6 +1907,7 @@ impl DurableContext {
         let op_id = self.next_operation_identifier(Some("map".to_string()));
         let config = config.unwrap_or_default();
 
+        let logger = self.logger.read().unwrap().clone();
         let result = crate::handlers::map_handler(
             items,
             func,
@@ -1889,7 +1915,7 @@ impl DurableContext {
             &op_id,
             self,
             &config,
-            &self.logger,
+            &logger,
         )
         .await;
 
@@ -1945,13 +1971,14 @@ impl DurableContext {
         let op_id = self.next_operation_identifier(Some("parallel".to_string()));
         let config = config.unwrap_or_default();
 
+        let logger = self.logger.read().unwrap().clone();
         let result = crate::handlers::parallel_handler(
             branches,
             &self.state,
             &op_id,
             self,
             &config,
-            &self.logger,
+            &logger,
         )
         .await;
 
@@ -2004,8 +2031,9 @@ impl DurableContext {
         let op_id = self.next_operation_identifier(Some("child_context".to_string()));
         let config = config.unwrap_or_default();
 
+        let logger = self.logger.read().unwrap().clone();
         let result =
-            crate::handlers::child_handler(func, &self.state, &op_id, self, &config, &self.logger)
+            crate::handlers::child_handler(func, &self.state, &op_id, self, &config, &logger)
                 .await;
 
         // Track replay after completion
@@ -2037,8 +2065,9 @@ impl DurableContext {
         let op_id = self.next_operation_identifier(Some(name.to_string()));
         let config = config.unwrap_or_default();
 
+        let logger = self.logger.read().unwrap().clone();
         let result =
-            crate::handlers::child_handler(func, &self.state, &op_id, self, &config, &self.logger)
+            crate::handlers::child_handler(func, &self.state, &op_id, self, &config, &logger)
                 .await;
 
         // Track replay after completion
@@ -2084,12 +2113,11 @@ impl DurableContext {
     ///             Err("Order not ready yet".into())
     ///         }
     ///     },
-    ///     WaitForConditionConfig {
-    ///         initial_state: OrderState { order_id: "123".to_string() },
-    ///         interval: Duration::from_seconds(5),
-    ///         max_attempts: Some(10),
-    ///         ..Default::default()
-    ///     },
+    ///     WaitForConditionConfig::from_interval(
+    ///         OrderState { order_id: "123".to_string() },
+    ///         Duration::from_seconds(5),
+    ///         Some(10),
+    ///     ),
     /// ).await?;
     /// ```
     ///
@@ -2112,6 +2140,7 @@ impl DurableContext {
     {
         let op_id = self.next_operation_identifier(Some("wait_for_condition".to_string()));
 
+        let logger = self.logger.read().unwrap().clone();
         // Use the new wait_for_condition_handler which implements the single STEP with RETRY pattern
         // This is more efficient than the previous child context + multiple steps approach
         let result = crate::handlers::wait_for_condition_handler(
@@ -2119,7 +2148,7 @@ impl DurableContext {
             config,
             &self.state,
             &op_id,
-            &self.logger,
+            &logger,
         )
         .await;
 
@@ -2193,6 +2222,7 @@ impl DurableContext {
         // The child context ensures the submitter execution is tracked and not re-executed during replay
         let child_config = crate::config::ChildConfig::default();
 
+        let logger = self.logger.read().unwrap().clone();
         crate::handlers::child_handler(
             |child_ctx| {
                 let callback_id = callback_id.clone();
@@ -2229,7 +2259,7 @@ impl DurableContext {
             &op_id,
             self,
             &child_config,
-            &self.logger,
+            &logger,
         )
         .await?;
 
@@ -2280,7 +2310,8 @@ impl DurableContext {
     {
         let op_id = self.next_operation_identifier(Some("all".to_string()));
 
-        let result = crate::handlers::all_handler(futures, &self.state, &op_id, &self.logger).await;
+        let logger = self.logger.read().unwrap().clone();
+        let result = crate::handlers::all_handler(futures, &self.state, &op_id, &logger).await;
 
         // Track replay after completion
         if result.is_ok() {
@@ -2330,8 +2361,9 @@ impl DurableContext {
     {
         let op_id = self.next_operation_identifier(Some("all_settled".to_string()));
 
+        let logger = self.logger.read().unwrap().clone();
         let result =
-            crate::handlers::all_settled_handler(futures, &self.state, &op_id, &self.logger).await;
+            crate::handlers::all_settled_handler(futures, &self.state, &op_id, &logger).await;
 
         // Track replay after completion
         if result.is_ok() {
@@ -2376,8 +2408,9 @@ impl DurableContext {
     {
         let op_id = self.next_operation_identifier(Some("race".to_string()));
 
+        let logger = self.logger.read().unwrap().clone();
         let result =
-            crate::handlers::race_handler(futures, &self.state, &op_id, &self.logger).await;
+            crate::handlers::race_handler(futures, &self.state, &op_id, &logger).await;
 
         // Track replay after completion
         if result.is_ok() {
@@ -2424,7 +2457,8 @@ impl DurableContext {
     {
         let op_id = self.next_operation_identifier(Some("any".to_string()));
 
-        let result = crate::handlers::any_handler(futures, &self.state, &op_id, &self.logger).await;
+        let logger = self.logger.read().unwrap().clone();
+        let result = crate::handlers::any_handler(futures, &self.state, &op_id, &logger).await;
 
         // Track replay after completion
         if result.is_ok() {
@@ -2436,26 +2470,105 @@ impl DurableContext {
 }
 
 /// Configuration for wait_for_condition operations.
-#[derive(Debug, Clone)]
+///
+/// # Requirements
+///
+/// - 4.7: wait_for_condition uses wait_strategy to determine polling delay
+/// - 4.8: Backward-compatible constructor converts interval + max_attempts to a WaitStrategy
 pub struct WaitForConditionConfig<S> {
     /// Initial state to pass to the check function.
     pub initial_state: S,
-    /// Interval between condition checks.
-    pub interval: crate::duration::Duration,
-    /// Maximum number of attempts (None for unlimited).
-    pub max_attempts: Option<usize>,
+    /// Wait strategy function that determines polling behavior.
+    ///
+    /// Takes a reference to the current state and the attempt number (1-indexed),
+    /// and returns a [`WaitDecision`](crate::config::WaitDecision).
+    pub wait_strategy: Box<dyn Fn(&S, usize) -> crate::config::WaitDecision + Send + Sync>,
     /// Overall timeout for the operation.
     pub timeout: Option<crate::duration::Duration>,
+    /// Optional custom serializer/deserializer.
+    pub serdes: Option<std::sync::Arc<dyn crate::config::SerDesAny>>,
 }
 
-impl<S: Default> Default for WaitForConditionConfig<S> {
-    fn default() -> Self {
+impl<S> std::fmt::Debug for WaitForConditionConfig<S>
+where
+    S: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WaitForConditionConfig")
+            .field("initial_state", &self.initial_state)
+            .field("wait_strategy", &"<fn>")
+            .field("timeout", &self.timeout)
+            .field("serdes", &self.serdes.is_some())
+            .finish()
+    }
+}
+
+impl<S> WaitForConditionConfig<S> {
+    /// Creates a backward-compatible `WaitForConditionConfig` from interval and max_attempts.
+    ///
+    /// This constructor converts the old-style `interval` + `max_attempts` parameters
+    /// into a wait strategy that uses a fixed delay (no backoff, no jitter).
+    ///
+    /// # Arguments
+    ///
+    /// * `initial_state` - Initial state to pass to the check function.
+    /// * `interval` - Fixed interval between condition checks.
+    /// * `max_attempts` - Maximum number of attempts (`None` for unlimited).
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use aws_durable_execution_sdk::{WaitForConditionConfig, Duration};
+    ///
+    /// let config = WaitForConditionConfig::from_interval(
+    ///     my_initial_state,
+    ///     Duration::from_seconds(5),
+    ///     Some(10),
+    /// );
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// - 4.8: Backward-compatible constructor converts interval + max_attempts to a WaitStrategy
+    pub fn from_interval(
+        initial_state: S,
+        interval: crate::duration::Duration,
+        max_attempts: Option<usize>,
+    ) -> Self
+    where
+        S: Send + Sync + 'static,
+    {
+        let interval_secs = interval.to_seconds();
+        let max = max_attempts.unwrap_or(usize::MAX);
+
         Self {
-            initial_state: S::default(),
-            interval: crate::duration::Duration::from_seconds(5),
-            max_attempts: None,
+            initial_state,
+            wait_strategy: Box::new(move |_state: &S, attempts_made: usize| {
+                // In the backward-compatible mode, the check function's Ok/Err
+                // determines whether polling is done. The strategy only provides
+                // the delay and enforces max_attempts.
+                // Return Done when max_attempts exceeded (handler will checkpoint failure
+                // if check returned Err, or success if check returned Ok).
+                if attempts_made >= max {
+                    return crate::config::WaitDecision::Done;
+                }
+                crate::config::WaitDecision::Continue {
+                    delay: crate::duration::Duration::from_seconds(interval_secs),
+                }
+            }),
             timeout: None,
+            serdes: None,
         }
+    }
+}
+
+impl<S: Default + Send + Sync + 'static> Default for WaitForConditionConfig<S> {
+    fn default() -> Self {
+        Self::from_interval(
+            S::default(),
+            crate::duration::Duration::from_seconds(5),
+            None,
+        )
     }
 }
 
@@ -3461,6 +3574,139 @@ mod durable_context_tests {
 
         // Verify parent_id is included
         assert_eq!(info.parent_id, Some(parent_op_id));
+    }
+
+    // ========================================================================
+    // Runtime Logger Reconfiguration Tests (Req 13.1, 13.2)
+    // ========================================================================
+
+    #[test]
+    fn test_configure_logger_swaps_logger() {
+        // Req 13.1: configure_logger swaps the logger, subsequent calls use new logger
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let original_count = Arc::new(AtomicUsize::new(0));
+        let new_count = Arc::new(AtomicUsize::new(0));
+
+        let original_logger: Arc<dyn Logger> = Arc::new(custom_logger(
+            |_, _| {},
+            {
+                let count = original_count.clone();
+                move |_, _| {
+                    count.fetch_add(1, Ordering::SeqCst);
+                }
+            },
+            |_, _| {},
+            |_, _| {},
+        ));
+
+        let new_logger: Arc<dyn Logger> = Arc::new(custom_logger(
+            |_, _| {},
+            {
+                let count = new_count.clone();
+                move |_, _| {
+                    count.fetch_add(1, Ordering::SeqCst);
+                }
+            },
+            |_, _| {},
+            |_, _| {},
+        ));
+
+        let state = create_test_state();
+        let ctx = DurableContext::new(state).with_logger(original_logger);
+
+        // Log with original logger
+        ctx.log_info("before swap");
+        assert_eq!(original_count.load(Ordering::SeqCst), 1);
+        assert_eq!(new_count.load(Ordering::SeqCst), 0);
+
+        // Swap logger at runtime (note: &self, not &mut self)
+        ctx.configure_logger(new_logger);
+
+        // Subsequent calls use the new logger
+        ctx.log_info("after swap");
+        assert_eq!(original_count.load(Ordering::SeqCst), 1); // unchanged
+        assert_eq!(new_count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn test_original_logger_used_when_configure_logger_not_called() {
+        // Req 13.2: Original logger used when configure_logger not called
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let original_count = Arc::new(AtomicUsize::new(0));
+
+        let original_logger: Arc<dyn Logger> = Arc::new(custom_logger(
+            |_, _| {},
+            {
+                let count = original_count.clone();
+                move |_, _| {
+                    count.fetch_add(1, Ordering::SeqCst);
+                }
+            },
+            |_, _| {},
+            |_, _| {},
+        ));
+
+        let state = create_test_state();
+        let ctx = DurableContext::new(state).with_logger(original_logger);
+
+        // Log multiple times without calling configure_logger
+        ctx.log_info("message 1");
+        ctx.log_info("message 2");
+        ctx.log_info("message 3");
+
+        assert_eq!(original_count.load(Ordering::SeqCst), 3);
+    }
+
+    #[test]
+    fn test_configure_logger_affects_child_contexts() {
+        // Verify that child contexts sharing the same RwLock see the swapped logger
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let original_count = Arc::new(AtomicUsize::new(0));
+        let new_count = Arc::new(AtomicUsize::new(0));
+
+        let original_logger: Arc<dyn Logger> = Arc::new(custom_logger(
+            |_, _| {},
+            {
+                let count = original_count.clone();
+                move |_, _| {
+                    count.fetch_add(1, Ordering::SeqCst);
+                }
+            },
+            |_, _| {},
+            |_, _| {},
+        ));
+
+        let new_logger: Arc<dyn Logger> = Arc::new(custom_logger(
+            |_, _| {},
+            {
+                let count = new_count.clone();
+                move |_, _| {
+                    count.fetch_add(1, Ordering::SeqCst);
+                }
+            },
+            |_, _| {},
+            |_, _| {},
+        ));
+
+        let state = create_test_state();
+        let ctx = DurableContext::new(state).with_logger(original_logger);
+        let parent_op_id = ctx.next_operation_id();
+        let child_ctx = ctx.create_child_context(&parent_op_id);
+
+        // Child uses original logger
+        child_ctx.log_info("child before swap");
+        assert_eq!(original_count.load(Ordering::SeqCst), 1);
+
+        // Swap on parent
+        ctx.configure_logger(new_logger);
+
+        // Child now uses the new logger (shared RwLock)
+        child_ctx.log_info("child after swap");
+        assert_eq!(new_count.load(Ordering::SeqCst), 1);
+        assert_eq!(original_count.load(Ordering::SeqCst), 1); // unchanged
     }
 }
 

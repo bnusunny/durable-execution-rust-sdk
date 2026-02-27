@@ -1,0 +1,112 @@
+name: Integration Tests
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  STACK_NAME: durable-sdk-rust-integ-${{ github.run_id }}
+
+jobs:
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            aws-durable-execution-sdk/target
+          key: ${{ runner.os }}-cargo-integ-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-integ-
+
+      - name: Configure AWS credentials
+        if: github.actor != 'nektos/act'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.ACTIONS_INTEGRATION_ROLE_ARN }}
+          role-session-name: rust-sdk-integration-test
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Build test Lambda functions
+        working-directory: aws-durable-execution-sdk
+        run: |
+          cargo build --release --package aws-durable-execution-sdk-examples
+          
+      - name: Package Lambda functions
+        run: |
+          mkdir -p lambda-packages
+          cd aws-durable-execution-sdk/target/release/examples
+          for binary in simple_workflow parallel_processing callback_workflow; do
+            if [ -f "$binary" ]; then
+              cp $binary bootstrap
+              zip -j ../../../../lambda-packages/${binary}.zip bootstrap
+              rm bootstrap
+            fi
+          done
+
+      - name: Create S3 bucket and upload packages
+        run: |
+          BUCKET_NAME="${{ env.STACK_NAME }}-deployment"
+          aws s3 mb s3://${BUCKET_NAME} --region ${{ vars.AWS_REGION || 'us-east-1' }} || true
+          aws s3 cp lambda-packages/ s3://${BUCKET_NAME}/ --recursive
+          echo "DEPLOYMENT_BUCKET=${BUCKET_NAME}" >> $GITHUB_ENV
+
+      - name: Deploy test infrastructure
+        run: |
+          aws cloudformation deploy \
+            --template-file .github/workflows/integration-test-stack.yml \
+            --stack-name ${{ env.STACK_NAME }} \
+            --capabilities CAPABILITY_IAM \
+            --parameter-overrides \
+              DeploymentBucket=${{ env.DEPLOYMENT_BUCKET }} \
+              SimpleWorkflowKey=simple_workflow.zip \
+              ParallelProcessingKey=parallel_processing.zip \
+              CallbackWorkflowKey=callback_workflow.zip
+
+      - name: Get function names
+        id: functions
+        run: |
+          echo "simple=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query 'Stacks[0].Outputs[?OutputKey==`SimpleWorkflowFunction`].OutputValue' --output text)" >> $GITHUB_OUTPUT
+          echo "parallel=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query 'Stacks[0].Outputs[?OutputKey==`ParallelProcessingFunction`].OutputValue' --output text)" >> $GITHUB_OUTPUT
+          echo "callback=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query 'Stacks[0].Outputs[?OutputKey==`CallbackWorkflowFunction`].OutputValue' --output text)" >> $GITHUB_OUTPUT
+
+      - name: Run integration tests
+        working-directory: aws-durable-execution-sdk
+        env:
+          SIMPLE_WORKFLOW_FUNCTION: ${{ steps.functions.outputs.simple }}
+          PARALLEL_PROCESSING_FUNCTION: ${{ steps.functions.outputs.parallel }}
+          CALLBACK_WORKFLOW_FUNCTION: ${{ steps.functions.outputs.callback }}
+        run: cargo test --package aws-durable-execution-sdk-testing --test integration -- --ignored
+
+      - name: Cleanup test infrastructure
+        if: always()
+        run: |
+          # Delete S3 bucket contents first
+          if [ -n "${{ env.DEPLOYMENT_BUCKET }}" ]; then
+            aws s3 rm s3://${{ env.DEPLOYMENT_BUCKET }} --recursive || true
+            aws s3 rb s3://${{ env.DEPLOYMENT_BUCKET }} || true
+          fi
+          # Delete CloudFormation stack
+          aws cloudformation delete-stack --stack-name ${{ env.STACK_NAME }} || true
+          aws cloudformation wait stack-delete-complete --stack-name ${{ env.STACK_NAME }} || true

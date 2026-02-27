@@ -1,0 +1,11 @@
+# Default owners for everything in the repo
+* @bnusunny @awslabs/durable-execution-sdk-maintainers
+
+# SDK core
+/aws-durable-execution-sdk/ @awslabs/durable-execution-sdk-maintainers
+
+# Conformance tests
+/conformance-tests/ @awslabs/durable-execution-sdk-maintainers
+
+# CI/CD
+/.github/ @awslabs/durable-execution-sdk-maintainers

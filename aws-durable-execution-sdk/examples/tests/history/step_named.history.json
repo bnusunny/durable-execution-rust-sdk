@@ -1,19 +1,52 @@
-{
-  "events": [
-    {
-      "event_type": "Execution"
-    },
-    {
-      "event_type": "Step",
-      "name": "fetch_data"
-    },
-    {
-      "event_type": "Step",
-      "name": "process_data"
-    },
-    {
-      "event_type": "Step",
-      "name": "finalize"
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "03ce2bd3-eac6-450b-aa85-4d3c48cf3cf9",
+    "EventTimestamp": "2026-01-20T23:17:39.473Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
     }
-  ]
-}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 2,
+    "Id": "eabf43a602524612354350117428da5d",
+    "EventTimestamp": "2026-01-20T23:17:39.476Z",
+    "Name": "fetch_data",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "{\"step_name\":\"fetch_data\",\"value\":42}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 3,
+    "Id": "4816f739fb55a74928b69512e1638499",
+    "EventTimestamp": "2026-01-20T23:17:39.476Z",
+    "Name": "process_data",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "{\"step_name\":\"process_data\",\"value\":100}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 4,
+    "Id": "185f2fd9e5cd517c1fcce9fd82546885",
+    "EventTimestamp": "2026-01-20T23:17:39.477Z",
+    "Name": "finalize",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "{\"step_name\":\"finalize\",\"value\":200}"
+      },
+      "RetryDetails": {}
+    }
+  }
+]

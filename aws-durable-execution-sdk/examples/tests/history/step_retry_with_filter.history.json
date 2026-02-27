@@ -1,0 +1,26 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "5857d5dc-8a9a-447d-bd79-8b7472fde104",
+    "EventTimestamp": "2026-02-26T23:27:26.496Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 2,
+    "Id": "fd8b9bee32ae4deaa649877402ea6429",
+    "EventTimestamp": "2026-02-26T23:27:26.496Z",
+    "Name": "filtered_operation",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"filter_configured\""
+      },
+      "RetryDetails": {}
+    }
+  }
+]

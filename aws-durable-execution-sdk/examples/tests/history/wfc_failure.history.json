@@ -1,0 +1,58 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "16d41810-0329-45b0-b27c-9950e4135dfa",
+    "EventTimestamp": "2026-02-26T21:21:05.251Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "CallbackStarted",
+    "EventId": 2,
+    "Id": "b356a298c7ac1b425d76375f6eedf42f",
+    "EventTimestamp": "2026-02-26T21:21:05.252Z",
+    "CallbackStartedDetails": {
+      "CallbackId": "edf1a01c-09a3-430c-85a7-bf2f108788fa",
+      "Timeout": 0,
+      "HeartbeatTimeout": 0
+    }
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 3,
+    "Id": "187838b79790fa0aaad4fba2bf033843",
+    "EventTimestamp": "2026-02-26T21:21:05.252Z",
+    "Name": "wait_for_callback_submitter",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 4,
+    "Id": "1757b4bc3c94b95a37dee379fbb40a20",
+    "EventTimestamp": "2026-02-26T21:21:05.252Z",
+    "Name": "execute_submitter",
+    "ParentId": "187838b79790fa0aaad4fba2bf033843",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "null"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextFailed",
+    "EventId": 5,
+    "Id": "187838b79790fa0aaad4fba2bf033843",
+    "EventTimestamp": "2026-02-26T21:21:05.252Z",
+    "Name": "wait_for_callback_submitter",
+    "ContextFailedDetails": {
+      "Error": {
+        "Payload": "{\"ErrorType\":\"SubmitterError\",\"ErrorMessage\":\"External system unavailable\"}"
+      }
+    }
+  }
+]

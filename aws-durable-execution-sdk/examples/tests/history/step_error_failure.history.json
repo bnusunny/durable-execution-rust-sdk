@@ -1,11 +1,26 @@
-{
-  "events": [
-    {
-      "event_type": "Execution"
-    },
-    {
-      "event_type": "Step",
-      "name": "process_value"
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "1c962e71-2216-4468-8b30-21f68d5cadb2",
+    "EventTimestamp": "2026-01-20T23:17:39.192Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{\"value\":42,\"should_fail\":true}"
+      }
     }
-  ]
-}
+  },
+  {
+    "EventType": "StepFailed",
+    "EventId": 2,
+    "Id": "62202af9a94cdbcd78e26e030b335c0e",
+    "EventTimestamp": "2026-01-20T23:17:39.192Z",
+    "Name": "process_value",
+    "StepFailedDetails": {
+      "Error": {
+        "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"Processing failed due to invalid input\"}"
+      },
+      "RetryDetails": {}
+    }
+  }
+]

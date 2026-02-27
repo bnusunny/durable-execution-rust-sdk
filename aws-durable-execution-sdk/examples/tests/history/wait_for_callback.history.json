@@ -1,22 +1,71 @@
-{
-  "events": [
-    {
-      "event_type": "Execution"
-    },
-    {
-      "event_type": "Step",
-      "name": "validate"
-    },
-    {
-      "event_type": "Callback"
-    },
-    {
-      "event_type": "Context",
-      "name": "wait_for_callback_submitter"
-    },
-    {
-      "event_type": "Step",
-      "name": "execute_submitter"
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "d084bdaf-b086-4f40-a8a1-e90d90f8e161",
+    "EventTimestamp": "2026-01-20T23:17:39.166Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{\"payment_id\":\"pay-12345\",\"amount\":100.0,\"currency\":\"USD\",\"customer_email\":\"test@example.com\"}"
+      }
     }
-  ]
-}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 2,
+    "Id": "c1b8c1230c210ec81ca162845cb51bda",
+    "EventTimestamp": "2026-01-20T23:17:39.167Z",
+    "Name": "validate",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "{\"payment_id\":\"pay-12345\",\"amount\":100.0,\"currency\":\"USD\",\"customer_email\":\"test@example.com\"}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "CallbackStarted",
+    "EventId": 3,
+    "Id": "e18251c17849834ec1b2ad0dfbfee6ee",
+    "EventTimestamp": "2026-01-20T23:17:39.167Z",
+    "CallbackStartedDetails": {
+      "CallbackId": "c6774060-bdbf-4801-a552-56ff2c97ba12",
+      "Timeout": 3600,
+      "HeartbeatTimeout": 600
+    }
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 4,
+    "Id": "5b08d4c775c8d861f58bb7d73ac20478",
+    "EventTimestamp": "2026-01-20T23:17:39.167Z",
+    "Name": "wait_for_callback_submitter",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 5,
+    "Id": "b3614efb382db478039d833072af36dc",
+    "EventTimestamp": "2026-01-20T23:17:39.167Z",
+    "Name": "execute_submitter",
+    "ParentId": "5b08d4c775c8d861f58bb7d73ac20478",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "null"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 6,
+    "Id": "5b08d4c775c8d861f58bb7d73ac20478",
+    "EventTimestamp": "2026-01-20T23:17:39.167Z",
+    "Name": "wait_for_callback_submitter",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "null"
+      }
+    }
+  }
+]

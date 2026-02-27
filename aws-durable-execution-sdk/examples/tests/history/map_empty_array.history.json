@@ -1,0 +1,25 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "2c1a3f7b-8b91-4a38-8923-5dadab0c8602",
+    "EventTimestamp": "2026-02-26T22:42:03.299Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 2,
+    "Id": "14c4540aa998d7632e3d8f26d4cf0300",
+    "EventTimestamp": "2026-02-26T22:42:03.299Z",
+    "Name": "map",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "{\"items\":[],\"completion_reason\":\"AllCompleted\"}"
+      }
+    }
+  }
+]

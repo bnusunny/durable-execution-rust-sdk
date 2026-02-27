@@ -1,0 +1,25 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "bbe5c854-65e2-499d-ad93-b54663c4e5eb",
+    "EventTimestamp": "2026-02-26T21:47:10.172Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "CallbackStarted",
+    "EventId": 2,
+    "Id": "3f1e747544973f3add33fe132829b701",
+    "EventTimestamp": "2026-02-26T21:47:10.172Z",
+    "Name": "heartbeat_callback",
+    "CallbackStartedDetails": {
+      "CallbackId": "b5c09c30-0f9d-44d8-847d-e59866bfe598",
+      "Timeout": 7200,
+      "HeartbeatTimeout": 600
+    }
+  }
+]

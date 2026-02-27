@@ -1,10 +1,24 @@
-{
-  "events": [
-    {
-      "event_type": "Execution"
-    },
-    {
-      "event_type": "Callback"
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "dff16191-d263-4149-86b5-a5dadebb475d",
+    "EventTimestamp": "2026-01-20T23:17:39.166Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
     }
-  ]
-}
+  },
+  {
+    "EventType": "CallbackStarted",
+    "EventId": 2,
+    "Id": "85a99143b4dc4e819c4e344941f12297",
+    "EventTimestamp": "2026-01-20T23:17:39.167Z",
+    "CallbackStartedDetails": {
+      "CallbackId": "f29139ba-6286-4813-b6c7-3a21e0cefeb0",
+      "Timeout": 0,
+      "HeartbeatTimeout": 0
+    }
+  }
+]

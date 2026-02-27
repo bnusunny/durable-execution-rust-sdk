@@ -1,0 +1,56 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "f4b309c0-313f-4f9c-9a29-d80cc737ada2",
+    "EventTimestamp": "2026-02-26T23:15:07.992Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 2,
+    "Id": "574ac3e9b51b4a6e0f4cc75b6dcb3705",
+    "EventTimestamp": "2026-02-26T23:15:07.993Z",
+    "Name": "misuse_wait_condition",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "StepStarted",
+    "EventId": 3,
+    "Id": "d34fb40b982add124179ee784bbd7db1",
+    "EventTimestamp": "2026-02-26T23:15:07.993Z",
+    "SubType": "wait_for_condition",
+    "Name": "wait_for_condition",
+    "StepStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 4,
+    "Id": "d34fb40b982add124179ee784bbd7db1",
+    "EventTimestamp": "2026-02-26T23:15:07.993Z",
+    "SubType": "wait_for_condition",
+    "Name": "wait_for_condition",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"condition_met\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 5,
+    "Id": "574ac3e9b51b4a6e0f4cc75b6dcb3705",
+    "EventTimestamp": "2026-02-26T23:15:07.993Z",
+    "Name": "misuse_wait_condition",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "\"condition_met\""
+      }
+    }
+  }
+]

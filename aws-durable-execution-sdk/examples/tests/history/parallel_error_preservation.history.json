@@ -1,0 +1,208 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "11a9c155-ee39-437b-8986-2fe9fcebf852",
+    "EventTimestamp": "2026-02-26T22:19:10.493Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 2,
+    "Id": "61b6063a447045b9e791ede078e54ea1",
+    "EventTimestamp": "2026-02-26T22:19:10.493Z",
+    "Name": "map",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 3,
+    "Id": "e13a31e64cc8eaee7636760b666632fd",
+    "EventTimestamp": "2026-02-26T22:19:10.493Z",
+    "Name": "map-item-0",
+    "ParentId": "61b6063a447045b9e791ede078e54ea1",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 4,
+    "Id": "b040b0a8609b5acdb25a3d9c68f40285",
+    "EventTimestamp": "2026-02-26T22:19:10.493Z",
+    "Name": "map-item-1",
+    "ParentId": "61b6063a447045b9e791ede078e54ea1",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 5,
+    "Id": "472efd8dd090075d331fa441b96dbfa0",
+    "EventTimestamp": "2026-02-26T22:19:10.493Z",
+    "Name": "map-item-2",
+    "ParentId": "61b6063a447045b9e791ede078e54ea1",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 6,
+    "Id": "ef9d16ce3ee8956f645e1d793d5dbb95",
+    "EventTimestamp": "2026-02-26T22:19:10.493Z",
+    "Name": "map-item-3",
+    "ParentId": "61b6063a447045b9e791ede078e54ea1",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 7,
+    "Id": "89ef6c1823735676acfff18193073e90",
+    "EventTimestamp": "2026-02-26T22:19:10.493Z",
+    "Name": "map-item-4",
+    "ParentId": "61b6063a447045b9e791ede078e54ea1",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 8,
+    "Id": "964876e09022fca1158120ab409e278d",
+    "EventTimestamp": "2026-02-26T22:19:10.494Z",
+    "ParentId": "e13a31e64cc8eaee7636760b666632fd",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"item 1 ok\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepFailed",
+    "EventId": 9,
+    "Id": "094241fea6bfd718c7f6d964536797fa",
+    "EventTimestamp": "2026-02-26T22:19:10.494Z",
+    "ParentId": "b040b0a8609b5acdb25a3d9c68f40285",
+    "StepFailedDetails": {
+      "Error": {
+        "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"Item 2 failed: even numbers not allowed\"}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 10,
+    "Id": "6e94becd68b1a90e45f161032d4e5936",
+    "EventTimestamp": "2026-02-26T22:19:10.494Z",
+    "ParentId": "472efd8dd090075d331fa441b96dbfa0",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"item 3 ok\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepFailed",
+    "EventId": 11,
+    "Id": "e093ab0f6a69387d20e86b724ee15f50",
+    "EventTimestamp": "2026-02-26T22:19:10.494Z",
+    "ParentId": "ef9d16ce3ee8956f645e1d793d5dbb95",
+    "StepFailedDetails": {
+      "Error": {
+        "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"Item 4 failed: even numbers not allowed\"}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 12,
+    "Id": "b5466555cd1b7768c93015289c36eca5",
+    "EventTimestamp": "2026-02-26T22:19:10.494Z",
+    "ParentId": "89ef6c1823735676acfff18193073e90",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"item 5 ok\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 13,
+    "Id": "e13a31e64cc8eaee7636760b666632fd",
+    "EventTimestamp": "2026-02-26T22:19:10.494Z",
+    "Name": "map-item-0",
+    "ParentId": "61b6063a447045b9e791ede078e54ea1",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "\"item 1 ok\""
+      }
+    }
+  },
+  {
+    "EventType": "ContextFailed",
+    "EventId": 14,
+    "Id": "b040b0a8609b5acdb25a3d9c68f40285",
+    "EventTimestamp": "2026-02-26T22:19:10.494Z",
+    "Name": "map-item-1",
+    "ParentId": "61b6063a447045b9e791ede078e54ea1",
+    "ContextFailedDetails": {
+      "Error": {
+        "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"Item 2 failed: even numbers not allowed\"}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 15,
+    "Id": "472efd8dd090075d331fa441b96dbfa0",
+    "EventTimestamp": "2026-02-26T22:19:10.494Z",
+    "Name": "map-item-2",
+    "ParentId": "61b6063a447045b9e791ede078e54ea1",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "\"item 3 ok\""
+      }
+    }
+  },
+  {
+    "EventType": "ContextFailed",
+    "EventId": 16,
+    "Id": "ef9d16ce3ee8956f645e1d793d5dbb95",
+    "EventTimestamp": "2026-02-26T22:19:10.494Z",
+    "Name": "map-item-3",
+    "ParentId": "61b6063a447045b9e791ede078e54ea1",
+    "ContextFailedDetails": {
+      "Error": {
+        "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"Item 4 failed: even numbers not allowed\"}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 17,
+    "Id": "89ef6c1823735676acfff18193073e90",
+    "EventTimestamp": "2026-02-26T22:19:10.494Z",
+    "Name": "map-item-4",
+    "ParentId": "61b6063a447045b9e791ede078e54ea1",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "\"item 5 ok\""
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 18,
+    "Id": "61b6063a447045b9e791ede078e54ea1",
+    "EventTimestamp": "2026-02-26T22:19:10.494Z",
+    "Name": "map",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "{\"items\":[{\"index\":0,\"status\":\"Succeeded\",\"result\":\"item 1 ok\",\"error\":null},{\"index\":1,\"status\":\"Failed\",\"result\":null,\"error\":{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"Item 2 failed: even numbers not allowed\"}},{\"index\":2,\"status\":\"Succeeded\",\"result\":\"item 3 ok\",\"error\":null},{\"index\":3,\"status\":\"Failed\",\"result\":null,\"error\":{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"Item 4 failed: even numbers not allowed\"}},{\"index\":4,\"status\":\"Succeeded\",\"result\":\"item 5 ok\",\"error\":null}],\"completion_reason\":\"AllCompleted\"}"
+      }
+    }
+  }
+]

@@ -1,20 +1,72 @@
-{
-  "events": [
-    {
-      "event_type": "Execution"
-    },
-    {
-      "event_type": "Step",
-      "name": "any"
-    },
-    {
-      "event_type": "Step"
-    },
-    {
-      "event_type": "Step"
-    },
-    {
-      "event_type": "Step"
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "70aae4a5-e5aa-4f1f-a27e-687fb7b2ed05",
+    "EventTimestamp": "2026-01-20T23:17:39.256Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
     }
-  ]
-}
+  },
+  {
+    "EventType": "StepStarted",
+    "EventId": 2,
+    "Id": "872cad4478018d9fa5abdde9d5095b5f",
+    "EventTimestamp": "2026-01-20T23:17:39.263Z",
+    "SubType": "PromiseCombinator",
+    "Name": "any",
+    "StepStartedDetails": {}
+  },
+  {
+    "EventType": "StepFailed",
+    "EventId": 3,
+    "Id": "f6fbda6ff42aff579e320bfae3fd453d",
+    "EventTimestamp": "2026-01-20T23:17:39.274Z",
+    "StepFailedDetails": {
+      "Error": {
+        "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"primary unavailable\"}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 4,
+    "Id": "e6702614291de2591a027e86e647ad80",
+    "EventTimestamp": "2026-01-20T23:17:39.274Z",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"data from secondary\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 5,
+    "Id": "4fbd108097705d16c17ca55f76f65c18",
+    "EventTimestamp": "2026-01-20T23:17:39.274Z",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"data from fallback\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 6,
+    "Id": "872cad4478018d9fa5abdde9d5095b5f",
+    "EventTimestamp": "2026-01-20T23:17:39.284Z",
+    "SubType": "PromiseCombinator",
+    "Name": "any",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"data from secondary\""
+      },
+      "RetryDetails": {}
+    }
+  }
+]

@@ -1,0 +1,52 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "18f3a24e-83ad-4321-8415-4ffe1851a9b7",
+    "EventTimestamp": "2026-02-26T23:28:01.312Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 2,
+    "Id": "7e3a3c40fcfe136d57be3886ec9657e8",
+    "EventTimestamp": "2026-02-26T23:28:01.313Z",
+    "Name": "batched_step_1",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"batched_1\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 3,
+    "Id": "c56832ca96287775416adaea6a6094b9",
+    "EventTimestamp": "2026-02-26T23:28:01.313Z",
+    "Name": "batched_step_2",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"batched_2\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 4,
+    "Id": "986e407635df4786c88445d9f023a4e9",
+    "EventTimestamp": "2026-02-26T23:28:01.313Z",
+    "Name": "batched_step_3",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"batched_3\""
+      },
+      "RetryDetails": {}
+    }
+  }
+]

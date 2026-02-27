@@ -1,15 +1,35 @@
-{
-  "events": [
-    {
-      "event_type": "Execution"
-    },
-    {
-      "event_type": "Wait",
-      "name": "seconds_wait"
-    },
-    {
-      "event_type": "Wait",
-      "name": "minutes_wait"
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "e679cb62-da87-4a01-b5bf-2d679ea9783e",
+    "EventTimestamp": "2026-01-20T23:17:39.523Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
     }
-  ]
-}
+  },
+  {
+    "EventType": "WaitStarted",
+    "EventId": 2,
+    "Id": "23b8088d3a4503cdcf6fe3739d561a59",
+    "EventTimestamp": "2026-01-20T23:17:39.533Z",
+    "Name": "seconds_wait",
+    "WaitStartedDetails": {
+      "Duration": "PT30S",
+      "ScheduledEndTimestamp": "2026-01-20T23:18:09.533Z"
+    }
+  },
+  {
+    "EventType": "WaitStarted",
+    "EventId": 3,
+    "Id": "677377c78709ec16232c8d96fbb32f00",
+    "EventTimestamp": "2026-01-20T23:17:39.603Z",
+    "Name": "minutes_wait",
+    "WaitStartedDetails": {
+      "Duration": "PT60S",
+      "ScheduledEndTimestamp": "2026-01-20T23:18:39.603Z"
+    }
+  }
+]

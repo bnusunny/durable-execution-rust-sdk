@@ -1,31 +1,85 @@
-{
-  "events": [
-    {
-      "event_type": "Execution"
-    },
-    {
-      "event_type": "Step",
-      "name": "stage_1_process"
-    },
-    {
-      "event_type": "Wait",
-      "name": "wait_before_stage_2"
-    },
-    {
-      "event_type": "Step",
-      "name": "stage_2_process"
-    },
-    {
-      "event_type": "Wait",
-      "name": "wait_before_stage_3"
-    },
-    {
-      "event_type": "Step",
-      "name": "stage_3_process"
-    },
-    {
-      "event_type": "Wait",
-      "name": "final_cooldown"
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "949f464b-4cd8-4402-a568-be242283dcee",
+    "EventTimestamp": "2026-01-20T23:17:39.523Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
     }
-  ]
-}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 2,
+    "Id": "b8d7d89e69d1143f6cb29c8769bb7898",
+    "EventTimestamp": "2026-01-20T23:17:39.533Z",
+    "Name": "stage_1_process",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"stage 1 complete\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "WaitStarted",
+    "EventId": 3,
+    "Id": "de81246a8c7cef8d62f4dcccd2932621",
+    "EventTimestamp": "2026-01-20T23:17:39.553Z",
+    "Name": "wait_before_stage_2",
+    "WaitStartedDetails": {
+      "Duration": "PT5S",
+      "ScheduledEndTimestamp": "2026-01-20T23:17:44.553Z"
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 4,
+    "Id": "4a5894cf39ec35d2bdbc368b7b79274f",
+    "EventTimestamp": "2026-01-20T23:17:39.613Z",
+    "Name": "stage_2_process",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"stage 2 complete\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "WaitStarted",
+    "EventId": 5,
+    "Id": "b428de6951d7d41d46fdc2e08372686f",
+    "EventTimestamp": "2026-01-20T23:17:39.614Z",
+    "Name": "wait_before_stage_3",
+    "WaitStartedDetails": {
+      "Duration": "PT10S",
+      "ScheduledEndTimestamp": "2026-01-20T23:17:49.614Z"
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 6,
+    "Id": "54e3f0b42b8457c74d0cca895790fc94",
+    "EventTimestamp": "2026-01-20T23:17:39.616Z",
+    "Name": "stage_3_process",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"stage 3 complete\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "WaitStarted",
+    "EventId": 7,
+    "Id": "a1f1506e5003cecbedf5ee4d43b53329",
+    "EventTimestamp": "2026-01-20T23:17:39.623Z",
+    "Name": "final_cooldown",
+    "WaitStartedDetails": {
+      "Duration": "PT2S",
+      "ScheduledEndTimestamp": "2026-01-20T23:17:41.623Z"
+    }
+  }
+]

@@ -1,0 +1,26 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "1b583ccc-274b-4b0a-a071-33276071d3f2",
+    "EventTimestamp": "2026-02-26T23:27:33.979Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "StepFailed",
+    "EventId": 2,
+    "Id": "87fa404a1a009fe11feadacedc7ae40e",
+    "EventTimestamp": "2026-02-26T23:27:33.979Z",
+    "Name": "always_fails",
+    "StepFailedDetails": {
+      "Error": {
+        "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"deterministic_failure\"}"
+      },
+      "RetryDetails": {}
+    }
+  }
+]

@@ -1,10 +1,23 @@
-{
-  "events": [
-    {
-      "event_type": "Execution"
-    },
-    {
-      "event_type": "Wait"
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "e27cfebe-bbf8-4206-b0ba-48af91c1a0ad",
+    "EventTimestamp": "2026-01-20T23:17:39.523Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
     }
-  ]
-}
+  },
+  {
+    "EventType": "WaitStarted",
+    "EventId": 2,
+    "Id": "d21d7bcfa8ed9631fbd1b216df57fd02",
+    "EventTimestamp": "2026-01-20T23:17:39.533Z",
+    "WaitStartedDetails": {
+      "Duration": "PT2S",
+      "ScheduledEndTimestamp": "2026-01-20T23:17:41.533Z"
+    }
+  }
+]

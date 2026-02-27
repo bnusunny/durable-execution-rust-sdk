@@ -1,21 +1,81 @@
-{
-  "events": [
-    {
-      "event_type": "Execution"
-    },
-    {
-      "event_type": "Context",
-      "name": "level_1"
-    },
-    {
-      "event_type": "Step"
-    },
-    {
-      "event_type": "Context",
-      "name": "level_2"
-    },
-    {
-      "event_type": "Step"
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "df095fc4-8ca4-4fab-a432-e19527a0bf14",
+    "EventTimestamp": "2026-01-20T23:17:39.173Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
     }
-  ]
-}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 2,
+    "Id": "b8c310493725745452bb3455fcd1ab8c",
+    "EventTimestamp": "2026-01-20T23:17:39.173Z",
+    "Name": "level_1",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 3,
+    "Id": "b7845eb5fdeda58fa32af8de63c33b05",
+    "EventTimestamp": "2026-01-20T23:17:39.174Z",
+    "ParentId": "b8c310493725745452bb3455fcd1ab8c",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "{\"level\":1,\"value\":\"level 1 complete\"}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 4,
+    "Id": "05fec08c60f245f7b3f94ead0740c665",
+    "EventTimestamp": "2026-01-20T23:17:39.174Z",
+    "Name": "level_2",
+    "ParentId": "b8c310493725745452bb3455fcd1ab8c",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 5,
+    "Id": "59182087d12087712cc9cee5753fbdf9",
+    "EventTimestamp": "2026-01-20T23:17:39.174Z",
+    "ParentId": "05fec08c60f245f7b3f94ead0740c665",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "{\"level\":2,\"value\":\"level 2 complete\"}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 6,
+    "Id": "05fec08c60f245f7b3f94ead0740c665",
+    "EventTimestamp": "2026-01-20T23:17:39.174Z",
+    "Name": "level_2",
+    "ParentId": "b8c310493725745452bb3455fcd1ab8c",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "{\"level\":2,\"value\":\"level 2 complete\"}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 7,
+    "Id": "b8c310493725745452bb3455fcd1ab8c",
+    "EventTimestamp": "2026-01-20T23:17:39.174Z",
+    "Name": "level_1",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "[{\"level\":1,\"value\":\"level 1 complete\"},{\"level\":2,\"value\":\"level 2 complete\"}]"
+      }
+    }
+  }
+]

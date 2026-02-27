@@ -1,0 +1,45 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "be4b4278-c2af-454b-bea1-634cec8685f4",
+    "EventTimestamp": "2026-02-26T23:12:52.801Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 2,
+    "Id": "71e304e093cae00c79a6b2af21b43608",
+    "EventTimestamp": "2026-02-26T23:12:52.801Z",
+    "Name": "child_context",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 3,
+    "Id": "df57b090a09d60540e1307f4109667ef",
+    "EventTimestamp": "2026-02-26T23:12:52.801Z",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"from_parent\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 4,
+    "Id": "71e304e093cae00c79a6b2af21b43608",
+    "EventTimestamp": "2026-02-26T23:12:52.801Z",
+    "Name": "child_context",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "\"from_parent\""
+      }
+    }
+  }
+]

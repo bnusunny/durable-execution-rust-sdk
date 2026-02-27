@@ -1,32 +1,138 @@
-{
-  "events": [
-    {
-      "event_type": "Execution"
-    },
-    {
-      "event_type": "Context",
-      "name": "map"
-    },
-    {
-      "event_type": "Context",
-      "name": "map-item-0"
-    },
-    {
-      "event_type": "Context",
-      "name": "map-item-1"
-    },
-    {
-      "event_type": "Context",
-      "name": "map-item-2"
-    },
-    {
-      "event_type": "Step"
-    },
-    {
-      "event_type": "Step"
-    },
-    {
-      "event_type": "Step"
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "342bca92-9343-4d7d-94c4-6ced9cbb3879",
+    "EventTimestamp": "2026-01-20T23:17:39.256Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
     }
-  ]
-}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 2,
+    "Id": "b1c9ab82763b3b8481844d970dd2a657",
+    "EventTimestamp": "2026-01-20T23:17:39.259Z",
+    "Name": "map",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 3,
+    "Id": "eb18b960f2b5def43cc46253b4109676",
+    "EventTimestamp": "2026-01-20T23:17:39.263Z",
+    "Name": "map-item-0",
+    "ParentId": "b1c9ab82763b3b8481844d970dd2a657",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 4,
+    "Id": "a1226ac3938803698436b310e07a61c5",
+    "EventTimestamp": "2026-01-20T23:17:39.263Z",
+    "Name": "map-item-1",
+    "ParentId": "b1c9ab82763b3b8481844d970dd2a657",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 5,
+    "Id": "435cb95c0551f917e24bff6f864805c0",
+    "EventTimestamp": "2026-01-20T23:17:39.263Z",
+    "Name": "map-item-2",
+    "ParentId": "b1c9ab82763b3b8481844d970dd2a657",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 6,
+    "Id": "be3a16459a6f6b8a8e4b9895a3a10b8e",
+    "EventTimestamp": "2026-01-20T23:17:39.273Z",
+    "ParentId": "eb18b960f2b5def43cc46253b4109676",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"fast result\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 7,
+    "Id": "2a45fd35eec276129e4aa1c905231b31",
+    "EventTimestamp": "2026-01-20T23:17:39.274Z",
+    "ParentId": "a1226ac3938803698436b310e07a61c5",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"medium result\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 8,
+    "Id": "b1347263494f5a2b81ba150b33084e09",
+    "EventTimestamp": "2026-01-20T23:17:39.274Z",
+    "ParentId": "435cb95c0551f917e24bff6f864805c0",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"slow result\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 9,
+    "Id": "eb18b960f2b5def43cc46253b4109676",
+    "EventTimestamp": "2026-01-20T23:17:39.284Z",
+    "Name": "map-item-0",
+    "ParentId": "b1c9ab82763b3b8481844d970dd2a657",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "\"fast result\""
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 10,
+    "Id": "a1226ac3938803698436b310e07a61c5",
+    "EventTimestamp": "2026-01-20T23:17:39.284Z",
+    "Name": "map-item-1",
+    "ParentId": "b1c9ab82763b3b8481844d970dd2a657",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "\"medium result\""
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 11,
+    "Id": "435cb95c0551f917e24bff6f864805c0",
+    "EventTimestamp": "2026-01-20T23:17:39.284Z",
+    "Name": "map-item-2",
+    "ParentId": "b1c9ab82763b3b8481844d970dd2a657",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "\"slow result\""
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 12,
+    "Id": "b1c9ab82763b3b8481844d970dd2a657",
+    "EventTimestamp": "2026-01-20T23:17:39.294Z",
+    "Name": "map",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "{\"items\":[{\"index\":0,\"status\":\"Succeeded\",\"result\":\"fast result\",\"error\":null},{\"index\":1,\"status\":\"Succeeded\",\"result\":\"medium result\",\"error\":null},{\"index\":2,\"status\":\"Succeeded\",\"result\":\"slow result\",\"error\":null}],\"completion_reason\":\"MinSuccessfulReached\"}"
+      }
+    }
+  }
+]

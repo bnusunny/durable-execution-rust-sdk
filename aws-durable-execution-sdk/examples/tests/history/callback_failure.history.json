@@ -1,0 +1,25 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "07b7f549-e878-450f-809f-22e2d74cd95b",
+    "EventTimestamp": "2026-02-26T21:49:51.377Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "CallbackStarted",
+    "EventId": 2,
+    "Id": "4ff124282be5c7814275014284bfc42e",
+    "EventTimestamp": "2026-02-26T21:49:51.378Z",
+    "Name": "failure_callback",
+    "CallbackStartedDetails": {
+      "CallbackId": "b546f1b7-52b5-4fa9-a2d0-3dd4c4ffcc86",
+      "Timeout": 0,
+      "HeartbeatTimeout": 0
+    }
+  }
+]

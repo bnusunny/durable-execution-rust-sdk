@@ -1,15 +1,37 @@
-{
-  "events": [
-    {
-      "event_type": "Execution"
-    },
-    {
-      "event_type": "Callback",
-      "name": "credit_check"
-    },
-    {
-      "event_type": "Callback",
-      "name": "fraud_check"
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "0c3e14b1-27da-4ef8-938d-76794f864228",
+    "EventTimestamp": "2026-01-20T23:17:39.166Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
     }
-  ]
-}
+  },
+  {
+    "EventType": "CallbackStarted",
+    "EventId": 2,
+    "Id": "949e15cfc99e72b58271754daaa47d20",
+    "EventTimestamp": "2026-01-20T23:17:39.167Z",
+    "Name": "credit_check",
+    "CallbackStartedDetails": {
+      "CallbackId": "72e27693-9307-4f3d-b1ac-b7660fc73bad",
+      "Timeout": 300,
+      "HeartbeatTimeout": 0
+    }
+  },
+  {
+    "EventType": "CallbackStarted",
+    "EventId": 3,
+    "Id": "40355a09eac9ee5b184e11955d6b3d30",
+    "EventTimestamp": "2026-01-20T23:17:39.167Z",
+    "Name": "fraud_check",
+    "CallbackStartedDetails": {
+      "CallbackId": "4f5e837d-168b-4077-875e-eec28c31152e",
+      "Timeout": 300,
+      "HeartbeatTimeout": 0
+    }
+  }
+]

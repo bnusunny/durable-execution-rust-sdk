@@ -1,0 +1,81 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "5fe56115-5b79-4723-b8cd-cadbdb670c2b",
+    "EventTimestamp": "2026-02-26T21:37:49.152Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 2,
+    "Id": "48a6f7eec9089fd86e2e7673d44a238a",
+    "EventTimestamp": "2026-02-26T21:37:49.152Z",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"prepared\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 3,
+    "Id": "046e85bb3a92734415836acd2d424ba4",
+    "EventTimestamp": "2026-02-26T21:37:49.152Z",
+    "Name": "child_context",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "CallbackStarted",
+    "EventId": 4,
+    "Id": "1f081d90cc0e3941168354588b2b4f07",
+    "EventTimestamp": "2026-02-26T21:37:49.152Z",
+    "ParentId": "046e85bb3a92734415836acd2d424ba4",
+    "CallbackStartedDetails": {
+      "CallbackId": "f06c533a-b955-41a3-bbb8-19c4bf1697e9",
+      "Timeout": 0,
+      "HeartbeatTimeout": 0
+    }
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 5,
+    "Id": "4538cf9b7a6ed95f9aa96ee30841af4d",
+    "EventTimestamp": "2026-02-26T21:37:49.152Z",
+    "Name": "wait_for_callback_submitter",
+    "ParentId": "046e85bb3a92734415836acd2d424ba4",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 6,
+    "Id": "d5e781bcaeae01b501f1b00a2da8c8d1",
+    "EventTimestamp": "2026-02-26T21:37:49.153Z",
+    "Name": "execute_submitter",
+    "ParentId": "4538cf9b7a6ed95f9aa96ee30841af4d",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "null"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 7,
+    "Id": "4538cf9b7a6ed95f9aa96ee30841af4d",
+    "EventTimestamp": "2026-02-26T21:37:49.153Z",
+    "Name": "wait_for_callback_submitter",
+    "ParentId": "046e85bb3a92734415836acd2d424ba4",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "null"
+      }
+    }
+  }
+]

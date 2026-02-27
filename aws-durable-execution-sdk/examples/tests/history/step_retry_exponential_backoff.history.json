@@ -1,0 +1,26 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "092a9346-75cf-466c-8266-4a6789216b0a",
+    "EventTimestamp": "2026-02-26T23:27:17.352Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 2,
+    "Id": "c7829b887ae1010dc1a6a1fc733b4f4f",
+    "EventTimestamp": "2026-02-26T23:27:17.362Z",
+    "Name": "retryable_operation",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"operation_succeeded\""
+      },
+      "RetryDetails": {}
+    }
+  }
+]

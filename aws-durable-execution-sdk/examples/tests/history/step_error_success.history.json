@@ -1,11 +1,26 @@
-{
-  "events": [
-    {
-      "event_type": "Execution"
-    },
-    {
-      "event_type": "Step",
-      "name": "process_value"
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "235d58c2-6844-48cd-a6d6-8c61f84fc35d",
+    "EventTimestamp": "2026-01-20T23:17:39.192Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{\"value\":42,\"should_fail\":false}"
+      }
     }
-  ]
-}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 2,
+    "Id": "e0e8df29c1ee8da68c4db8365b005dfc",
+    "EventTimestamp": "2026-01-20T23:17:39.192Z",
+    "Name": "process_value",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "84"
+      },
+      "RetryDetails": {}
+    }
+  }
+]

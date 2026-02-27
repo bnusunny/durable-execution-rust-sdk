@@ -1,19 +1,61 @@
-{
-  "events": [
-    {
-      "event_type": "Execution"
-    },
-    {
-      "event_type": "Context",
-      "name": "sub_workflow"
-    },
-    {
-      "event_type": "Step",
-      "name": "child_step_1"
-    },
-    {
-      "event_type": "Step",
-      "name": "child_step_2"
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "e9fd8e7d-028a-45da-b550-bfa45c22cc8b",
+    "EventTimestamp": "2026-01-20T23:17:39.173Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
     }
-  ]
-}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 2,
+    "Id": "da7815e7dc472cfe28b0075da06adc52",
+    "EventTimestamp": "2026-01-20T23:17:39.173Z",
+    "Name": "sub_workflow",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 3,
+    "Id": "c11a08b2fdb54306d85f44ff961e08c0",
+    "EventTimestamp": "2026-01-20T23:17:39.174Z",
+    "Name": "child_step_1",
+    "ParentId": "da7815e7dc472cfe28b0075da06adc52",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"child step 1 done\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 4,
+    "Id": "44e74c332d230d1f0203127011b706e7",
+    "EventTimestamp": "2026-01-20T23:17:39.174Z",
+    "Name": "child_step_2",
+    "ParentId": "da7815e7dc472cfe28b0075da06adc52",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"child step 2 done\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 5,
+    "Id": "da7815e7dc472cfe28b0075da06adc52",
+    "EventTimestamp": "2026-01-20T23:17:39.174Z",
+    "Name": "sub_workflow",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "{\"step1\":\"child step 1 done\",\"step2\":\"child step 2 done\"}"
+      }
+    }
+  }
+]

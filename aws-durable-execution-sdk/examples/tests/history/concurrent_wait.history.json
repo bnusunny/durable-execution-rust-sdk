@@ -1,0 +1,46 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "f6379e43-20de-4ed0-97fa-8af05db9ff4e",
+    "EventTimestamp": "2026-02-26T23:15:53.027Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "WaitStarted",
+    "EventId": 2,
+    "Id": "7b088b2907fb4efceb7ac465db954fef",
+    "EventTimestamp": "2026-02-26T23:15:53.027Z",
+    "Name": "wait_1",
+    "WaitStartedDetails": {
+      "Duration": "PT1S",
+      "ScheduledEndTimestamp": "2026-02-26T23:15:54.027Z"
+    }
+  },
+  {
+    "EventType": "WaitStarted",
+    "EventId": 3,
+    "Id": "ac7be90c117c40cb4ceefc204347425c",
+    "EventTimestamp": "2026-02-26T23:15:53.027Z",
+    "Name": "wait_2",
+    "WaitStartedDetails": {
+      "Duration": "PT2S",
+      "ScheduledEndTimestamp": "2026-02-26T23:15:55.027Z"
+    }
+  },
+  {
+    "EventType": "WaitStarted",
+    "EventId": 4,
+    "Id": "c4a871754ecba2600440e9f3d406acb0",
+    "EventTimestamp": "2026-02-26T23:15:53.027Z",
+    "Name": "wait_3",
+    "WaitStartedDetails": {
+      "Duration": "PT3S",
+      "ScheduledEndTimestamp": "2026-02-26T23:15:56.027Z"
+    }
+  }
+]

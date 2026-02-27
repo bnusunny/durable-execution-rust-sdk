@@ -1,32 +1,124 @@
-{
-  "events": [
-    {
-      "event_type": "Execution"
-    },
-    {
-      "event_type": "Context",
-      "name": "check_inventory"
-    },
-    {
-      "event_type": "Step"
-    },
-    {
-      "event_type": "Context",
-      "name": "process_payment"
-    },
-    {
-      "event_type": "Wait",
-      "name": "payment_delay"
-    },
-    {
-      "event_type": "Step"
-    },
-    {
-      "event_type": "Context",
-      "name": "calculate_shipping"
-    },
-    {
-      "event_type": "Step"
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "e198e085-821f-42ba-805c-707a45a60ef2",
+    "EventTimestamp": "2026-01-20T23:17:39.213Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
     }
-  ]
-}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 2,
+    "Id": "8c870a3292aa93e89b7d22ebce6e8be1",
+    "EventTimestamp": "2026-01-20T23:17:39.214Z",
+    "Name": "check_inventory",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 3,
+    "Id": "407d98e7eee04ca47d94ef51bc68b8f0",
+    "EventTimestamp": "2026-01-20T23:17:39.215Z",
+    "ParentId": "8c870a3292aa93e89b7d22ebce6e8be1",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"inventory_available\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 4,
+    "Id": "8c870a3292aa93e89b7d22ebce6e8be1",
+    "EventTimestamp": "2026-01-20T23:17:39.215Z",
+    "Name": "check_inventory",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "\"inventory_available\""
+      }
+    }
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 5,
+    "Id": "d9e9f3a36ea0a06335e76db7fd70cee6",
+    "EventTimestamp": "2026-01-20T23:17:39.216Z",
+    "Name": "process_payment",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "WaitStarted",
+    "EventId": 6,
+    "Id": "c4ae8ccc62273195c41dcea2bd2d527c",
+    "EventTimestamp": "2026-01-20T23:17:39.216Z",
+    "Name": "payment_delay",
+    "ParentId": "d9e9f3a36ea0a06335e76db7fd70cee6",
+    "WaitStartedDetails": {
+      "Duration": "PT1S",
+      "ScheduledEndTimestamp": "2026-01-20T23:17:40.216Z"
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 7,
+    "Id": "725367d208ff5ba6a0c4efbd6f3d4ca6",
+    "EventTimestamp": "2026-01-20T23:17:39.221Z",
+    "ParentId": "d9e9f3a36ea0a06335e76db7fd70cee6",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"payment_completed\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 8,
+    "Id": "d9e9f3a36ea0a06335e76db7fd70cee6",
+    "EventTimestamp": "2026-01-20T23:17:39.221Z",
+    "Name": "process_payment",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "\"payment_completed\""
+      }
+    }
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 9,
+    "Id": "4dc533a896826eb57e32dba95e919847",
+    "EventTimestamp": "2026-01-20T23:17:39.222Z",
+    "Name": "calculate_shipping",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 10,
+    "Id": "53a8224bbc377ce92e0b10c2c2aadc3f",
+    "EventTimestamp": "2026-01-20T23:17:39.222Z",
+    "ParentId": "4dc533a896826eb57e32dba95e919847",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"shipping_calculated\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 11,
+    "Id": "4dc533a896826eb57e32dba95e919847",
+    "EventTimestamp": "2026-01-20T23:17:39.222Z",
+    "Name": "calculate_shipping",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "\"shipping_calculated\""
+      }
+    }
+  }
+]

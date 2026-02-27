@@ -1,17 +1,60 @@
-{
-  "events": [
-    {
-      "event_type": "Execution"
-    },
-    {
-      "event_type": "Step",
-      "name": "race"
-    },
-    {
-      "event_type": "Step"
-    },
-    {
-      "event_type": "Step"
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "c97cc0f4-c147-4e0b-8330-5e786ee3db7b",
+    "EventTimestamp": "2026-01-20T23:17:39.256Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
     }
-  ]
-}
+  },
+  {
+    "EventType": "StepStarted",
+    "EventId": 2,
+    "Id": "177af12e23e82696240a1033771e52a7",
+    "EventTimestamp": "2026-01-20T23:17:39.263Z",
+    "SubType": "PromiseCombinator",
+    "Name": "race",
+    "StepStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 3,
+    "Id": "48fb0c494ad5003e953dc36ea59acd70",
+    "EventTimestamp": "2026-01-20T23:17:39.273Z",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"operation completed\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepFailed",
+    "EventId": 4,
+    "Id": "72416e02100f2842cdfbece049f288e5",
+    "EventTimestamp": "2026-01-20T23:17:39.273Z",
+    "StepFailedDetails": {
+      "Error": {
+        "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"operation timed out\"}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 5,
+    "Id": "177af12e23e82696240a1033771e52a7",
+    "EventTimestamp": "2026-01-20T23:17:39.284Z",
+    "SubType": "PromiseCombinator",
+    "Name": "race",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"operation completed\""
+      },
+      "RetryDetails": {}
+    }
+  }
+]

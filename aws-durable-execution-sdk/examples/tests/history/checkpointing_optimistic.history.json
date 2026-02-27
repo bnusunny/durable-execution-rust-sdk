@@ -1,0 +1,52 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "4ac9ef05-53c6-4f2e-87f4-e365c40dfdf5",
+    "EventTimestamp": "2026-02-26T23:28:09.165Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 2,
+    "Id": "eacea5185de2ea1ecde536d61713bc8b",
+    "EventTimestamp": "2026-02-26T23:28:09.165Z",
+    "Name": "optimistic_step_1",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"fast_1\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 3,
+    "Id": "0878debeeddcd752b4689d6c083f1224",
+    "EventTimestamp": "2026-02-26T23:28:09.165Z",
+    "Name": "optimistic_step_2",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"fast_2\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 4,
+    "Id": "055b6c9b197fceb0b1713f9f33d5273f",
+    "EventTimestamp": "2026-02-26T23:28:09.166Z",
+    "Name": "optimistic_step_3",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"fast_3\""
+      },
+      "RetryDetails": {}
+    }
+  }
+]

@@ -1,17 +1,60 @@
-{
-  "events": [
-    {
-      "event_type": "Execution"
-    },
-    {
-      "event_type": "Step",
-      "name": "race"
-    },
-    {
-      "event_type": "Step"
-    },
-    {
-      "event_type": "Step"
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "8a379a9e-459b-49bc-924e-bbb033aa8b99",
+    "EventTimestamp": "2026-01-20T23:17:39.256Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
     }
-  ]
-}
+  },
+  {
+    "EventType": "StepStarted",
+    "EventId": 2,
+    "Id": "e3d7b3b714bd4bbe3863ecd7a301fde2",
+    "EventTimestamp": "2026-01-20T23:17:39.259Z",
+    "SubType": "PromiseCombinator",
+    "Name": "race",
+    "StepStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 3,
+    "Id": "ee2431ca093791d2c0de21ded5f5c997",
+    "EventTimestamp": "2026-01-20T23:17:39.259Z",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"fast result\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 4,
+    "Id": "5d5bc8e198681e34de47a3da502f5d98",
+    "EventTimestamp": "2026-01-20T23:17:39.259Z",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"slow result\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 5,
+    "Id": "e3d7b3b714bd4bbe3863ecd7a301fde2",
+    "EventTimestamp": "2026-01-20T23:17:39.262Z",
+    "SubType": "PromiseCombinator",
+    "Name": "race",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"fast result\""
+      },
+      "RetryDetails": {}
+    }
+  }
+]

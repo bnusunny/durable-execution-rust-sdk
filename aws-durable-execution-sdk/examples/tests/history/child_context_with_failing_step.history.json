@@ -1,0 +1,46 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "c1b44638-d92e-4eca-b226-9ea9b667c46c",
+    "EventTimestamp": "2026-02-26T22:59:43.625Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 2,
+    "Id": "489161855bebb58d423ad0575bffc61d",
+    "EventTimestamp": "2026-02-26T22:59:43.626Z",
+    "Name": "failing_child",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "StepFailed",
+    "EventId": 3,
+    "Id": "cb4b68056c036b5dc66abf662330560e",
+    "EventTimestamp": "2026-02-26T22:59:43.626Z",
+    "ParentId": "489161855bebb58d423ad0575bffc61d",
+    "StepFailedDetails": {
+      "Error": {
+        "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"step failed intentionally\"}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextFailed",
+    "EventId": 4,
+    "Id": "489161855bebb58d423ad0575bffc61d",
+    "EventTimestamp": "2026-02-26T22:59:43.626Z",
+    "Name": "failing_child",
+    "ContextFailedDetails": {
+      "Error": {
+        "Payload": "{\"ErrorType\":\"ExecutionError\",\"ErrorMessage\":\"mapped_error: User code error: step failed intentionally\"}"
+      }
+    }
+  }
+]

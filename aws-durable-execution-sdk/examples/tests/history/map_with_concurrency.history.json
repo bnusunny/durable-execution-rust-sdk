@@ -1,91 +1,393 @@
-{
-  "events": [
-    {
-      "event_type": "Execution"
-    },
-    {
-      "event_type": "Context",
-      "name": "map"
-    },
-    {
-      "event_type": "Context",
-      "name": "map-item-0"
-    },
-    {
-      "event_type": "Context",
-      "name": "map-item-1"
-    },
-    {
-      "event_type": "Context",
-      "name": "map-item-2"
-    },
-    {
-      "event_type": "Step",
-      "name": "process_0"
-    },
-    {
-      "event_type": "Step",
-      "name": "process_1"
-    },
-    {
-      "event_type": "Step",
-      "name": "process_2"
-    },
-    {
-      "event_type": "Context",
-      "name": "map-item-3"
-    },
-    {
-      "event_type": "Context",
-      "name": "map-item-4"
-    },
-    {
-      "event_type": "Context",
-      "name": "map-item-5"
-    },
-    {
-      "event_type": "Step",
-      "name": "process_3"
-    },
-    {
-      "event_type": "Step",
-      "name": "process_4"
-    },
-    {
-      "event_type": "Step",
-      "name": "process_5"
-    },
-    {
-      "event_type": "Context",
-      "name": "map-item-6"
-    },
-    {
-      "event_type": "Context",
-      "name": "map-item-7"
-    },
-    {
-      "event_type": "Context",
-      "name": "map-item-8"
-    },
-    {
-      "event_type": "Step",
-      "name": "process_6"
-    },
-    {
-      "event_type": "Step",
-      "name": "process_7"
-    },
-    {
-      "event_type": "Step",
-      "name": "process_8"
-    },
-    {
-      "event_type": "Context",
-      "name": "map-item-9"
-    },
-    {
-      "event_type": "Step",
-      "name": "process_9"
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "4f35357d-92af-4334-a91c-38f70973e8ad",
+    "EventTimestamp": "2026-01-20T23:17:39.211Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
     }
-  ]
-}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 2,
+    "Id": "471ac87db21f8d8a0347d31c9d5ae566",
+    "EventTimestamp": "2026-01-20T23:17:39.213Z",
+    "Name": "map",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 3,
+    "Id": "d20dc9159b621fa888b38ce785fdacee",
+    "EventTimestamp": "2026-01-20T23:17:39.214Z",
+    "Name": "map-item-0",
+    "ParentId": "471ac87db21f8d8a0347d31c9d5ae566",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 4,
+    "Id": "459fa992ea965ea8c107fbc0ea2a7b8e",
+    "EventTimestamp": "2026-01-20T23:17:39.214Z",
+    "Name": "map-item-1",
+    "ParentId": "471ac87db21f8d8a0347d31c9d5ae566",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 5,
+    "Id": "1e8dfb58d874531e9f7021f80606ab53",
+    "EventTimestamp": "2026-01-20T23:17:39.214Z",
+    "Name": "map-item-2",
+    "ParentId": "471ac87db21f8d8a0347d31c9d5ae566",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 6,
+    "Id": "4f68aa3e40b28fda6b5e8c3f535be2ff",
+    "EventTimestamp": "2026-01-20T23:17:39.215Z",
+    "Name": "process_0",
+    "ParentId": "d20dc9159b621fa888b38ce785fdacee",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "{\"id\":\"item-1\",\"result\":\"processed_item-1\"}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 7,
+    "Id": "38faf818838b12bb8a89124454c452a6",
+    "EventTimestamp": "2026-01-20T23:17:39.216Z",
+    "Name": "process_1",
+    "ParentId": "459fa992ea965ea8c107fbc0ea2a7b8e",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "{\"id\":\"item-2\",\"result\":\"processed_item-2\"}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 8,
+    "Id": "9bc6bdaadf71cb7c8fdc96ff99e946e5",
+    "EventTimestamp": "2026-01-20T23:17:39.216Z",
+    "Name": "process_2",
+    "ParentId": "1e8dfb58d874531e9f7021f80606ab53",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "{\"id\":\"item-3\",\"result\":\"processed_item-3\"}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 9,
+    "Id": "d20dc9159b621fa888b38ce785fdacee",
+    "EventTimestamp": "2026-01-20T23:17:39.216Z",
+    "Name": "map-item-0",
+    "ParentId": "471ac87db21f8d8a0347d31c9d5ae566",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "{\"id\":\"item-1\",\"result\":\"processed_item-1\"}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 10,
+    "Id": "459fa992ea965ea8c107fbc0ea2a7b8e",
+    "EventTimestamp": "2026-01-20T23:17:39.218Z",
+    "Name": "map-item-1",
+    "ParentId": "471ac87db21f8d8a0347d31c9d5ae566",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "{\"id\":\"item-2\",\"result\":\"processed_item-2\"}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 11,
+    "Id": "1e8dfb58d874531e9f7021f80606ab53",
+    "EventTimestamp": "2026-01-20T23:17:39.218Z",
+    "Name": "map-item-2",
+    "ParentId": "471ac87db21f8d8a0347d31c9d5ae566",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "{\"id\":\"item-3\",\"result\":\"processed_item-3\"}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 12,
+    "Id": "222833cabb20ee32b8b712e0d51bf14a",
+    "EventTimestamp": "2026-01-20T23:17:39.218Z",
+    "Name": "map-item-3",
+    "ParentId": "471ac87db21f8d8a0347d31c9d5ae566",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 13,
+    "Id": "ec0dd03968082ea54f55907cbb8920a1",
+    "EventTimestamp": "2026-01-20T23:17:39.219Z",
+    "Name": "map-item-4",
+    "ParentId": "471ac87db21f8d8a0347d31c9d5ae566",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 14,
+    "Id": "4bde1033ce8cd7aa63ca78f6de451148",
+    "EventTimestamp": "2026-01-20T23:17:39.219Z",
+    "Name": "map-item-5",
+    "ParentId": "471ac87db21f8d8a0347d31c9d5ae566",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 15,
+    "Id": "3a7f2440977107f01d5dacf4b6340f65",
+    "EventTimestamp": "2026-01-20T23:17:39.219Z",
+    "Name": "process_3",
+    "ParentId": "222833cabb20ee32b8b712e0d51bf14a",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "{\"id\":\"item-4\",\"result\":\"processed_item-4\"}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 16,
+    "Id": "d1e21525f90e3526fd4826570b81f09a",
+    "EventTimestamp": "2026-01-20T23:17:39.219Z",
+    "Name": "process_4",
+    "ParentId": "ec0dd03968082ea54f55907cbb8920a1",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "{\"id\":\"item-5\",\"result\":\"processed_item-5\"}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 17,
+    "Id": "64a11e4e1381f941bfe6a945cda8e2d5",
+    "EventTimestamp": "2026-01-20T23:17:39.220Z",
+    "Name": "process_5",
+    "ParentId": "4bde1033ce8cd7aa63ca78f6de451148",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "{\"id\":\"item-6\",\"result\":\"processed_item-6\"}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 18,
+    "Id": "222833cabb20ee32b8b712e0d51bf14a",
+    "EventTimestamp": "2026-01-20T23:17:39.220Z",
+    "Name": "map-item-3",
+    "ParentId": "471ac87db21f8d8a0347d31c9d5ae566",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "{\"id\":\"item-4\",\"result\":\"processed_item-4\"}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 19,
+    "Id": "ec0dd03968082ea54f55907cbb8920a1",
+    "EventTimestamp": "2026-01-20T23:17:39.220Z",
+    "Name": "map-item-4",
+    "ParentId": "471ac87db21f8d8a0347d31c9d5ae566",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "{\"id\":\"item-5\",\"result\":\"processed_item-5\"}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 20,
+    "Id": "4bde1033ce8cd7aa63ca78f6de451148",
+    "EventTimestamp": "2026-01-20T23:17:39.220Z",
+    "Name": "map-item-5",
+    "ParentId": "471ac87db21f8d8a0347d31c9d5ae566",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "{\"id\":\"item-6\",\"result\":\"processed_item-6\"}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 21,
+    "Id": "ee07288e9bc9df820da1a52b7994d4ea",
+    "EventTimestamp": "2026-01-20T23:17:39.220Z",
+    "Name": "map-item-6",
+    "ParentId": "471ac87db21f8d8a0347d31c9d5ae566",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 22,
+    "Id": "560bc123d7c2fe4f25414ecca112186e",
+    "EventTimestamp": "2026-01-20T23:17:39.221Z",
+    "Name": "map-item-7",
+    "ParentId": "471ac87db21f8d8a0347d31c9d5ae566",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 23,
+    "Id": "33ab192f9b350c3e5b92ad6a5499c2a3",
+    "EventTimestamp": "2026-01-20T23:17:39.221Z",
+    "Name": "map-item-8",
+    "ParentId": "471ac87db21f8d8a0347d31c9d5ae566",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 24,
+    "Id": "b2411b91f8f2f8c7c034704a2c9aead6",
+    "EventTimestamp": "2026-01-20T23:17:39.221Z",
+    "Name": "process_6",
+    "ParentId": "ee07288e9bc9df820da1a52b7994d4ea",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "{\"id\":\"item-7\",\"result\":\"processed_item-7\"}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 25,
+    "Id": "98573f6d374211cb070ea9caaeccf003",
+    "EventTimestamp": "2026-01-20T23:17:39.221Z",
+    "Name": "process_7",
+    "ParentId": "560bc123d7c2fe4f25414ecca112186e",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "{\"id\":\"item-8\",\"result\":\"processed_item-8\"}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 26,
+    "Id": "80708072fc2aaf9dbd01d9b221ab3a2c",
+    "EventTimestamp": "2026-01-20T23:17:39.221Z",
+    "Name": "process_8",
+    "ParentId": "33ab192f9b350c3e5b92ad6a5499c2a3",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "{\"id\":\"item-9\",\"result\":\"processed_item-9\"}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 27,
+    "Id": "ee07288e9bc9df820da1a52b7994d4ea",
+    "EventTimestamp": "2026-01-20T23:17:39.221Z",
+    "Name": "map-item-6",
+    "ParentId": "471ac87db21f8d8a0347d31c9d5ae566",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "{\"id\":\"item-7\",\"result\":\"processed_item-7\"}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 28,
+    "Id": "560bc123d7c2fe4f25414ecca112186e",
+    "EventTimestamp": "2026-01-20T23:17:39.222Z",
+    "Name": "map-item-7",
+    "ParentId": "471ac87db21f8d8a0347d31c9d5ae566",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "{\"id\":\"item-8\",\"result\":\"processed_item-8\"}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 29,
+    "Id": "33ab192f9b350c3e5b92ad6a5499c2a3",
+    "EventTimestamp": "2026-01-20T23:17:39.222Z",
+    "Name": "map-item-8",
+    "ParentId": "471ac87db21f8d8a0347d31c9d5ae566",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "{\"id\":\"item-9\",\"result\":\"processed_item-9\"}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 30,
+    "Id": "f02fd34cb77b84449568736f6cb087fb",
+    "EventTimestamp": "2026-01-20T23:17:39.222Z",
+    "Name": "map-item-9",
+    "ParentId": "471ac87db21f8d8a0347d31c9d5ae566",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 31,
+    "Id": "cbde6213c32ad881c174bef7ec0be7fd",
+    "EventTimestamp": "2026-01-20T23:17:39.222Z",
+    "Name": "process_9",
+    "ParentId": "f02fd34cb77b84449568736f6cb087fb",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "{\"id\":\"item-10\",\"result\":\"processed_item-10\"}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 32,
+    "Id": "f02fd34cb77b84449568736f6cb087fb",
+    "EventTimestamp": "2026-01-20T23:17:39.222Z",
+    "Name": "map-item-9",
+    "ParentId": "471ac87db21f8d8a0347d31c9d5ae566",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "{\"id\":\"item-10\",\"result\":\"processed_item-10\"}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 33,
+    "Id": "471ac87db21f8d8a0347d31c9d5ae566",
+    "EventTimestamp": "2026-01-20T23:17:39.223Z",
+    "Name": "map",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "{\"items\":[{\"index\":0,\"status\":\"Succeeded\",\"result\":{\"id\":\"item-1\",\"result\":\"processed_item-1\"},\"error\":null},{\"index\":1,\"status\":\"Succeeded\",\"result\":{\"id\":\"item-2\",\"result\":\"processed_item-2\"},\"error\":null},{\"index\":2,\"status\":\"Succeeded\",\"result\":{\"id\":\"item-3\",\"result\":\"processed_item-3\"},\"error\":null},{\"index\":3,\"status\":\"Succeeded\",\"result\":{\"id\":\"item-4\",\"result\":\"processed_item-4\"},\"error\":null},{\"index\":4,\"status\":\"Succeeded\",\"result\":{\"id\":\"item-5\",\"result\":\"processed_item-5\"},\"error\":null},{\"index\":5,\"status\":\"Succeeded\",\"result\":{\"id\":\"item-6\",\"result\":\"processed_item-6\"},\"error\":null},{\"index\":6,\"status\":\"Succeeded\",\"result\":{\"id\":\"item-7\",\"result\":\"processed_item-7\"},\"error\":null},{\"index\":7,\"status\":\"Succeeded\",\"result\":{\"id\":\"item-8\",\"result\":\"processed_item-8\"},\"error\":null},{\"index\":8,\"status\":\"Succeeded\",\"result\":{\"id\":\"item-9\",\"result\":\"processed_item-9\"},\"error\":null},{\"index\":9,\"status\":\"Succeeded\",\"result\":{\"id\":\"item-10\",\"result\":\"processed_item-10\"},\"error\":null}],\"completion_reason\":\"AllCompleted\"}"
+      }
+    }
+  }
+]

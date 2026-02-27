@@ -1,19 +1,48 @@
-{
-  "events": [
-    {
-      "event_type": "Execution"
-    },
-    {
-      "event_type": "Wait",
-      "name": "initial_delay"
-    },
-    {
-      "event_type": "Step",
-      "name": "process"
-    },
-    {
-      "event_type": "Wait",
-      "name": "cooldown_period"
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "33c57771-6ed0-4b04-82cf-1a4152a0d343",
+    "EventTimestamp": "2026-01-20T23:17:39.523Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
     }
-  ]
-}
+  },
+  {
+    "EventType": "WaitStarted",
+    "EventId": 2,
+    "Id": "8ad0c578bccd0e50210ec4540b84beab",
+    "EventTimestamp": "2026-01-20T23:17:39.533Z",
+    "Name": "initial_delay",
+    "WaitStartedDetails": {
+      "Duration": "PT1S",
+      "ScheduledEndTimestamp": "2026-01-20T23:17:40.533Z"
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 3,
+    "Id": "352dbc0e089149ceff15360f2f441cd4",
+    "EventTimestamp": "2026-01-20T23:17:39.612Z",
+    "Name": "process",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "42"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "WaitStarted",
+    "EventId": 4,
+    "Id": "6cff47756c256cacb84051641e87e234",
+    "EventTimestamp": "2026-01-20T23:17:39.612Z",
+    "Name": "cooldown_period",
+    "WaitStartedDetails": {
+      "Duration": "PT2S",
+      "ScheduledEndTimestamp": "2026-01-20T23:17:41.612Z"
+    }
+  }
+]

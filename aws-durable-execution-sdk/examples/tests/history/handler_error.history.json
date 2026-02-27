@@ -1,0 +1,26 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "62996e25-ff5b-4f6f-a342-9a7f2c16898b",
+    "EventTimestamp": "2026-02-26T23:28:30.339Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 2,
+    "Id": "37fb402329cf4e91c55b2e70db8f533c",
+    "EventTimestamp": "2026-02-26T23:28:30.340Z",
+    "Name": "setup_step",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"setup_done\""
+      },
+      "RetryDetails": {}
+    }
+  }
+]

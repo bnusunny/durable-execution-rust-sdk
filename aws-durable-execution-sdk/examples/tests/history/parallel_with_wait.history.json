@@ -1,0 +1,182 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "4c653066-065c-40f2-b4f6-8afec6f61efb",
+    "EventTimestamp": "2026-02-26T22:13:26.028Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 2,
+    "Id": "b62dab76e9ad40a6847da290179ef993",
+    "EventTimestamp": "2026-02-26T22:13:26.029Z",
+    "Name": "map",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 3,
+    "Id": "85a2eff72a0083908e6771a3cc799155",
+    "EventTimestamp": "2026-02-26T22:13:26.029Z",
+    "Name": "map-item-0",
+    "ParentId": "b62dab76e9ad40a6847da290179ef993",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 4,
+    "Id": "72f013c0c74761ba5e16c5aebff49c09",
+    "EventTimestamp": "2026-02-26T22:13:26.029Z",
+    "Name": "map-item-1",
+    "ParentId": "b62dab76e9ad40a6847da290179ef993",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 5,
+    "Id": "92463dc7a03addd91290b4f8d9f95cec",
+    "EventTimestamp": "2026-02-26T22:13:26.029Z",
+    "Name": "map-item-2",
+    "ParentId": "b62dab76e9ad40a6847da290179ef993",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "WaitStarted",
+    "EventId": 6,
+    "Id": "cb21759edeebe50f0f31a46950d2708d",
+    "EventTimestamp": "2026-02-26T22:13:26.029Z",
+    "Name": "wait_1",
+    "ParentId": "85a2eff72a0083908e6771a3cc799155",
+    "WaitStartedDetails": {
+      "Duration": "PT1S",
+      "ScheduledEndTimestamp": "2026-02-26T22:13:27.029Z"
+    }
+  },
+  {
+    "EventType": "WaitStarted",
+    "EventId": 7,
+    "Id": "e41fb9f155a0fd59436b3850c6e783e6",
+    "EventTimestamp": "2026-02-26T22:13:26.029Z",
+    "Name": "wait_2",
+    "ParentId": "72f013c0c74761ba5e16c5aebff49c09",
+    "WaitStartedDetails": {
+      "Duration": "PT2S",
+      "ScheduledEndTimestamp": "2026-02-26T22:13:28.029Z"
+    }
+  },
+  {
+    "EventType": "WaitStarted",
+    "EventId": 8,
+    "Id": "4575c78ea1fd59528b98faa4edad5468",
+    "EventTimestamp": "2026-02-26T22:13:26.029Z",
+    "Name": "wait_3",
+    "ParentId": "92463dc7a03addd91290b4f8d9f95cec",
+    "WaitStartedDetails": {
+      "Duration": "PT3S",
+      "ScheduledEndTimestamp": "2026-02-26T22:13:29.029Z"
+    }
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 9,
+    "Id": "b62dab76e9ad40a6847da290179ef993",
+    "EventTimestamp": "2026-02-26T22:13:26.030Z",
+    "Name": "map",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 10,
+    "Id": "4d910222e49e627645e0315c2801e5a4",
+    "EventTimestamp": "2026-02-26T22:13:26.030Z",
+    "ParentId": "85a2eff72a0083908e6771a3cc799155",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"branch 1 done\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 11,
+    "Id": "6ff144f7b90f2104a8cb79a42a175ee1",
+    "EventTimestamp": "2026-02-26T22:13:26.030Z",
+    "ParentId": "72f013c0c74761ba5e16c5aebff49c09",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"branch 2 done\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 12,
+    "Id": "dd3edbfeab5d4d856888e734a6a43276",
+    "EventTimestamp": "2026-02-26T22:13:26.030Z",
+    "ParentId": "92463dc7a03addd91290b4f8d9f95cec",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"branch 3 done\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 13,
+    "Id": "85a2eff72a0083908e6771a3cc799155",
+    "EventTimestamp": "2026-02-26T22:13:26.030Z",
+    "Name": "map-item-0",
+    "ParentId": "b62dab76e9ad40a6847da290179ef993",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "\"branch 1 done\""
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 14,
+    "Id": "72f013c0c74761ba5e16c5aebff49c09",
+    "EventTimestamp": "2026-02-26T22:13:26.030Z",
+    "Name": "map-item-1",
+    "ParentId": "b62dab76e9ad40a6847da290179ef993",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "\"branch 2 done\""
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 15,
+    "Id": "92463dc7a03addd91290b4f8d9f95cec",
+    "EventTimestamp": "2026-02-26T22:13:26.030Z",
+    "Name": "map-item-2",
+    "ParentId": "b62dab76e9ad40a6847da290179ef993",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "\"branch 3 done\""
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 16,
+    "Id": "b62dab76e9ad40a6847da290179ef993",
+    "EventTimestamp": "2026-02-26T22:13:26.030Z",
+    "Name": "map",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "{\"items\":[{\"index\":0,\"status\":\"Succeeded\",\"result\":\"branch 1 done\",\"error\":null},{\"index\":1,\"status\":\"Succeeded\",\"result\":\"branch 2 done\",\"error\":null},{\"index\":2,\"status\":\"Succeeded\",\"result\":\"branch 3 done\",\"error\":null}],\"completion_reason\":\"AllCompleted\"}"
+      }
+    }
+  }
+]

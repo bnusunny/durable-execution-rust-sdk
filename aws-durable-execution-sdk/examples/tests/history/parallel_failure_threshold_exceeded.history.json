@@ -1,0 +1,208 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "0a26c804-5208-4a9f-baaf-041f34e63a2e",
+    "EventTimestamp": "2026-02-26T22:37:02.841Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 2,
+    "Id": "ba82aab8a5f5e76a35d641aab213f336",
+    "EventTimestamp": "2026-02-26T22:37:02.841Z",
+    "Name": "map",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 3,
+    "Id": "d747e04c606ddad38a1e6571bb12fa21",
+    "EventTimestamp": "2026-02-26T22:37:02.841Z",
+    "Name": "map-item-0",
+    "ParentId": "ba82aab8a5f5e76a35d641aab213f336",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 4,
+    "Id": "a55e196ee356606f0ef8aac7a4ffedc3",
+    "EventTimestamp": "2026-02-26T22:37:02.841Z",
+    "Name": "map-item-1",
+    "ParentId": "ba82aab8a5f5e76a35d641aab213f336",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 5,
+    "Id": "e5beddb6acaaf79abb75dedf5b0fb9fc",
+    "EventTimestamp": "2026-02-26T22:37:02.841Z",
+    "Name": "map-item-2",
+    "ParentId": "ba82aab8a5f5e76a35d641aab213f336",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 6,
+    "Id": "32edb1e6e3ec2c6024d18c18396ed5e5",
+    "EventTimestamp": "2026-02-26T22:37:02.842Z",
+    "Name": "map-item-3",
+    "ParentId": "ba82aab8a5f5e76a35d641aab213f336",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 7,
+    "Id": "02ffaa1ad98b6f2f1451100b0105e0cb",
+    "EventTimestamp": "2026-02-26T22:37:02.842Z",
+    "Name": "map-item-4",
+    "ParentId": "ba82aab8a5f5e76a35d641aab213f336",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "StepFailed",
+    "EventId": 8,
+    "Id": "b7b3dfd0f90622644189ba6a637f016e",
+    "EventTimestamp": "2026-02-26T22:37:02.842Z",
+    "ParentId": "d747e04c606ddad38a1e6571bb12fa21",
+    "StepFailedDetails": {
+      "Error": {
+        "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"Item 1 failed\"}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 9,
+    "Id": "6156643bc6e5591a30df381f55cc433a",
+    "EventTimestamp": "2026-02-26T22:37:02.842Z",
+    "ParentId": "a55e196ee356606f0ef8aac7a4ffedc3",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"item 2 ok\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepFailed",
+    "EventId": 10,
+    "Id": "408ab852f754836bcd511f575151e043",
+    "EventTimestamp": "2026-02-26T22:37:02.842Z",
+    "ParentId": "e5beddb6acaaf79abb75dedf5b0fb9fc",
+    "StepFailedDetails": {
+      "Error": {
+        "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"Item 3 failed\"}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 11,
+    "Id": "07b21b917da0f0090716611026e92e42",
+    "EventTimestamp": "2026-02-26T22:37:02.842Z",
+    "ParentId": "32edb1e6e3ec2c6024d18c18396ed5e5",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"item 4 ok\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepFailed",
+    "EventId": 12,
+    "Id": "2a8f13b66894429f5526acd18540ea99",
+    "EventTimestamp": "2026-02-26T22:37:02.842Z",
+    "ParentId": "02ffaa1ad98b6f2f1451100b0105e0cb",
+    "StepFailedDetails": {
+      "Error": {
+        "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"Item 5 failed\"}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextFailed",
+    "EventId": 13,
+    "Id": "d747e04c606ddad38a1e6571bb12fa21",
+    "EventTimestamp": "2026-02-26T22:37:02.842Z",
+    "Name": "map-item-0",
+    "ParentId": "ba82aab8a5f5e76a35d641aab213f336",
+    "ContextFailedDetails": {
+      "Error": {
+        "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"Item 1 failed\"}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 14,
+    "Id": "a55e196ee356606f0ef8aac7a4ffedc3",
+    "EventTimestamp": "2026-02-26T22:37:02.842Z",
+    "Name": "map-item-1",
+    "ParentId": "ba82aab8a5f5e76a35d641aab213f336",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "\"item 2 ok\""
+      }
+    }
+  },
+  {
+    "EventType": "ContextFailed",
+    "EventId": 15,
+    "Id": "e5beddb6acaaf79abb75dedf5b0fb9fc",
+    "EventTimestamp": "2026-02-26T22:37:02.842Z",
+    "Name": "map-item-2",
+    "ParentId": "ba82aab8a5f5e76a35d641aab213f336",
+    "ContextFailedDetails": {
+      "Error": {
+        "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"Item 3 failed\"}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 16,
+    "Id": "32edb1e6e3ec2c6024d18c18396ed5e5",
+    "EventTimestamp": "2026-02-26T22:37:02.842Z",
+    "Name": "map-item-3",
+    "ParentId": "ba82aab8a5f5e76a35d641aab213f336",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "\"item 4 ok\""
+      }
+    }
+  },
+  {
+    "EventType": "ContextFailed",
+    "EventId": 17,
+    "Id": "02ffaa1ad98b6f2f1451100b0105e0cb",
+    "EventTimestamp": "2026-02-26T22:37:02.842Z",
+    "Name": "map-item-4",
+    "ParentId": "ba82aab8a5f5e76a35d641aab213f336",
+    "ContextFailedDetails": {
+      "Error": {
+        "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"Item 5 failed\"}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 18,
+    "Id": "ba82aab8a5f5e76a35d641aab213f336",
+    "EventTimestamp": "2026-02-26T22:37:02.842Z",
+    "Name": "map",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "{\"items\":[{\"index\":0,\"status\":\"Failed\",\"result\":null,\"error\":{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"Item 1 failed\"}},{\"index\":1,\"status\":\"Succeeded\",\"result\":\"item 2 ok\",\"error\":null},{\"index\":2,\"status\":\"Failed\",\"result\":null,\"error\":{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"Item 3 failed\"}},{\"index\":3,\"status\":\"Succeeded\",\"result\":\"item 4 ok\",\"error\":null},{\"index\":4,\"status\":\"Failed\",\"result\":null,\"error\":{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"Item 5 failed\"}}],\"completion_reason\":\"FailureToleranceExceeded\"}"
+      }
+    }
+  }
+]

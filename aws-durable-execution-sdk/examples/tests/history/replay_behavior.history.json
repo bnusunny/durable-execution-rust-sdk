@@ -1,0 +1,119 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "fdf72dd9-cc15-4530-b607-e84753af3323",
+    "EventTimestamp": "2026-02-26T22:59:22.394Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "StepStarted",
+    "EventId": 2,
+    "Id": "1fef97c4917ca2b1ac9351a7fe34a829",
+    "EventTimestamp": "2026-02-26T22:59:22.394Z",
+    "SubType": "PromiseCombinator",
+    "Name": "all",
+    "StepStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 3,
+    "Id": "ea87aba38f91df992eb8569a43c547da",
+    "EventTimestamp": "2026-02-26T22:59:22.394Z",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"result_a\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 4,
+    "Id": "0ee515dad21a29d5dc5e42fa4984d2db",
+    "EventTimestamp": "2026-02-26T22:59:22.394Z",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"result_b\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 5,
+    "Id": "4553c77031845f9788d6d643a694cc8b",
+    "EventTimestamp": "2026-02-26T22:59:22.394Z",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"result_c\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 6,
+    "Id": "1fef97c4917ca2b1ac9351a7fe34a829",
+    "EventTimestamp": "2026-02-26T22:59:22.394Z",
+    "SubType": "PromiseCombinator",
+    "Name": "all",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "[\"result_a\",\"result_b\",\"result_c\"]"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepStarted",
+    "EventId": 7,
+    "Id": "99fec45706a42a503d230168af97138a",
+    "EventTimestamp": "2026-02-26T22:59:22.395Z",
+    "SubType": "PromiseCombinator",
+    "Name": "race",
+    "StepStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 8,
+    "Id": "f11186c2b140d0820a5ec2244ff40eec",
+    "EventTimestamp": "2026-02-26T22:59:22.395Z",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"fast_path\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 9,
+    "Id": "fa876f3aa3807dbcfd265f45d04f5e59",
+    "EventTimestamp": "2026-02-26T22:59:22.395Z",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"slow_path\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 10,
+    "Id": "99fec45706a42a503d230168af97138a",
+    "EventTimestamp": "2026-02-26T22:59:22.395Z",
+    "SubType": "PromiseCombinator",
+    "Name": "race",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"fast_path\""
+      },
+      "RetryDetails": {}
+    }
+  }
+]

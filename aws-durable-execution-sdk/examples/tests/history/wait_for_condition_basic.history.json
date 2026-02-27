@@ -1,11 +1,72 @@
-{
-  "events": [
-    {
-      "event_type": "Execution"
-    },
-    {
-      "event_type": "Step",
-      "name": "wait_for_condition"
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "8cbd836b-7aba-461e-aab6-3895ef788c56",
+    "EventTimestamp": "2026-01-20T23:17:39.523Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
     }
-  ]
-}
+  },
+  {
+    "EventType": "StepStarted",
+    "EventId": 2,
+    "Id": "765ad810e1d54383989cb057853004fc",
+    "EventTimestamp": "2026-01-20T23:17:39.553Z",
+    "SubType": "wait_for_condition",
+    "Name": "wait_for_condition",
+    "StepStartedDetails": {}
+  },
+  {
+    "EventType": "StepFailed",
+    "EventId": 3,
+    "Id": "765ad810e1d54383989cb057853004fc",
+    "EventTimestamp": "2026-01-20T23:17:39.563Z",
+    "SubType": "wait_for_condition",
+    "Name": "wait_for_condition",
+    "StepFailedDetails": {
+      "Error": {
+        "Payload": ""
+      },
+      "RetryDetails": {
+        "CurrentAttempt": 2,
+        "NextAttemptDelaySeconds": 5
+      }
+    }
+  },
+  {
+    "EventType": "StepFailed",
+    "EventId": 4,
+    "Id": "765ad810e1d54383989cb057853004fc",
+    "EventTimestamp": "2026-01-20T23:17:39.575Z",
+    "SubType": "wait_for_condition",
+    "Name": "wait_for_condition",
+    "StepFailedDetails": {
+      "Error": {
+        "Payload": ""
+      },
+      "RetryDetails": {
+        "CurrentAttempt": 3,
+        "NextAttemptDelaySeconds": 5
+      }
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 5,
+    "Id": "765ad810e1d54383989cb057853004fc",
+    "EventTimestamp": "2026-01-20T23:17:39.576Z",
+    "SubType": "wait_for_condition",
+    "Name": "wait_for_condition",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "{\"job_id\":\"job-12345\",\"status\":\"completed\",\"result\":\"Job finished successfully\"}"
+      },
+      "RetryDetails": {
+        "CurrentAttempt": 3
+      }
+    }
+  }
+]

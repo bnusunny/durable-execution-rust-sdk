@@ -1,15 +1,47 @@
-{
-  "events": [
-    {
-      "event_type": "Execution"
-    },
-    {
-      "event_type": "Step",
-      "name": "charge_payment"
-    },
-    {
-      "event_type": "Step",
-      "name": "log_transaction"
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "d56b56d3-b1bd-439e-9665-9e898cd9f90c",
+    "EventTimestamp": "2026-01-20T23:17:39.474Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
     }
-  ]
-}
+  },
+  {
+    "EventType": "StepStarted",
+    "EventId": 2,
+    "Id": "cd602cb0361f312cfc1a928f80a2a2db",
+    "EventTimestamp": "2026-01-20T23:17:39.478Z",
+    "Name": "charge_payment",
+    "StepStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 3,
+    "Id": "cd602cb0361f312cfc1a928f80a2a2db",
+    "EventTimestamp": "2026-01-20T23:17:39.483Z",
+    "Name": "charge_payment",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "{\"transaction_id\":\"txn_abc123\",\"amount\":9999,\"status\":\"completed\"}"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 4,
+    "Id": "5e41a20fccce89fe25abf6a60235f30a",
+    "EventTimestamp": "2026-01-20T23:17:39.487Z",
+    "Name": "log_transaction",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "true"
+      },
+      "RetryDetails": {}
+    }
+  }
+]

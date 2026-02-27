@@ -1,53 +1,208 @@
-{
-  "events": [
-    {
-      "event_type": "Execution"
-    },
-    {
-      "event_type": "Step",
-      "name": "validate_order"
-    },
-    {
-      "event_type": "Context",
-      "name": "check_inventory"
-    },
-    {
-      "event_type": "Step"
-    },
-    {
-      "event_type": "Context",
-      "name": "check_customer"
-    },
-    {
-      "event_type": "Step"
-    },
-    {
-      "event_type": "Context",
-      "name": "map"
-    },
-    {
-      "event_type": "Context",
-      "name": "map-item-0"
-    },
-    {
-      "event_type": "Context",
-      "name": "map-item-1"
-    },
-    {
-      "event_type": "Step",
-      "name": "process_item_0"
-    },
-    {
-      "event_type": "Step",
-      "name": "process_item_1"
-    },
-    {
-      "event_type": "Wait",
-      "name": "processing_delay"
-    },
-    {
-      "event_type": "Step",
-      "name": "finalize_order"
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "c99ab48a-762a-48e5-a62b-d9924a17e923",
+    "EventTimestamp": "2026-01-20T23:17:39.180Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{\"order_id\":\"order-123\",\"customer_id\":\"customer-456\",\"items\":[{\"sku\":\"SKU-001\",\"quantity\":2,\"price_cents\":1000},{\"sku\":\"SKU-002\",\"quantity\":1,\"price_cents\":2500}],\"requires_approval\":false}"
+      }
     }
-  ]
-}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 2,
+    "Id": "f99b315876d41d92f2a65aaa45b687f9",
+    "EventTimestamp": "2026-01-20T23:17:39.180Z",
+    "Name": "validate_order",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "true"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 3,
+    "Id": "2a8c33167e9ddb19db84487b93d82e22",
+    "EventTimestamp": "2026-01-20T23:17:39.180Z",
+    "Name": "check_inventory",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 4,
+    "Id": "a82acd08648fc93eda9aa3f9621a96dc",
+    "EventTimestamp": "2026-01-20T23:17:39.181Z",
+    "ParentId": "2a8c33167e9ddb19db84487b93d82e22",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"inventory_ok\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 5,
+    "Id": "2a8c33167e9ddb19db84487b93d82e22",
+    "EventTimestamp": "2026-01-20T23:17:39.181Z",
+    "Name": "check_inventory",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "\"inventory_ok\""
+      }
+    }
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 6,
+    "Id": "ef497ef82aeaac66dfef6b75c9e3c665",
+    "EventTimestamp": "2026-01-20T23:17:39.181Z",
+    "Name": "check_customer",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 7,
+    "Id": "a6a28d6fc4c6df38d1e9364f48273097",
+    "EventTimestamp": "2026-01-20T23:17:39.181Z",
+    "ParentId": "ef497ef82aeaac66dfef6b75c9e3c665",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"customer_ok\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 8,
+    "Id": "ef497ef82aeaac66dfef6b75c9e3c665",
+    "EventTimestamp": "2026-01-20T23:17:39.181Z",
+    "Name": "check_customer",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "\"customer_ok\""
+      }
+    }
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 9,
+    "Id": "ecae486af2129f58b996aedbc0e1128f",
+    "EventTimestamp": "2026-01-20T23:17:39.182Z",
+    "Name": "map",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 10,
+    "Id": "f71fa0f0b03c8bfc81e782d1d5da20d3",
+    "EventTimestamp": "2026-01-20T23:17:39.182Z",
+    "Name": "map-item-0",
+    "ParentId": "ecae486af2129f58b996aedbc0e1128f",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 11,
+    "Id": "0d6f85b290ff68d6c91170dea92f41af",
+    "EventTimestamp": "2026-01-20T23:17:39.182Z",
+    "Name": "map-item-1",
+    "ParentId": "ecae486af2129f58b996aedbc0e1128f",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 12,
+    "Id": "f358ce504a0e563901cc38d61384407a",
+    "EventTimestamp": "2026-01-20T23:17:39.182Z",
+    "Name": "process_item_0",
+    "ParentId": "f71fa0f0b03c8bfc81e782d1d5da20d3",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "2000"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 13,
+    "Id": "25b6805bbcd54b559fe55a0078bdd45a",
+    "EventTimestamp": "2026-01-20T23:17:39.182Z",
+    "Name": "process_item_1",
+    "ParentId": "0d6f85b290ff68d6c91170dea92f41af",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "2500"
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 14,
+    "Id": "f71fa0f0b03c8bfc81e782d1d5da20d3",
+    "EventTimestamp": "2026-01-20T23:17:39.182Z",
+    "Name": "map-item-0",
+    "ParentId": "ecae486af2129f58b996aedbc0e1128f",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "2000"
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 15,
+    "Id": "0d6f85b290ff68d6c91170dea92f41af",
+    "EventTimestamp": "2026-01-20T23:17:39.182Z",
+    "Name": "map-item-1",
+    "ParentId": "ecae486af2129f58b996aedbc0e1128f",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "2500"
+      }
+    }
+  },
+  {
+    "EventType": "ContextSucceeded",
+    "EventId": 16,
+    "Id": "ecae486af2129f58b996aedbc0e1128f",
+    "EventTimestamp": "2026-01-20T23:17:39.183Z",
+    "Name": "map",
+    "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "{\"items\":[{\"index\":0,\"status\":\"Succeeded\",\"result\":2000,\"error\":null},{\"index\":1,\"status\":\"Succeeded\",\"result\":2500,\"error\":null}],\"completion_reason\":\"AllCompleted\"}"
+      }
+    }
+  },
+  {
+    "EventType": "WaitStarted",
+    "EventId": 17,
+    "Id": "0222bca93b77d4e0e325ce2bd785a639",
+    "EventTimestamp": "2026-01-20T23:17:39.183Z",
+    "Name": "processing_delay",
+    "WaitStartedDetails": {
+      "Duration": "PT2S",
+      "ScheduledEndTimestamp": "2026-01-20T23:17:41.183Z"
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 18,
+    "Id": "9c7bfde11b790879e3e5e9a35f5453b9",
+    "EventTimestamp": "2026-01-20T23:17:39.185Z",
+    "Name": "finalize_order",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "true"
+      },
+      "RetryDetails": {}
+    }
+  }
+]

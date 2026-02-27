@@ -1,0 +1,49 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "1660b5be-9fa1-4946-bb31-782f1bec459b",
+    "EventTimestamp": "2026-02-26T21:56:39.806Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 2,
+    "Id": "f4a51ac2eb93e7d25f01f368bfca893a",
+    "EventTimestamp": "2026-02-26T21:56:39.807Z",
+    "Name": "prepare",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"prepared_payload\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "WaitStarted",
+    "EventId": 3,
+    "Id": "914e5e1412f64e9c8b388be5a6cfa3a8",
+    "EventTimestamp": "2026-02-26T21:56:39.807Z",
+    "Name": "pre_callback_delay",
+    "WaitStartedDetails": {
+      "Duration": "PT1S",
+      "ScheduledEndTimestamp": "2026-02-26T21:56:40.807Z"
+    }
+  },
+  {
+    "EventType": "CallbackStarted",
+    "EventId": 4,
+    "Id": "47132cb68216cd6a4f3c71a4f91dfe86",
+    "EventTimestamp": "2026-02-26T21:56:39.807Z",
+    "Name": "mixed_callback",
+    "CallbackStartedDetails": {
+      "CallbackId": "c9e8528e-5ed1-43f8-95e3-b0940143375d",
+      "Timeout": 0,
+      "HeartbeatTimeout": 0
+    }
+  }
+]

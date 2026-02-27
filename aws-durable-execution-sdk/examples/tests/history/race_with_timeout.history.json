@@ -1,0 +1,60 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "91bc805a-cced-4362-8f3e-22b4f5c309bf",
+    "EventTimestamp": "2026-02-26T22:59:15.295Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "StepStarted",
+    "EventId": 2,
+    "Id": "0b4e2344ba0ee9aa6c6e455c80259310",
+    "EventTimestamp": "2026-02-26T22:59:15.296Z",
+    "SubType": "PromiseCombinator",
+    "Name": "race",
+    "StepStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 3,
+    "Id": "346b9fbb57a93cb28eb8dc20fa8b242c",
+    "EventTimestamp": "2026-02-26T22:59:15.296Z",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"operation completed\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 4,
+    "Id": "bab4aafc65e324958dab284af82656b1",
+    "EventTimestamp": "2026-02-26T22:59:15.296Z",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"timed out\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 5,
+    "Id": "0b4e2344ba0ee9aa6c6e455c80259310",
+    "EventTimestamp": "2026-02-26T22:59:15.296Z",
+    "SubType": "PromiseCombinator",
+    "Name": "race",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"operation completed\""
+      },
+      "RetryDetails": {}
+    }
+  }
+]

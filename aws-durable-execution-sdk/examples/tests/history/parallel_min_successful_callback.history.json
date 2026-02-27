@@ -1,0 +1,87 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "7dfcaf29-cdd3-40ab-ac7c-d4235c7bd577",
+    "EventTimestamp": "2026-02-26T22:27:49.202Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 2,
+    "Id": "952be6fc78bd300aaa5f26d4e814914d",
+    "EventTimestamp": "2026-02-26T22:27:49.202Z",
+    "Name": "map",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 3,
+    "Id": "9ee377407bedcf4faa35a724cb7a7ca7",
+    "EventTimestamp": "2026-02-26T22:27:49.203Z",
+    "Name": "map-item-0",
+    "ParentId": "952be6fc78bd300aaa5f26d4e814914d",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 4,
+    "Id": "992f20a7ca325b1066ad5765607d996d",
+    "EventTimestamp": "2026-02-26T22:27:49.203Z",
+    "Name": "map-item-1",
+    "ParentId": "952be6fc78bd300aaa5f26d4e814914d",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "ContextStarted",
+    "EventId": 5,
+    "Id": "3cfa733001b2a016a86718572e0b0c40",
+    "EventTimestamp": "2026-02-26T22:27:49.203Z",
+    "Name": "map-item-2",
+    "ParentId": "952be6fc78bd300aaa5f26d4e814914d",
+    "ContextStartedDetails": {}
+  },
+  {
+    "EventType": "CallbackStarted",
+    "EventId": 6,
+    "Id": "ce996077f211e3ff6667d92ee24f38a5",
+    "EventTimestamp": "2026-02-26T22:27:49.203Z",
+    "Name": "service-a_callback",
+    "ParentId": "9ee377407bedcf4faa35a724cb7a7ca7",
+    "CallbackStartedDetails": {
+      "CallbackId": "e298ed3c-cd81-4b3c-bc1f-1608504336f2",
+      "Timeout": 0,
+      "HeartbeatTimeout": 0
+    }
+  },
+  {
+    "EventType": "CallbackStarted",
+    "EventId": 7,
+    "Id": "a9eab20e3be111c3a6030277c1b0f437",
+    "EventTimestamp": "2026-02-26T22:27:49.203Z",
+    "Name": "service-b_callback",
+    "ParentId": "992f20a7ca325b1066ad5765607d996d",
+    "CallbackStartedDetails": {
+      "CallbackId": "e9135970-2ca9-410d-a22e-8d596d666dd1",
+      "Timeout": 0,
+      "HeartbeatTimeout": 0
+    }
+  },
+  {
+    "EventType": "CallbackStarted",
+    "EventId": 8,
+    "Id": "db7e5482e4f66419077cc3c95ba0b491",
+    "EventTimestamp": "2026-02-26T22:27:49.203Z",
+    "Name": "service-c_callback",
+    "ParentId": "3cfa733001b2a016a86718572e0b0c40",
+    "CallbackStartedDetails": {
+      "CallbackId": "f4d5f1f9-9d76-48d3-95de-a726ed5243f3",
+      "Timeout": 0,
+      "HeartbeatTimeout": 0
+    }
+  }
+]

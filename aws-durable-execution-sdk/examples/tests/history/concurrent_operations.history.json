@@ -1,0 +1,49 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "00bf1adf-9a91-467a-97fa-e4d4842f5fe7",
+    "EventTimestamp": "2026-02-26T23:15:30.756Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 2,
+    "Id": "2422ca4bdfc24f3a56fb426881ea4e80",
+    "EventTimestamp": "2026-02-26T23:15:30.756Z",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"step_1\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 3,
+    "Id": "13e6606ebadd02c3e97d17ff29cb6f7d",
+    "EventTimestamp": "2026-02-26T23:15:30.757Z",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"step_2\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 4,
+    "Id": "dea9624a85e9bc1f57da74746188b935",
+    "EventTimestamp": "2026-02-26T23:15:30.757Z",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"step_3\""
+      },
+      "RetryDetails": {}
+    }
+  }
+]

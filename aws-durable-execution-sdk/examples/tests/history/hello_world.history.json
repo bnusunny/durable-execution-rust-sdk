@@ -1,7 +1,13 @@
-{
-  "events": [
-    {
-      "event_type": "Execution"
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "085c22af-13ca-4c7e-8dab-4b876c070a07",
+    "EventTimestamp": "2026-01-20T23:17:39.198Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
     }
-  ]
-}
+  }
+]

@@ -1,0 +1,37 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "95b890bb-280c-4265-93e7-1ebea53ac37a",
+    "EventTimestamp": "2026-02-26T23:16:22.414Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 2,
+    "Id": "a9393d19361792cfb1c2b1fb27922002",
+    "EventTimestamp": "2026-02-26T23:16:22.415Z",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"step_done\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "CallbackStarted",
+    "EventId": 3,
+    "Id": "67fb87ac2718f10a58005addb3f845df",
+    "EventTimestamp": "2026-02-26T23:16:22.415Z",
+    "Name": "concurrent_cb",
+    "CallbackStartedDetails": {
+      "CallbackId": "c61d33b2-6f31-4ed8-bb73-5114a6f4f639",
+      "Timeout": 300,
+      "HeartbeatTimeout": 0
+    }
+  }
+]

@@ -1,0 +1,94 @@
+[
+  {
+    "EventType": "ExecutionStarted",
+    "EventId": 1,
+    "Id": "52a84011-cc09-4591-80d9-c406df3ff624",
+    "EventTimestamp": "2026-02-26T22:59:08.555Z",
+    "ExecutionStartedDetails": {
+      "Input": {
+        "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "WaitStarted",
+    "EventId": 2,
+    "Id": "3ef66b5dff42290ced68be2d2d407944",
+    "EventTimestamp": "2026-02-26T22:59:08.555Z",
+    "Name": "wait_1",
+    "WaitStartedDetails": {
+      "Duration": "PT1S",
+      "ScheduledEndTimestamp": "2026-02-26T22:59:09.555Z"
+    }
+  },
+  {
+    "EventType": "WaitStarted",
+    "EventId": 3,
+    "Id": "5e35a1ee247f15f307e53b960b60fb34",
+    "EventTimestamp": "2026-02-26T22:59:08.556Z",
+    "Name": "wait_2",
+    "WaitStartedDetails": {
+      "Duration": "PT2S",
+      "ScheduledEndTimestamp": "2026-02-26T22:59:10.556Z"
+    }
+  },
+  {
+    "EventType": "StepStarted",
+    "EventId": 4,
+    "Id": "63678f35232325784816c6c3807f8025",
+    "EventTimestamp": "2026-02-26T22:59:08.557Z",
+    "SubType": "PromiseCombinator",
+    "Name": "all",
+    "StepStartedDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 5,
+    "Id": "806cdb511cebd2dedb1d550011947642",
+    "EventTimestamp": "2026-02-26T22:59:08.557Z",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"fast\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 6,
+    "Id": "88ea6fcbe0e67bae647c1b3b28bea209",
+    "EventTimestamp": "2026-02-26T22:59:08.557Z",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"after_wait_1\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 7,
+    "Id": "9ac9570cbbd4124d9435bc2b8149e415",
+    "EventTimestamp": "2026-02-26T22:59:08.557Z",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "\"after_wait_2\""
+      },
+      "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 8,
+    "Id": "63678f35232325784816c6c3807f8025",
+    "EventTimestamp": "2026-02-26T22:59:08.557Z",
+    "SubType": "PromiseCombinator",
+    "Name": "all",
+    "StepSucceededDetails": {
+      "Result": {
+        "Payload": "[\"fast\",\"after_wait_1\",\"after_wait_2\"]"
+      },
+      "RetryDetails": {}
+    }
+  }
+]

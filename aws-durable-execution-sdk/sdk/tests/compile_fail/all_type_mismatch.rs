@@ -1,5 +1,5 @@
 //! Compile-fail test: all! macro should reject futures with incompatible output types.
-//! 
+//!
 //! Property 4: Compile-time type mismatch detection
 //! Validates: Requirements 6.1, 6.2
 
@@ -7,6 +7,8 @@ use std::future::Future;
 use std::pin::Pin;
 use aws_durable_execution_sdk::all;
 use aws_durable_execution_sdk::error::DurableError;
+
+type DynFut<T> = Pin<Box<dyn Future<Output = Result<T, DurableError>> + Send>>;
 
 // Mock context for testing
 struct MockContext;
@@ -23,10 +25,9 @@ impl MockContext {
 
 fn main() {
     let ctx = MockContext;
-    
+
     // This should fail to compile: mixing i32 and String output types
-    let _ = all!(ctx,
-        Box::pin(async { Ok::<_, DurableError>(42i32) }) as Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>,
-        Box::pin(async { Ok::<_, DurableError>("hello".to_string()) }) as Pin<Box<dyn Future<Output = Result<String, DurableError>> + Send>>,
-    );
+    let f1: DynFut<i32> = Box::pin(async { Ok(42i32) });
+    let f2: DynFut<String> = Box::pin(async { Ok("hello".into()) });
+    let _ = all!(ctx, f1, f2);
 }

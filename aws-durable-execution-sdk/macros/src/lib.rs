@@ -166,7 +166,7 @@ pub fn durable_execution(_attr: TokenStream, item: TokenStream) -> TokenStream {
     // Generate the inner function name
     let inner_fn_name = format_ident!("__{}_inner", fn_name);
 
-    // Generate the wrapper function
+    // Generate the wrapper function — delegates to run_durable_handler
     let output = quote! {
         // The inner function containing the user's logic
         #(#fn_attrs)*
@@ -176,187 +176,11 @@ pub fn durable_execution(_attr: TokenStream, item: TokenStream) -> TokenStream {
         ) -> #return_type
         #fn_block
 
-        // The Lambda handler wrapper
+        // The Lambda handler wrapper — thin delegation to the runtime
         #fn_vis async fn #fn_name(
             lambda_event: ::lambda_runtime::LambdaEvent<::aws_durable_execution_sdk::DurableExecutionInvocationInput>,
         ) -> ::std::result::Result<::aws_durable_execution_sdk::DurableExecutionInvocationOutput, ::lambda_runtime::Error> {
-            use ::aws_durable_execution_sdk::{
-                DurableContext, DurableError, DurableExecutionInvocationOutput,
-                ExecutionState, ErrorObject, CheckpointBatcherConfig,
-                SharedDurableServiceClient, LambdaDurableServiceClient,
-                OperationType,
-            };
-
-            let (durable_input, lambda_context) = lambda_event.into_parts();
-
-            // Extract the user's event from the input
-            // First try the top-level Input field, then fall back to ExecutionDetails.InputPayload
-            let user_event: #event_type = {
-                // Try top-level Input first
-                if let Some(value) = &durable_input.input {
-                    match ::serde_json::from_value(value.clone()) {
-                        Ok(event) => event,
-                        Err(e) => {
-                            return Ok(DurableExecutionInvocationOutput::failed(
-                                ErrorObject::new("DeserializationError", format!("Failed to deserialize event from Input: {}", e))
-                            ));
-                        }
-                    }
-                } else {
-                    // Try to extract from ExecutionDetails.InputPayload of the EXECUTION operation
-                    let execution_op = durable_input.initial_execution_state.operations.iter()
-                        .find(|op| op.operation_type == OperationType::Execution);
-
-                    if let Some(op) = execution_op {
-                        if let Some(details) = &op.execution_details {
-                            if let Some(payload) = &details.input_payload {
-                                // Parse the JSON string payload
-                                match ::serde_json::from_str::<#event_type>(payload) {
-                                    Ok(event) => event,
-                                    Err(e) => {
-                                        return Ok(DurableExecutionInvocationOutput::failed(
-                                            ErrorObject::new("DeserializationError", format!("Failed to deserialize event from ExecutionDetails.InputPayload: {}", e))
-                                        ));
-                                    }
-                                }
-                            } else {
-                                // No InputPayload, try default
-                                match ::serde_json::from_value(::serde_json::Value::Null) {
-                                    Ok(event) => event,
-                                    Err(_) => {
-                                        return Ok(DurableExecutionInvocationOutput::failed(
-                                            ErrorObject::new("DeserializationError", "No InputPayload in ExecutionDetails and event type does not support default")
-                                        ));
-                                    }
-                                }
-                            }
-                        } else {
-                            // No ExecutionDetails, try default
-                            match ::serde_json::from_value(::serde_json::Value::Null) {
-                                Ok(event) => event,
-                                Err(_) => {
-                                    return Ok(DurableExecutionInvocationOutput::failed(
-                                        ErrorObject::new("DeserializationError", "No ExecutionDetails in EXECUTION operation and event type does not support default")
-                                    ));
-                                }
-                            }
-                        }
-                    } else {
-                        // No EXECUTION operation found, try default
-                        match ::serde_json::from_value(::serde_json::Value::Null) {
-                            Ok(event) => event,
-                            Err(_) => {
-                                return Ok(DurableExecutionInvocationOutput::failed(
-                                    ErrorObject::new("DeserializationError", "No input provided and event type does not support default")
-                                ));
-                            }
-                        }
-                    }
-                }
-            };
-
-            // Create the service client
-            let aws_config = ::aws_config::load_defaults(::aws_config::BehaviorVersion::latest()).await;
-            let service_client: SharedDurableServiceClient = ::std::sync::Arc::new(
-                LambdaDurableServiceClient::from_aws_config(&aws_config)
-            );
-
-            // Create ExecutionState with batcher
-            let batcher_config = CheckpointBatcherConfig::default();
-            let (state, mut batcher) = ExecutionState::with_batcher(
-                &durable_input.durable_execution_arn,
-                &durable_input.checkpoint_token,
-                durable_input.initial_execution_state,
-                service_client,
-                batcher_config,
-                100, // queue buffer size
-            );
-            let state = ::std::sync::Arc::new(state);
-
-            // Spawn the checkpoint batcher task
-            let batcher_handle = ::tokio::spawn(async move {
-                batcher.run().await;
-            });
-
-            // Create DurableContext
-            let durable_ctx = DurableContext::from_lambda_context(state.clone(), lambda_context);
-
-            // Call the user's handler
-            let result = #inner_fn_name(user_event, durable_ctx).await;
-
-            // Process the result while state is still alive (for large response checkpointing)
-            const MAX_RESPONSE_SIZE: usize = 6 * 1024 * 1024;
-
-            let output = match result {
-                Ok(value) => {
-                    // Serialize the result
-                    match ::serde_json::to_string(&value) {
-                        Ok(json) => {
-                            // Check if response is too large (>6MB)
-                            if json.len() > MAX_RESPONSE_SIZE {
-                                // For large responses, checkpoint the result before returning
-                                // Generate a unique operation ID for the result checkpoint
-                                let result_op_id = format!("__result__{}", ::std::time::SystemTime::now()
-                                    .duration_since(::std::time::UNIX_EPOCH)
-                                    .map(|d| d.as_nanos())
-                                    .unwrap_or(0));
-
-                                // Create an operation update to checkpoint the large result
-                                let update = ::aws_durable_execution_sdk::OperationUpdate::succeed(
-                                    &result_op_id,
-                                    ::aws_durable_execution_sdk::OperationType::Execution,
-                                    Some(json.clone()),
-                                );
-
-                                // Checkpoint the result synchronously
-                                match state.create_checkpoint(update, true).await {
-                                    Ok(()) => {
-                                        // Return a reference to the checkpointed result
-                                        DurableExecutionInvocationOutput::succeeded(Some(
-                                            format!("{{\"__checkpointed_result__\":\"{}\",\"size\":{}}}", result_op_id, json.len())
-                                        ))
-                                    }
-                                    Err(e) => {
-                                        // If checkpointing fails, return an error
-                                        DurableExecutionInvocationOutput::failed(
-                                            ErrorObject::new(
-                                                "CheckpointError",
-                                                format!("Failed to checkpoint large result: {}", e)
-                                            )
-                                        )
-                                    }
-                                }
-                            } else {
-                                DurableExecutionInvocationOutput::succeeded(Some(json))
-                            }
-                        }
-                        Err(e) => {
-                            DurableExecutionInvocationOutput::failed(
-                                ErrorObject::new("SerializationError", format!("Failed to serialize result: {}", e))
-                            )
-                        }
-                    }
-                }
-                Err(DurableError::Suspend { .. }) => {
-                    // Execution suspended - return PENDING status
-                    DurableExecutionInvocationOutput::pending()
-                }
-                Err(error) => {
-                    // Execution failed - return FAILED status with error details
-                    DurableExecutionInvocationOutput::failed(ErrorObject::from(&error))
-                }
-            };
-
-            // Drop the state to close the checkpoint queue and stop the batcher
-            drop(state);
-
-            // Wait for batcher to finish (with timeout)
-            let _ = ::tokio::time::timeout(
-                ::std::time::Duration::from_secs(5),
-                batcher_handle
-            ).await;
-
-            Ok(output)
+            ::aws_durable_execution_sdk::run_durable_handler(lambda_event, #inner_fn_name).await
         }
     };
 

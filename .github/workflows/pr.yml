@@ -190,6 +190,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -202,17 +204,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-coverage-
 
-      - name: Install cargo-tarpaulin
-        run: cargo install cargo-tarpaulin --locked
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
 
       - name: Generate coverage
         working-directory: aws-durable-execution-sdk
-        run: cargo tarpaulin --workspace --all-features --out Xml --timeout 300
+        run: cargo llvm-cov --workspace --all-features --exclude aws-durable-execution-sdk-examples --codecov --output-path codecov.json
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: ./aws-durable-execution-sdk/cobertura.xml
+          files: ./aws-durable-execution-sdk/codecov.json
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 

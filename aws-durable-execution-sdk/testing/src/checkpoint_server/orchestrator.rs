@@ -40,6 +40,8 @@ use aws_durable_execution_sdk::{
 use super::scheduler::{QueueScheduler, Scheduler};
 use super::types::ExecutionId;
 use super::worker_manager::CheckpointWorkerManager;
+use crate::operation::CallbackSender;
+use crate::operation_handle::{OperationHandle, OperationMatcher};
 use crate::types::{ExecutionStatus, Invocation, TestResultError};
 
 /// Configuration for time skipping behavior.
@@ -227,6 +229,12 @@ where
     execution_complete: Arc<AtomicBool>,
     /// The final result (if any)
     final_result: Arc<Mutex<Option<Result<O, DurableError>>>>,
+    /// Pre-registered operation handles for lazy population during execution
+    registered_handles: Vec<OperationHandle>,
+    /// Shared operations list for child operation enumeration across handles
+    shared_operations: Arc<RwLock<Vec<Operation>>>,
+    /// Callback sender for populating callback handles
+    callback_sender: Option<Arc<dyn CallbackSender>>,
 }
 
 impl<I, O> TestExecutionOrchestrator<I, O>
@@ -272,7 +280,40 @@ where
             checkpoint_token: None,
             execution_complete: Arc::new(AtomicBool::new(false)),
             final_result: Arc::new(Mutex::new(None)),
+            registered_handles: Vec::new(),
+            shared_operations: Arc::new(RwLock::new(Vec::new())),
+            callback_sender: None,
         }
+    }
+
+    /// Set the pre-registered operation handles for lazy population during execution.
+    ///
+    /// # Arguments
+    ///
+    /// * `handles` - The pre-registered operation handles
+    /// * `shared_operations` - Shared operations list for child enumeration
+    /// * `callback_sender` - Callback sender for populating callback handles
+    pub fn with_handles(
+        mut self,
+        handles: Vec<OperationHandle>,
+        shared_operations: Arc<RwLock<Vec<Operation>>>,
+        callback_sender: Option<Arc<dyn CallbackSender>>,
+    ) -> Self {
+        // Set the callback_sender on each handle so they can send callback responses.
+        // Because callback_sender is behind Arc<RwLock<>>, this update is visible
+        // to all clones of the handle (including the one the test code holds).
+        if let Some(ref sender) = callback_sender {
+            for handle in &handles {
+                let sender_clone = Arc::clone(sender);
+                if let Ok(mut guard) = handle.callback_sender.try_write() {
+                    *guard = Some(sender_clone);
+                }
+            }
+        }
+        self.registered_handles = handles;
+        self.shared_operations = shared_operations;
+        self.callback_sender = callback_sender;
+        self
     }
 
     /// Check if time skipping is enabled.
@@ -417,6 +458,9 @@ where
             Err(_) => Vec::new(),
         };
 
+        // Populate pre-registered handles with matching operations
+        self.populate_handles(&operations).await;
+
         // Build the test result based on handler outcome
         match handler_result {
             Ok(result) => {
@@ -467,7 +511,7 @@ where
             }
 
             // Get current operations
-            let operations = match self.checkpoint_api.get_operations(&execution_arn, "").await {
+            let mut operations = match self.checkpoint_api.get_operations(&execution_arn, "").await {
                 Ok(response) => {
                     let mut storage = self.operation_storage.write().await;
                     for op in &response.operations {
@@ -477,6 +521,9 @@ where
                 }
                 Err(_) => Vec::new(),
             };
+
+            // Populate pre-registered handles with matching operations
+            self.populate_handles(&operations).await;
 
             // Process operations and check for execution completion
             let process_result = self.process_operations(&operations, &execution_arn);
@@ -512,11 +559,54 @@ where
                     // If advance_time_ms is None, it means there are pending operations
                     // but none with a scheduled time (e.g., only callbacks are pending).
                     // Callbacks need external signals to complete, not re-invocation.
-                    // In this case, return Running status instead of re-invoking.
                     if advance_time_ms.is_none() {
-                        let mut test_result = TestExecutionResult::running(operations, execution_arn);
-                        test_result.invocations = invocations;
-                        return Ok(test_result);
+                        // When there are registered handles, the test code will send
+                        // callback responses via OperationHandle. Poll the checkpoint
+                        // server until the callback completes, then re-invoke.
+                        if !self.registered_handles.is_empty() {
+                            loop {
+                                tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+                                // Re-fetch operations to check for callback completion
+                                let poll_operations = match self
+                                    .checkpoint_api
+                                    .get_operations(&execution_arn, "")
+                                    .await
+                                {
+                                    Ok(response) => response.operations,
+                                    Err(_) => continue,
+                                };
+
+                                // Populate handles with updated operations
+                                self.populate_handles(&poll_operations).await;
+
+                                // Check if any previously pending callback has completed
+                                let all_callbacks_done = self.pending_operations.iter().all(|op_id| {
+                                    poll_operations.iter().any(|op| {
+                                        &op.operation_id == op_id
+                                            && op.operation_type == OperationType::Callback
+                                            && matches!(
+                                                op.status,
+                                                OperationStatus::Succeeded
+                                                    | OperationStatus::Failed
+                                                    | OperationStatus::Cancelled
+                                            )
+                                    })
+                                });
+
+                                if all_callbacks_done {
+                                    operations = poll_operations;
+                                    break;
+                                }
+                            }
+                            // Fall through to re-invoke the handler
+                        } else {
+                            // No registered handles — return Running as before
+                            let mut test_result =
+                                TestExecutionResult::running(operations, execution_arn);
+                            test_result.invocations = invocations;
+                            return Ok(test_result);
+                        }
                     }
 
                     // Advance time if needed (for time skipping mode)
@@ -636,6 +726,9 @@ where
                             Err(_) => Vec::new(),
                         };
 
+                    // Populate handles with final operation state
+                    self.populate_handles(&final_operations).await;
+
                     let mut test_result =
                         TestExecutionResult::success(result, final_operations, execution_arn);
                     test_result.invocations = invocations;
@@ -658,6 +751,9 @@ where
                                 Ok(response) => response.operations,
                                 Err(_) => Vec::new(),
                             };
+
+                        // Populate handles with final operation state
+                        self.populate_handles(&final_operations).await;
 
                         let mut test_result = TestExecutionResult::failure(
                             test_error,
@@ -920,6 +1016,65 @@ where
         // Callbacks don't have a scheduled time - they complete when external
         // system sends a response
         OperationProcessResult::Pending(None)
+    }
+
+    /// Populate pre-registered operation handles with matching operations.
+    ///
+    /// For each operation in the list, checks all registered handles for a match
+    /// based on the handle's matcher (by name, by index, or by ID). When a match
+    /// is found, writes the `Operation` into the handle's `inner` and sends a
+    /// status update via the handle's `status_tx` watch channel.
+    ///
+    /// Also updates the shared operations list for child operation enumeration.
+    ///
+    /// # Arguments
+    ///
+    /// * `operations` - The current list of operations from the checkpoint server
+    ///
+    /// # Requirements
+    ///
+    /// - 1.2: WHEN the handler executes and produces an operation matching the
+    ///   registered name, THE Local_Test_Runner SHALL populate the Operation_Handle
+    ///   with the operation data
+    /// - 2.2: WHEN `run()` is executing, THE Local_Test_Runner SHALL allow concurrent
+    ///   calls to `wait_for_data()` on pre-registered Operation_Handles
+    async fn populate_handles(&self, operations: &[Operation]) {
+        // Update the shared operations list for child enumeration
+        {
+            let mut shared_ops = self.shared_operations.write().await;
+            shared_ops.clear();
+            shared_ops.extend(operations.iter().cloned());
+        }
+
+        // Check each registered handle against the operations
+        for handle in &self.registered_handles {
+            let matched_op = match &handle.matcher {
+                OperationMatcher::ByName(name) => {
+                    operations.iter().find(|op| op.name.as_deref() == Some(name))
+                }
+                OperationMatcher::ByIndex(index) => operations.get(*index),
+                OperationMatcher::ById(id) => {
+                    operations.iter().find(|op| op.operation_id == *id)
+                }
+                OperationMatcher::ByNameAndIndex(name, index) => {
+                    operations
+                        .iter()
+                        .filter(|op| op.name.as_deref() == Some(name))
+                        .nth(*index)
+                }
+            };
+
+            if let Some(op) = matched_op {
+                // Write the operation into the handle's inner
+                {
+                    let mut inner = handle.inner.write().await;
+                    *inner = Some(op.clone());
+                }
+
+                // Send status update via the watch channel
+                let _ = handle.status_tx.send(Some(op.status.clone()));
+            }
+        }
     }
 
     /// Schedule handler re-invocation at a specific timestamp.

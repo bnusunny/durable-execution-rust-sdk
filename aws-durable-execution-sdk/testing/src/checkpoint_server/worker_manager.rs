@@ -180,6 +180,9 @@ impl CheckpointWorkerManager {
             ApiType::UpdateCheckpointData => {
                 Self::handle_update_checkpoint_data(state, &command.data)
             }
+            ApiType::GetNodeJsHistoryEvents => {
+                Self::handle_get_nodejs_history_events(state, &command.data)
+            }
             _ => WorkerApiResponse::error(
                 command.data.api_type,
                 command.data.request_id.clone(),
@@ -440,6 +443,13 @@ impl CheckpointWorkerManager {
                                 .send_success(&req.callback_id, &req.result)
                             {
                                 Ok(()) => {
+                                    // Also update the callback operation status to Succeeded
+                                    // so the orchestrator can detect completion and re-invoke.
+                                    checkpoint_manager.complete_callback_operation(
+                                        &req.callback_id,
+                                        Some(req.result.clone()),
+                                        None,
+                                    );
                                     return WorkerApiResponse::success(
                                         request.api_type,
                                         request.request_id.clone(),
@@ -504,6 +514,13 @@ impl CheckpointWorkerManager {
                                 .send_failure(&req.callback_id, &req.error)
                             {
                                 Ok(()) => {
+                                    // Also update the callback operation status to Failed
+                                    // so the orchestrator can detect completion and re-invoke.
+                                    checkpoint_manager.complete_callback_operation(
+                                        &req.callback_id,
+                                        None,
+                                        Some(req.error.clone()),
+                                    );
                                     return WorkerApiResponse::success(
                                         request.api_type,
                                         request.request_id.clone(),
@@ -630,6 +647,56 @@ impl CheckpointWorkerManager {
                             request.request_id.clone(),
                             "{}".to_string(),
                         )
+                    }
+                    None => WorkerApiResponse::error(
+                        request.api_type,
+                        request.request_id.clone(),
+                        format!("Execution not found: {}", req.execution_id),
+                    ),
+                }
+            }
+            Err(e) => WorkerApiResponse::error(
+                request.api_type,
+                request.request_id.clone(),
+                format!("Failed to parse request: {}", e),
+            ),
+        }
+    }
+
+    /// Handle GetNodeJsHistoryEvents request.
+    /// 
+    /// This method retrieves the Node.js-compatible history events for an execution.
+    /// These events match the Node.js SDK's event history format exactly,
+    /// enabling cross-SDK history comparison.
+    fn handle_get_nodejs_history_events(
+        state: &mut CheckpointServerState,
+        request: &WorkerApiRequest,
+    ) -> WorkerApiResponse {
+        let parsed: Result<super::types::GetNodeJsHistoryEventsRequest, _> =
+            serde_json::from_str(&request.payload);
+
+        match parsed {
+            Ok(req) => {
+                // Get checkpoint manager by execution ID
+                match state
+                    .execution_manager
+                    .get_checkpoints_by_execution(&req.execution_id)
+                {
+                    Some(checkpoint_manager) => {
+                        // Get Node.js history events
+                        let events = checkpoint_manager.get_nodejs_history_events();
+                        match serde_json::to_string(&events) {
+                            Ok(payload) => WorkerApiResponse::success(
+                                request.api_type,
+                                request.request_id.clone(),
+                                payload,
+                            ),
+                            Err(e) => WorkerApiResponse::error(
+                                request.api_type,
+                                request.request_id.clone(),
+                                format!("Failed to serialize response: {}", e),
+                            ),
+                        }
                     }
                     None => WorkerApiResponse::error(
                         request.api_type,
@@ -862,6 +929,49 @@ impl CheckpointWorkerManager {
         }
 
         Ok(())
+    }
+
+    /// Get Node.js-compatible history events for an execution.
+    ///
+    /// Returns events in the Node.js SDK compatible format, suitable for
+    /// cross-SDK history comparison. These events use PascalCase field names
+    /// and include detailed event-specific information.
+    ///
+    /// # Arguments
+    ///
+    /// * `execution_id` - The execution ID to get history events for
+    ///
+    /// # Returns
+    ///
+    /// A vector of Node.js-compatible history events.
+    pub async fn get_nodejs_history_events(
+        &self,
+        execution_id: &str,
+    ) -> Result<Vec<super::nodejs_event_types::NodeJsHistoryEvent>, DurableError> {
+        use super::types::GetNodeJsHistoryEventsRequest;
+
+        let request = GetNodeJsHistoryEventsRequest {
+            execution_id: execution_id.to_string(),
+        };
+
+        let payload = serde_json::to_string(&request)
+            .map_err(|e| DurableError::validation(format!("Failed to serialize request: {}", e)))?;
+
+        let response = self
+            .send_api_request(ApiType::GetNodeJsHistoryEvents, payload)
+            .await
+            .map_err(|e| DurableError::checkpoint_retriable(format!("Communication error: {}", e)))?;
+
+        if let Some(error) = response.error {
+            return Err(DurableError::checkpoint_retriable(error));
+        }
+
+        let payload = response
+            .payload
+            .ok_or_else(|| DurableError::checkpoint_retriable("Empty response payload"))?;
+
+        serde_json::from_str(&payload)
+            .map_err(|e| DurableError::validation(format!("Failed to parse response: {}", e)))
     }
 }
 

@@ -25,6 +25,7 @@ pub mod checkpoint_manager;
 pub mod checkpoint_token;
 pub mod event_processor;
 pub mod execution_manager;
+pub mod nodejs_event_types;
 pub mod orchestrator;
 pub mod scheduler;
 pub mod types;
@@ -34,8 +35,21 @@ pub mod worker_manager;
 pub use callback_manager::{CallbackManager, CallbackState, CompleteCallbackStatus};
 pub use checkpoint_manager::{CheckpointManager, CheckpointOperation, InvocationTimestamps, OperationEvents};
 pub use checkpoint_token::{decode_checkpoint_token, encode_checkpoint_token, CheckpointTokenData};
-pub use event_processor::EventProcessor;
+pub use event_processor::{EventProcessor, EventType, HistoryEvent};
 pub use execution_manager::{ExecutionManager, InvocationResult};
+pub use nodejs_event_types::{
+    CallbackFailedDetails, CallbackFailedDetailsWrapper, CallbackStartedDetails,
+    CallbackStartedDetailsWrapper, CallbackSucceededDetails, CallbackSucceededDetailsWrapper,
+    ContextFailedDetails, ContextFailedDetailsWrapper, ContextStartedDetails,
+    ContextStartedDetailsWrapper, ContextSucceededDetails, ContextSucceededDetailsWrapper,
+    EmptyDetails, ErrorWrapper, ExecutionFailedDetails, ExecutionFailedDetailsWrapper,
+    ExecutionStartedDetails, ExecutionStartedDetailsWrapper, ExecutionSucceededDetails,
+    ExecutionSucceededDetailsWrapper, InvocationCompletedDetails, InvocationCompletedDetailsWrapper,
+    NodeJsEventDetails, NodeJsEventType, NodeJsHistoryEvent, PayloadWrapper, RetryDetails,
+    StepFailedDetails, StepFailedDetailsWrapper, StepStartedDetails, StepStartedDetailsWrapper,
+    StepSucceededDetails, StepSucceededDetailsWrapper, WaitStartedDetails, WaitStartedDetailsWrapper,
+    WaitSucceededDetails, WaitSucceededDetailsWrapper,
+};
 pub use orchestrator::{
     BoxedHandler, InvokeHandlerResult, OperationProcessResult, OperationStorage, ProcessOperationsResult,
     SkipTimeConfig, TestExecutionOrchestrator, TestExecutionResult,

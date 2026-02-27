@@ -41,6 +41,8 @@ pub enum ApiType {
     SendDurableExecutionCallbackFailure,
     /// Send a callback heartbeat
     SendDurableExecutionCallbackHeartbeat,
+    /// Get Node.js-compatible history events for an execution
+    GetNodeJsHistoryEvents,
 }
 
 /// Command types sent from the main thread to the worker.
@@ -160,6 +162,13 @@ pub struct SendCallbackFailureRequest {
 pub struct SendCallbackHeartbeatRequest {
     /// The callback ID
     pub callback_id: String,
+}
+
+/// Request to get Node.js-compatible history events for an execution.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetNodeJsHistoryEventsRequest {
+    /// The execution ID
+    pub execution_id: ExecutionId,
 }
 
 // ============================================================================

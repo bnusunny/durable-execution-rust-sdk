@@ -1,7 +1,7 @@
 //! Tests for hello_world example using LocalDurableTestRunner.
 
 use aws_durable_execution_sdk::{DurableContext, DurableError};
-use aws_durable_execution_sdk_examples::test_helper::assert_event_signatures;
+use aws_durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures;
 use aws_durable_execution_sdk_testing::{
     ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig,
 };
@@ -35,8 +35,8 @@ async fn test_hello_world() {
     let operations = result.get_operations();
     assert!(!operations.is_empty(), "Should have at least one operation");
 
-    // Check event signatures
-    assert_event_signatures(operations, "tests/history/hello_world.history.json");
+    // Check event signatures (Node.js-compatible format)
+    assert_nodejs_event_signatures(&result, "tests/history/hello_world.history.json");
 
     LocalDurableTestRunner::<serde_json::Value, String>::teardown_test_environment()
         .await

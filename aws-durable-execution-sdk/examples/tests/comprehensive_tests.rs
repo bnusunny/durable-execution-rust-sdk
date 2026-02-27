@@ -4,7 +4,7 @@ use aws_durable_execution_sdk::{
     CallbackConfig, CompletionConfig, DurableContext, DurableError, Duration, MapConfig,
     OperationType,
 };
-use aws_durable_execution_sdk_examples::test_helper::assert_event_signatures_unordered;
+use aws_durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures_unordered;
 use aws_durable_execution_sdk_testing::{
     ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig,
 };
@@ -205,9 +205,9 @@ async fn test_order_workflow_no_approval() {
         .collect();
     assert!(!context_ops.is_empty(), "Should have context operations");
 
-    // Use unordered comparison due to map concurrency
-    assert_event_signatures_unordered(
-        operations,
+    // Use unordered comparison due to map concurrency (Node.js-compatible format)
+    assert_nodejs_event_signatures_unordered(
+        &result,
         "tests/history/order_workflow_no_approval.history.json",
     );
 
@@ -258,9 +258,9 @@ async fn test_order_workflow_with_approval() {
     let approval_callback = callback_ops.first().unwrap();
     assert_eq!(approval_callback.name, Some("order_approval".to_string()));
 
-    // Use unordered comparison due to map concurrency
-    assert_event_signatures_unordered(
-        operations,
+    // Use unordered comparison due to map concurrency (Node.js-compatible format)
+    assert_nodejs_event_signatures_unordered(
+        &result,
         "tests/history/order_workflow_with_approval.history.json",
     );
 

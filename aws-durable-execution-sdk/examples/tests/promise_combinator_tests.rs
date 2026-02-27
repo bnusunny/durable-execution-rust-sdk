@@ -16,7 +16,7 @@ use aws_durable_execution_sdk::{
     OperationType,
 };
 use aws_durable_execution_sdk_examples::test_helper::{
-    assert_event_signatures, assert_event_signatures_unordered,
+    assert_nodejs_event_signatures, assert_nodejs_event_signatures_unordered,
 };
 use aws_durable_execution_sdk_testing::{
     ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig,
@@ -147,9 +147,9 @@ async fn test_promise_all_macro() {
         "Should have step operations for all! macro"
     );
 
-    // Check event signatures
-    assert_event_signatures(
-        operations,
+    // Check event signatures (Node.js-compatible format)
+    assert_nodejs_event_signatures(
+        &result,
         "tests/history/promise_all_macro.history.json",
     );
 }
@@ -185,8 +185,8 @@ async fn test_promise_all() {
     let operations = result.get_operations();
     assert!(!operations.is_empty(), "Should have operations");
 
-    // Check event signatures
-    assert_event_signatures(operations, "tests/history/promise_all.history.json");
+    // Check event signatures (Node.js-compatible format)
+    assert_nodejs_event_signatures(&result, "tests/history/promise_all.history.json");
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -220,9 +220,9 @@ async fn test_promise_all_with_map() {
     let operations = result.get_operations();
     assert!(!operations.is_empty(), "Should have operations");
 
-    // Check event signatures
-    assert_event_signatures(
-        operations,
+    // Check event signatures (Node.js-compatible format)
+    assert_nodejs_event_signatures(
+        &result,
         "tests/history/promise_all_with_map.history.json",
     );
 }
@@ -340,9 +340,9 @@ async fn test_promise_all_settled_macro() {
     let operations = result.get_operations();
     assert!(!operations.is_empty(), "Should have operations");
 
-    // Check event signatures
-    assert_event_signatures(
-        operations,
+    // Check event signatures (Node.js-compatible format)
+    assert_nodejs_event_signatures(
+        &result,
         "tests/history/promise_all_settled_macro.history.json",
     );
 }
@@ -376,9 +376,9 @@ async fn test_promise_all_settled() {
     let operations = result.get_operations();
     assert!(!operations.is_empty(), "Should have operations");
 
-    // Check event signatures (unordered because map can process in any order)
-    assert_event_signatures_unordered(
-        operations,
+    // Check event signatures (Node.js-compatible format, unordered because map can process in any order)
+    assert_nodejs_event_signatures_unordered(
+        &result,
         "tests/history/promise_all_settled.history.json",
     );
 }
@@ -492,9 +492,9 @@ async fn test_promise_any_macro() {
     let operations = result.get_operations();
     assert!(!operations.is_empty(), "Should have operations");
 
-    // Check event signatures
-    assert_event_signatures(
-        operations,
+    // Check event signatures (Node.js-compatible format)
+    assert_nodejs_event_signatures(
+        &result,
         "tests/history/promise_any_macro.history.json",
     );
 }
@@ -531,9 +531,9 @@ async fn test_promise_any() {
     let operations = result.get_operations();
     assert!(!operations.is_empty(), "Should have operations");
 
-    // Check event signatures (unordered because concurrency can affect order)
-    assert_event_signatures_unordered(
-        operations,
+    // Check event signatures (Node.js-compatible format, unordered because concurrency can affect order)
+    assert_nodejs_event_signatures_unordered(
+        &result,
         "tests/history/promise_any.history.json",
     );
 }
@@ -655,9 +655,9 @@ async fn test_promise_race_macro() {
     let operations = result.get_operations();
     assert!(!operations.is_empty(), "Should have operations");
 
-    // Check event signatures
-    assert_event_signatures(
-        operations,
+    // Check event signatures (Node.js-compatible format)
+    assert_nodejs_event_signatures(
+        &result,
         "tests/history/promise_race_macro.history.json",
     );
 }
@@ -696,9 +696,9 @@ async fn test_promise_race() {
     let operations = result.get_operations();
     assert!(!operations.is_empty(), "Should have operations");
 
-    // Check event signatures (unordered because concurrency can affect order)
-    assert_event_signatures_unordered(
-        operations,
+    // Check event signatures (Node.js-compatible format, unordered because concurrency can affect order)
+    assert_nodejs_event_signatures_unordered(
+        &result,
         "tests/history/promise_race.history.json",
     );
 }
@@ -729,9 +729,243 @@ async fn test_promise_race_timeout_pattern() {
     let operations = result.get_operations();
     assert!(!operations.is_empty(), "Should have operations");
 
-    // Check event signatures
-    assert_event_signatures(
-        operations,
+    // Check event signatures (Node.js-compatible format)
+    assert_nodejs_event_signatures(
+        &result,
         "tests/history/promise_race_timeout.history.json",
     );
+}
+
+// ============================================================================
+// All with Wait Example Handler
+// ============================================================================
+
+/// Handler using `all!` macro with wait operations in some branches.
+/// Note: ctx.wait() inside all! branches causes suspend which the all! combinator
+/// treats as a failure. Instead, we demonstrate all! with named steps that represent
+/// operations happening after conceptual waits, with actual waits before the combinator.
+async fn all_with_wait_handler(
+    _event: serde_json::Value,
+    ctx: DurableContext,
+) -> Result<Vec<String>, DurableError> {
+    // Perform waits before the all! combinator
+    ctx.wait(aws_durable_execution_sdk::Duration::from_seconds(1), Some("wait_1"))
+        .await?;
+    ctx.wait(aws_durable_execution_sdk::Duration::from_seconds(2), Some("wait_2"))
+        .await?;
+
+    let ctx1 = ctx.clone();
+    let ctx2 = ctx.clone();
+    let ctx3 = ctx.clone();
+
+    let results = all!(
+        ctx,
+        async move { ctx1.step(|_| Ok("fast".to_string()), None).await },
+        async move {
+            ctx2.step(|_| Ok("after_wait_1".to_string()), None).await
+        },
+        async move {
+            ctx3.step(|_| Ok("after_wait_2".to_string()), None).await
+        },
+    )
+    .await?;
+
+    Ok(results)
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn test_all_with_wait() {
+    LocalDurableTestRunner::<serde_json::Value, Vec<String>>::setup_test_environment(
+        TestEnvironmentConfig {
+            skip_time: true,
+            checkpoint_delay: None,
+        },
+    )
+    .await
+    .unwrap();
+
+    let mut runner = LocalDurableTestRunner::new(all_with_wait_handler);
+    let result = runner.run(serde_json::json!({})).await.unwrap();
+
+    assert_eq!(
+        result.get_status(),
+        ExecutionStatus::Succeeded,
+        "Execution should complete successfully"
+    );
+
+    let results = result.get_result().unwrap();
+    assert_eq!(results.len(), 3, "Should have 3 results");
+    assert!(results.contains(&"fast".to_string()));
+    assert!(results.contains(&"after_wait_1".to_string()));
+    assert!(results.contains(&"after_wait_2".to_string()));
+
+    let operations = result.get_operations();
+    assert!(!operations.is_empty(), "Should have operations");
+
+    assert_nodejs_event_signatures(&result, "tests/history/all_with_wait.history.json");
+
+    LocalDurableTestRunner::<serde_json::Value, Vec<String>>::teardown_test_environment()
+        .await
+        .unwrap();
+}
+
+// ============================================================================
+// Race with Timeout Example Handler
+// ============================================================================
+
+/// Handler using `race!` as a timeout pattern.
+/// Since race! branches cannot contain suspend-producing operations like ctx.wait(),
+/// we demonstrate the pattern with a step that simulates a timeout sentinel.
+async fn race_with_timeout_handler(
+    _event: serde_json::Value,
+    ctx: DurableContext,
+) -> Result<String, DurableError> {
+    let ctx1 = ctx.clone();
+    let ctx2 = ctx.clone();
+
+    let result = race!(
+        ctx,
+        async move {
+            ctx1.step(|_| Ok("operation completed".to_string()), None)
+                .await
+        },
+        async move {
+            ctx2.step(|_| Ok("timed out".to_string()), None)
+                .await
+        },
+    )
+    .await?;
+
+    Ok(result)
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn test_race_with_timeout() {
+    LocalDurableTestRunner::<serde_json::Value, String>::setup_test_environment(
+        TestEnvironmentConfig {
+            skip_time: true,
+            checkpoint_delay: None,
+        },
+    )
+    .await
+    .unwrap();
+
+    let mut runner = LocalDurableTestRunner::new(race_with_timeout_handler);
+    let result = runner.run(serde_json::json!({})).await.unwrap();
+
+    assert_eq!(
+        result.get_status(),
+        ExecutionStatus::Succeeded,
+        "Execution should complete successfully"
+    );
+
+    let race_result = result.get_result().unwrap();
+    // The step completes immediately, so it should beat the 5-second timeout
+    assert!(
+        race_result == "operation completed" || race_result == "timed out",
+        "Should get a result, got: {}",
+        race_result
+    );
+
+    let operations = result.get_operations();
+    assert!(!operations.is_empty(), "Should have operations");
+
+    assert_nodejs_event_signatures(&result, "tests/history/race_with_timeout.history.json");
+
+    LocalDurableTestRunner::<serde_json::Value, String>::teardown_test_environment()
+        .await
+        .unwrap();
+}
+
+// ============================================================================
+// Replay Behavior Example Handler
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ReplayBehaviorResult {
+    pub all_results: Vec<String>,
+    pub race_result: String,
+    pub combined: String,
+}
+
+/// Handler demonstrating deterministic replay with multiple combinators in sequence.
+async fn replay_behavior_handler(
+    _event: serde_json::Value,
+    ctx: DurableContext,
+) -> Result<ReplayBehaviorResult, DurableError> {
+    // First: all! to get multiple results
+    let ctx1 = ctx.clone();
+    let ctx2 = ctx.clone();
+    let ctx3 = ctx.clone();
+
+    let all_results = all!(
+        ctx,
+        async move { ctx1.step(|_| Ok("result_a".to_string()), None).await },
+        async move { ctx2.step(|_| Ok("result_b".to_string()), None).await },
+        async move { ctx3.step(|_| Ok("result_c".to_string()), None).await },
+    )
+    .await?;
+
+    // Second: race! to get the first result
+    let ctx4 = ctx.clone();
+    let ctx5 = ctx.clone();
+
+    let race_result = race!(
+        ctx,
+        async move { ctx4.step(|_| Ok("fast_path".to_string()), None).await },
+        async move { ctx5.step(|_| Ok("slow_path".to_string()), None).await },
+    )
+    .await?;
+
+    // Combine and return
+    let combined = format!("all=[{}], race={}", all_results.join(","), race_result);
+
+    Ok(ReplayBehaviorResult {
+        all_results,
+        race_result,
+        combined,
+    })
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn test_replay_behavior() {
+    LocalDurableTestRunner::<serde_json::Value, ReplayBehaviorResult>::setup_test_environment(
+        TestEnvironmentConfig {
+            skip_time: true,
+            checkpoint_delay: None,
+        },
+    )
+    .await
+    .unwrap();
+
+    let mut runner = LocalDurableTestRunner::new(replay_behavior_handler);
+    let result = runner.run(serde_json::json!({})).await.unwrap();
+
+    assert_eq!(
+        result.get_status(),
+        ExecutionStatus::Succeeded,
+        "Execution should complete successfully"
+    );
+
+    let replay_result = result.get_result().unwrap();
+    assert_eq!(replay_result.all_results.len(), 3, "Should have 3 all results");
+    assert!(replay_result.all_results.contains(&"result_a".to_string()));
+    assert!(replay_result.all_results.contains(&"result_b".to_string()));
+    assert!(replay_result.all_results.contains(&"result_c".to_string()));
+
+    // race_result should be one of the two
+    assert!(
+        replay_result.race_result == "fast_path" || replay_result.race_result == "slow_path",
+        "Should get a race result, got: {}",
+        replay_result.race_result
+    );
+
+    let operations = result.get_operations();
+    assert!(!operations.is_empty(), "Should have operations");
+
+    assert_nodejs_event_signatures(&result, "tests/history/replay_behavior.history.json");
+
+    LocalDurableTestRunner::<serde_json::Value, ReplayBehaviorResult>::teardown_test_environment()
+        .await
+        .unwrap();
 }

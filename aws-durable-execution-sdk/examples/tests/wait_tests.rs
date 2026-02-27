@@ -22,7 +22,7 @@ use aws_durable_execution_sdk::{
     DurableContext, DurableError, Duration, OperationStatus, OperationType, WaitForConditionConfig,
     WaitForConditionContext,
 };
-use aws_durable_execution_sdk_examples::test_helper::assert_event_signatures;
+use aws_durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures;
 use aws_durable_execution_sdk_testing::{
     ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig,
 };
@@ -105,8 +105,8 @@ async fn test_wait_basic() {
         invocations.len()
     );
 
-    // Check event signatures
-    assert_event_signatures(operations, "tests/history/wait_basic.history.json");
+    // Check event signatures (Node.js-compatible format)
+    assert_nodejs_event_signatures(&result, "tests/history/wait_basic.history.json");
 
     LocalDurableTestRunner::<serde_json::Value, String>::teardown_test_environment()
         .await
@@ -214,8 +214,8 @@ async fn test_wait_named() {
         invocations.len()
     );
 
-    // Check event signatures
-    assert_event_signatures(operations, "tests/history/wait_named.history.json");
+    // Check event signatures (Node.js-compatible format)
+    assert_nodejs_event_signatures(&result, "tests/history/wait_named.history.json");
 
     LocalDurableTestRunner::<serde_json::Value, String>::teardown_test_environment()
         .await
@@ -306,8 +306,8 @@ async fn test_wait_extended_duration() {
         invocations.len()
     );
 
-    // Check event signatures
-    assert_event_signatures(operations, "tests/history/wait_extended.history.json");
+    // Check event signatures (Node.js-compatible format)
+    assert_nodejs_event_signatures(&result, "tests/history/wait_extended.history.json");
 
     LocalDurableTestRunner::<serde_json::Value, String>::teardown_test_environment()
         .await
@@ -337,15 +337,14 @@ async fn wait_for_condition_basic_handler(
     ctx: DurableContext,
 ) -> Result<JobStatus, DurableError> {
     // Configure polling behavior with initial state
-    let config = WaitForConditionConfig {
-        initial_state: PollingState {
+    let config = WaitForConditionConfig::from_interval(
+        PollingState {
             job_id: "job-12345".to_string(),
             check_count: 0,
         },
-        interval: Duration::from_seconds(5), // Poll every 5 seconds
-        max_attempts: Some(10),              // Max 10 attempts
-        timeout: Some(Duration::from_minutes(5)),
-    };
+        Duration::from_seconds(5), // Poll every 5 seconds
+        Some(10),                  // Max 10 attempts
+    );
 
     // Poll until job completes
     let result: JobStatus = ctx
@@ -420,9 +419,9 @@ async fn test_wait_for_condition_basic() {
         invocations.len()
     );
 
-    // Check event signatures
-    assert_event_signatures(
-        operations,
+    // Check event signatures (Node.js-compatible format)
+    assert_nodejs_event_signatures(
+        &result,
         "tests/history/wait_for_condition_basic.history.json",
     );
 
@@ -572,8 +571,8 @@ async fn test_multiple_waits() {
         invocations.len()
     );
 
-    // Check event signatures
-    assert_event_signatures(operations, "tests/history/multiple_waits.history.json");
+    // Check event signatures (Node.js-compatible format)
+    assert_nodejs_event_signatures(&result, "tests/history/multiple_waits.history.json");
 
     LocalDurableTestRunner::<serde_json::Value, WorkflowProgress>::teardown_test_environment()
         .await

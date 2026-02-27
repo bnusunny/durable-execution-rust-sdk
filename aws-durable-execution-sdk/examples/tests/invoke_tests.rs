@@ -1,7 +1,7 @@
 //! Tests for invoke examples using LocalDurableTestRunner.
 
 use aws_durable_execution_sdk::{DurableContext, DurableError, OperationType};
-use aws_durable_execution_sdk_examples::test_helper::assert_event_signatures;
+use aws_durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures;
 use aws_durable_execution_sdk_testing::{
     ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig,
 };
@@ -68,7 +68,7 @@ async fn test_invoke_basic() {
         .collect();
     assert!(!invoke_ops.is_empty(), "Should have an invoke operation");
 
-    assert_event_signatures(operations, "tests/history/invoke_basic.history.json");
+    assert_nodejs_event_signatures(&result, "tests/history/invoke_basic.history.json");
 
     LocalDurableTestRunner::<serde_json::Value, ChildResponse>::teardown_test_environment()
         .await

@@ -4,7 +4,7 @@
 //! the expected operation history.
 
 use aws_durable_execution_sdk::{DurableContext, DurableError, StepConfig, StepSemantics};
-use aws_durable_execution_sdk_examples::test_helper::assert_event_signatures;
+use aws_durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures;
 use aws_durable_execution_sdk_testing::{ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig};
 use serde::{Deserialize, Serialize};
 
@@ -45,9 +45,9 @@ async fn test_step_basic() {
     let operations = result.get_operations();
     assert!(!operations.is_empty(), "Should have at least one operation");
 
-    // Check event signatures
-    assert_event_signatures(
-        operations,
+    // Check event signatures (Node.js-compatible format)
+    assert_nodejs_event_signatures(
+        &result,
         "tests/history/step_basic.history.json",
     );
 
@@ -142,9 +142,9 @@ async fn test_step_named() {
     let operations = result.get_operations();
     assert!(!operations.is_empty(), "Should have operations");
 
-    // Check event signatures
-    assert_event_signatures(
-        operations,
+    // Check event signatures (Node.js-compatible format)
+    assert_nodejs_event_signatures(
+        &result,
         "tests/history/step_named.history.json",
     );
 
@@ -224,13 +224,185 @@ async fn test_step_with_config() {
     let operations = result.get_operations();
     assert!(!operations.is_empty(), "Should have operations");
 
-    // Check event signatures
-    assert_event_signatures(
-        operations,
+    // Check event signatures (Node.js-compatible format)
+    assert_nodejs_event_signatures(
+        &result,
         "tests/history/step_with_config.history.json",
     );
 
     LocalDurableTestRunner::<serde_json::Value, PaymentResult>::teardown_test_environment()
+        .await
+        .unwrap();
+}
+
+// ============================================================================
+// Step Retry Exponential Backoff Example Handler
+// ============================================================================
+
+use aws_durable_execution_sdk::{Duration, ExponentialBackoff, JitterStrategy};
+
+/// Handler from step/retry_exponential_backoff example (without macro for testing)
+async fn step_retry_exponential_backoff_handler(
+    _event: serde_json::Value,
+    ctx: DurableContext,
+) -> Result<String, DurableError> {
+    let config = StepConfig {
+        retry_strategy: Some(Box::new(
+            ExponentialBackoff::builder()
+                .max_attempts(3)
+                .base_delay(Duration::from_seconds(1))
+                .max_delay(Duration::from_seconds(10))
+                .multiplier(2.0)
+                .jitter(JitterStrategy::Full)
+                .build(),
+        )),
+        ..Default::default()
+    };
+
+    let result: String = ctx
+        .step_named(
+            "retryable_operation",
+            |_step_ctx| Ok("operation_succeeded".to_string()),
+            Some(config),
+        )
+        .await?;
+
+    Ok(result)
+}
+
+#[tokio::test]
+async fn test_step_retry_exponential_backoff() {
+    LocalDurableTestRunner::<serde_json::Value, String>::setup_test_environment(
+        TestEnvironmentConfig {
+            skip_time: true,
+            checkpoint_delay: None,
+        },
+    )
+    .await
+    .unwrap();
+
+    let mut runner = LocalDurableTestRunner::new(step_retry_exponential_backoff_handler);
+    let result = runner.run(serde_json::json!({})).await.unwrap();
+
+    assert_eq!(result.get_status(), ExecutionStatus::Succeeded);
+    assert_eq!(result.get_result().unwrap(), "operation_succeeded");
+
+    let operations = result.get_operations();
+    assert!(!operations.is_empty(), "Should have at least one operation");
+
+    assert_nodejs_event_signatures(
+        &result,
+        "tests/history/step_retry_exponential_backoff.history.json",
+    );
+
+    LocalDurableTestRunner::<serde_json::Value, String>::teardown_test_environment()
+        .await
+        .unwrap();
+}
+
+// ============================================================================
+// Step Retry With Filter Example Handler
+// ============================================================================
+
+use aws_durable_execution_sdk::{ErrorPattern, RetryableErrorFilter};
+
+/// Handler from step/retry_with_filter example (without macro for testing)
+async fn step_retry_with_filter_handler(
+    _event: serde_json::Value,
+    ctx: DurableContext,
+) -> Result<String, DurableError> {
+    let config = StepConfig {
+        retryable_error_filter: Some(RetryableErrorFilter {
+            patterns: vec![ErrorPattern::Contains("transient".to_string())],
+            error_types: vec![],
+        }),
+        ..Default::default()
+    };
+
+    let result: String = ctx
+        .step_named(
+            "filtered_operation",
+            |_step_ctx| Ok("filter_configured".to_string()),
+            Some(config),
+        )
+        .await?;
+
+    Ok(result)
+}
+
+#[tokio::test]
+async fn test_step_retry_with_filter() {
+    LocalDurableTestRunner::<serde_json::Value, String>::setup_test_environment(
+        TestEnvironmentConfig {
+            skip_time: true,
+            checkpoint_delay: None,
+        },
+    )
+    .await
+    .unwrap();
+
+    let mut runner = LocalDurableTestRunner::new(step_retry_with_filter_handler);
+    let result = runner.run(serde_json::json!({})).await.unwrap();
+
+    assert_eq!(result.get_status(), ExecutionStatus::Succeeded);
+    assert_eq!(result.get_result().unwrap(), "filter_configured");
+
+    let operations = result.get_operations();
+    assert!(!operations.is_empty(), "Should have at least one operation");
+
+    assert_nodejs_event_signatures(
+        &result,
+        "tests/history/step_retry_with_filter.history.json",
+    );
+
+    LocalDurableTestRunner::<serde_json::Value, String>::teardown_test_environment()
+        .await
+        .unwrap();
+}
+
+// ============================================================================
+// Step Error Determinism Example Handler
+// ============================================================================
+
+/// Handler from step/error_determinism example (without macro for testing)
+async fn step_error_determinism_handler(
+    _event: serde_json::Value,
+    ctx: DurableContext,
+) -> Result<String, DurableError> {
+    let result: String = ctx
+        .step_named(
+            "always_fails",
+            |_step_ctx| Err::<String, _>("deterministic_failure".into()),
+            None,
+        )
+        .await?;
+
+    Ok(result)
+}
+
+#[tokio::test]
+async fn test_step_error_determinism() {
+    LocalDurableTestRunner::<serde_json::Value, String>::setup_test_environment(
+        TestEnvironmentConfig {
+            skip_time: true,
+            checkpoint_delay: None,
+        },
+    )
+    .await
+    .unwrap();
+
+    let mut runner = LocalDurableTestRunner::new(step_error_determinism_handler);
+    let result = runner.run(serde_json::json!({})).await.unwrap();
+
+    // The step always fails, so the execution should fail
+    assert_eq!(result.get_status(), ExecutionStatus::Failed);
+
+    assert_nodejs_event_signatures(
+        &result,
+        "tests/history/step_error_determinism.history.json",
+    );
+
+    LocalDurableTestRunner::<serde_json::Value, String>::teardown_test_environment()
         .await
         .unwrap();
 }

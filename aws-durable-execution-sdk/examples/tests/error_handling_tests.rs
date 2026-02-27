@@ -1,7 +1,7 @@
 //! Tests for error_handling examples using LocalDurableTestRunner.
 
 use aws_durable_execution_sdk::{DurableContext, DurableError, OperationType, TerminationReason};
-use aws_durable_execution_sdk_examples::test_helper::assert_event_signatures;
+use aws_durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures;
 use aws_durable_execution_sdk_testing::{
     ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig,
 };
@@ -86,7 +86,7 @@ async fn test_step_error_success() {
     let process_step = step_ops.first().unwrap();
     assert_eq!(process_step.name, Some("process_value".to_string()));
 
-    assert_event_signatures(operations, "tests/history/step_error_success.history.json");
+    assert_nodejs_event_signatures(&result, "tests/history/step_error_success.history.json");
 
     LocalDurableTestRunner::<ProcessingInput, ProcessingResult>::teardown_test_environment()
         .await
@@ -117,7 +117,7 @@ async fn test_step_error_failure() {
     let operations = result.get_operations();
     assert!(!operations.is_empty(), "Should have operations");
 
-    assert_event_signatures(operations, "tests/history/step_error_failure.history.json");
+    assert_nodejs_event_signatures(&result, "tests/history/step_error_failure.history.json");
 
     LocalDurableTestRunner::<ProcessingInput, ProcessingResult>::teardown_test_environment()
         .await

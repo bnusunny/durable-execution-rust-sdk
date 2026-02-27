@@ -22,6 +22,13 @@ tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 ```
 
+For testing support, add the testing crate:
+
+```toml
+[dev-dependencies]
+aws-durable-execution-sdk-testing = "0.1"
+```
+
 ## Quick Start
 
 ```rust
@@ -221,6 +228,41 @@ let result = callback.result().await?;
 
 `wait_for_callback` solves this by running your notification inside a checkpointed child context.
 
+## Retry Strategies
+
+Configure automatic retries for steps with built-in strategies:
+
+```rust
+use aws_durable_execution_sdk::{StepConfig, ExponentialBackoff, FixedDelay, LinearBackoff, NoRetry};
+
+// Exponential backoff: 1s, 2s, 4s, 8s, ...
+let config = StepConfig {
+    retry_strategy: Some(Box::new(ExponentialBackoff::new(3, 1000, 30000))),
+    ..Default::default()
+};
+
+// Fixed delay: 2s, 2s, 2s, ...
+let config = StepConfig {
+    retry_strategy: Some(Box::new(FixedDelay::new(5, 2000))),
+    ..Default::default()
+};
+
+// Linear backoff: 1s, 2s, 3s, 4s, ...
+let config = StepConfig {
+    retry_strategy: Some(Box::new(LinearBackoff::new(3, 1000))),
+    ..Default::default()
+};
+```
+
+Filter which errors are retryable:
+
+```rust
+use aws_durable_execution_sdk::RetryableErrorFilter;
+
+let filter = RetryableErrorFilter::new(vec!["TimeoutError".to_string()]);
+assert!(filter.is_retryable_with_type("request timed out", "TimeoutError"));
+```
+
 ## Replay-Safe Helpers
 
 Generate deterministic values that are safe for replay:
@@ -321,19 +363,131 @@ See [DETERMINISM.md](aws-durable-execution-sdk/docs/DETERMINISM.md) for detailed
 
 See [LIMITS.md](aws-durable-execution-sdk/docs/LIMITS.md) for complete details.
 
+## Testing
+
+The `aws-durable-execution-sdk-testing` crate provides two test runners for verifying durable workflows at different levels.
+
+### Local Testing
+
+`LocalDurableTestRunner` executes workflows in-process with a simulated checkpoint server. It supports time skipping, operation inspection, and callback interaction — no AWS credentials needed.
+
+```rust
+use aws_durable_execution_sdk_testing::{
+    LocalDurableTestRunner, TestEnvironmentConfig, ExecutionStatus,
+};
+
+#[tokio::test]
+async fn test_order_workflow() {
+    LocalDurableTestRunner::setup_test_environment(TestEnvironmentConfig {
+        skip_time: true,
+        checkpoint_delay: None,
+    }).await.unwrap();
+
+    let mut runner = LocalDurableTestRunner::new(process_order);
+    let result = runner.run("input").await.unwrap();
+
+    assert_eq!(result.get_status(), ExecutionStatus::Succeeded);
+
+    // Inspect individual operations
+    if let Some(op) = runner.get_operation("validate").await {
+        assert_eq!(op.get_status(), OperationStatus::Succeeded);
+    }
+
+    LocalDurableTestRunner::teardown_test_environment().await.unwrap();
+}
+```
+
+### Cloud Testing
+
+`CloudDurableTestRunner` invokes deployed Lambda functions and polls `GetDurableExecutionHistory` for real-time operation tracking. It supports operation handles for waiting on specific operations, callback interaction during execution, and configurable polling with timeout.
+
+```rust
+use aws_durable_execution_sdk_testing::{
+    CloudDurableTestRunner, CloudTestRunnerConfig, ExecutionStatus,
+};
+use std::time::Duration;
+
+#[tokio::test]
+async fn test_deployed_workflow() {
+    let mut runner = CloudDurableTestRunner::<String>::new("my-function-name")
+        .await
+        .unwrap()
+        .with_config(CloudTestRunnerConfig::new()
+            .with_poll_interval(Duration::from_millis(500))
+            .with_timeout(Duration::from_secs(60)));
+
+    // Get a handle to wait for a specific operation during execution
+    let callback_handle = runner.get_operation_handle("my-callback");
+
+    let result = runner.run("input").await.unwrap();
+    assert_eq!(result.get_status(), ExecutionStatus::Succeeded);
+
+    // All operations are available after run completes
+    let ops = runner.get_all_operations();
+    println!("Total operations: {}", ops.len());
+}
+```
+
+### Callback Testing
+
+Both runners support callback interaction through operation handles:
+
+```rust
+use aws_durable_execution_sdk_testing::WaitingOperationStatus;
+
+// Get a handle before calling run()
+let handle = runner.get_operation_handle("approval-callback");
+
+// In a separate task, wait for the callback to be ready, then respond
+let handle_clone = handle.clone();
+tokio::spawn(async move {
+    handle_clone.wait_for_data(WaitingOperationStatus::Submitted).await.unwrap();
+    handle_clone.send_callback_success(r#""approved""#).await.unwrap();
+});
+
+let result = runner.run(payload).await.unwrap();
+```
+
+### Operation Inspection
+
+Both runners provide consistent APIs for inspecting operations after execution:
+
+```rust
+// Look up operations by name, index, or ID
+let op = runner.get_operation("process_payment");
+let first_op = runner.get_operation_by_index(0);
+let specific_op = runner.get_operation_by_id("op-abc-123");
+
+// Get typed operation details
+let step: StepDetails<String> = op.get_step_details()?;
+let callback: CallbackDetails<Response> = op.get_callback_details()?;
+
+// Enumerate child operations
+let children = op.get_child_operations();
+```
+
 ## Examples
 
-See the `aws-durable-execution-sdk/examples/` directory:
+See the `aws-durable-execution-sdk/examples/` directory for runnable examples organized by feature:
 
-- `simple_workflow.rs` — Basic order processing with steps and waits
-- `parallel_processing.rs` — Concurrent item processing with map
-- `callback_workflow.rs` — External system integration with callbacks
+| Category | Examples |
+|----------|----------|
+| `hello_world/` | Minimal workflow with a single step |
+| `step/` | Step semantics, retries, error handling, named steps |
+| `wait/` | Wait durations, named waits, multiple waits |
+| `wait_for_condition/` | Polling conditions with configurable retry |
+| `callback/` | Simple callbacks, heartbeats, failures, custom serialization |
+| `invoke/` | Calling other durable functions |
+| `map/` | Parallel collection processing, concurrency, empty arrays |
+| `parallel/` | Concurrent branches, failure tolerance, min-successful |
+| `promise_combinators/` | all, any, race, all_settled with waits and timeouts |
+| `child_context/` | Nested workflows, large data, checkpoint limits |
+| `concurrency/` | Concurrent operations and wait patterns |
+| `serde/` | Custom serialization |
+| `error_handling/` | Error types and recovery patterns |
+| `comprehensive/` | End-to-end order processing workflow |
 
-Run examples locally:
-
-```bash
-cargo build --example simple_workflow
-```
+Each example has a corresponding history replay test in `examples/tests/`.
 
 ## Architecture
 
@@ -342,12 +496,21 @@ cargo build --example simple_workflow
 - **CheckpointBatcher** — Batches checkpoint requests for efficiency
 - **OperationIdGenerator** — Deterministic ID generation using blake2b
 
+### Crate Structure
+
+| Crate | Description |
+|-------|-------------|
+| `aws-durable-execution-sdk` | Core SDK with context, handlers, and client |
+| `aws-durable-execution-sdk-macros` | `#[durable_execution]` proc macro |
+| `aws-durable-execution-sdk-testing` | Local and cloud test runners, operation inspection, mocks |
+
 ## Documentation
 
-- [API Documentation](aws-durable-execution-sdk/src/lib.rs) — Comprehensive rustdoc with examples
+- [API Documentation](aws-durable-execution-sdk/sdk/src/lib.rs) — Comprehensive rustdoc with examples
 - [Determinism Guide](aws-durable-execution-sdk/docs/DETERMINISM.md) — Writing replay-safe workflows
 - [Limits Reference](aws-durable-execution-sdk/docs/LIMITS.md) — Execution constraints
 - [Tracing Guide](aws-durable-execution-sdk/docs/TRACING.md) — Logging configuration and best practices
+- [Language SDK Specification](aws-durable-execution-sdk/docs/language_sdk_specification.md) — Cross-language SDK design spec
 
 ## License
 

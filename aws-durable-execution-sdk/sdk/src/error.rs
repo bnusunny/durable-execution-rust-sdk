@@ -559,6 +559,18 @@ pub enum TerminationReason {
     SerializationError = 7,
     /// Size limit exceeded (payload, response, or history)
     SizeLimitExceeded = 8,
+    /// Operation was explicitly terminated
+    OperationTerminated = 9,
+    /// A retry has been scheduled; execution will resume
+    RetryScheduled = 10,
+    /// A wait operation has been scheduled
+    WaitScheduled = 11,
+    /// A callback is pending external completion
+    CallbackPending = 12,
+    /// Context validation failed
+    ContextValidationError = 13,
+    /// Lambda timeout approaching — graceful shutdown
+    LambdaTimeoutApproaching = 14,
 }
 
 /// AWS error details for checkpoint failures.
@@ -1316,6 +1328,29 @@ mod tests {
         );
     }
 
+    // Requirements: 11.1 - Verify existing discriminant values (0-8) are unchanged
+    #[test]
+    fn test_termination_reason_discriminant_values() {
+        // Existing variants — discriminants MUST NOT change for backward compatibility
+        assert_eq!(TerminationReason::UnhandledError as u8, 0);
+        assert_eq!(TerminationReason::InvocationError as u8, 1);
+        assert_eq!(TerminationReason::ExecutionError as u8, 2);
+        assert_eq!(TerminationReason::CheckpointFailed as u8, 3);
+        assert_eq!(TerminationReason::NonDeterministicExecution as u8, 4);
+        assert_eq!(TerminationReason::StepInterrupted as u8, 5);
+        assert_eq!(TerminationReason::CallbackError as u8, 6);
+        assert_eq!(TerminationReason::SerializationError as u8, 7);
+        assert_eq!(TerminationReason::SizeLimitExceeded as u8, 8);
+
+        // New variants
+        assert_eq!(TerminationReason::OperationTerminated as u8, 9);
+        assert_eq!(TerminationReason::RetryScheduled as u8, 10);
+        assert_eq!(TerminationReason::WaitScheduled as u8, 11);
+        assert_eq!(TerminationReason::CallbackPending as u8, 12);
+        assert_eq!(TerminationReason::ContextValidationError as u8, 13);
+        assert_eq!(TerminationReason::LambdaTimeoutApproaching as u8, 14);
+    }
+
     // Serde compatibility tests for enum discriminant optimization
     // Requirements: 6.6 - Verify JSON serialization uses string representations
 
@@ -1357,6 +1392,30 @@ mod tests {
         let reason = TerminationReason::SizeLimitExceeded;
         let json = serde_json::to_string(&reason).unwrap();
         assert_eq!(json, "\"SizeLimitExceeded\"");
+
+        let reason = TerminationReason::OperationTerminated;
+        let json = serde_json::to_string(&reason).unwrap();
+        assert_eq!(json, "\"OperationTerminated\"");
+
+        let reason = TerminationReason::RetryScheduled;
+        let json = serde_json::to_string(&reason).unwrap();
+        assert_eq!(json, "\"RetryScheduled\"");
+
+        let reason = TerminationReason::WaitScheduled;
+        let json = serde_json::to_string(&reason).unwrap();
+        assert_eq!(json, "\"WaitScheduled\"");
+
+        let reason = TerminationReason::CallbackPending;
+        let json = serde_json::to_string(&reason).unwrap();
+        assert_eq!(json, "\"CallbackPending\"");
+
+        let reason = TerminationReason::ContextValidationError;
+        let json = serde_json::to_string(&reason).unwrap();
+        assert_eq!(json, "\"ContextValidationError\"");
+
+        let reason = TerminationReason::LambdaTimeoutApproaching;
+        let json = serde_json::to_string(&reason).unwrap();
+        assert_eq!(json, "\"LambdaTimeoutApproaching\"");
     }
 
     #[test]
@@ -1371,6 +1430,12 @@ mod tests {
             TerminationReason::CallbackError,
             TerminationReason::SerializationError,
             TerminationReason::SizeLimitExceeded,
+            TerminationReason::OperationTerminated,
+            TerminationReason::RetryScheduled,
+            TerminationReason::WaitScheduled,
+            TerminationReason::CallbackPending,
+            TerminationReason::ContextValidationError,
+            TerminationReason::LambdaTimeoutApproaching,
         ];
 
         for reason in reasons {

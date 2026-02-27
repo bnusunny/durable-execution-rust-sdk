@@ -1,8 +1,6 @@
 name: Release
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -49,10 +47,14 @@ jobs:
   release-plz:
     name: Release PR
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable

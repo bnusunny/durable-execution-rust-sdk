@@ -577,7 +577,34 @@ where
         );
     }
 
-    func(step_ctx)
+    let result = func(step_ctx);
+
+    // When the function fails and a retryable_error_filter is configured,
+    // check whether the error is retryable before delegating to the retry strategy.
+    // If the filter says the error is not retryable, we skip retry regardless of strategy.
+    // When the filter is None, all errors are eligible for retry (Req 2.7).
+    if let Err(ref err) = result {
+        if let Some(ref filter) = config.retryable_error_filter {
+            let error_msg = err.to_string();
+            if !filter.is_retryable(&error_msg) {
+                logger.debug(
+                    &format!(
+                        "Error does not match retryable error filter, skipping retry: {}",
+                        error_msg
+                    ),
+                    log_info,
+                );
+                // Return the error directly — no retry
+                return result;
+            }
+            logger.debug(
+                &format!("Error matches retryable error filter: {}", error_msg),
+                log_info,
+            );
+        }
+    }
+
+    result
 }
 
 /// Creates a Start operation update.

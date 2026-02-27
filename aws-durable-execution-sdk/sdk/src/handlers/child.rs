@@ -190,7 +190,24 @@ where
                         message: format!("Failed to serialize child context result: {}", e),
                     })?;
 
-            let succeed_update = create_succeed_update(op_id, Some(serialized));
+            // Check if summary generation is needed (Requirement 7.1, 7.2, 7.3)
+            // 256KB threshold = 256 * 1024 = 262144 bytes
+            const SUMMARY_THRESHOLD: usize = 256 * 1024;
+            let result_to_store = match &config.summary_generator {
+                Some(generator) if serialized.len() > SUMMARY_THRESHOLD => {
+                    logger.debug(
+                        &format!(
+                            "Result size ({} bytes) exceeds 256KB threshold, generating summary",
+                            serialized.len()
+                        ),
+                        &log_info,
+                    );
+                    generator(&serialized)
+                }
+                _ => serialized,
+            };
+
+            let succeed_update = create_succeed_update(op_id, Some(result_to_store));
             state.create_checkpoint(succeed_update, true).await?;
 
             // Mark parent as done to prevent orphaned children
@@ -201,9 +218,17 @@ where
         }
         Err(error) => {
             // Check if this is a suspend - don't checkpoint suspends
+            // Requirement 6.3: Suspend errors skip the mapper
             if error.is_suspend() {
                 return Err(error);
             }
+
+            // Apply error_mapper if configured (Requirement 6.1)
+            // Requirement 6.2: None preserves current behavior
+            let error = match &config.error_mapper {
+                Some(mapper) => mapper(error),
+                None => error,
+            };
 
             // Checkpoint the error (Requirement 10.4)
             let error_obj = ErrorObject::from(&error);
@@ -586,5 +611,209 @@ mod tests {
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 42);
+    }
+
+    #[tokio::test]
+    async fn test_child_handler_error_mapper_applied() {
+        // Requirement 6.1: error_mapper applied to errors before checkpointing and propagation
+        let client = create_mock_client();
+        let state = create_test_state(client);
+        let op_id = create_test_op_id();
+        let logger = create_test_logger();
+        let parent_ctx = create_test_parent_ctx(state.clone());
+
+        let config = ChildConfig::default().set_error_mapper(Arc::new(|_err| {
+            DurableError::execution("mapped error message")
+        }));
+
+        let result: Result<i32, DurableError> = child_handler(
+            |_ctx| async { Err(DurableError::execution("original error")) },
+            &state,
+            &op_id,
+            &parent_ctx,
+            &config,
+            &logger,
+        )
+        .await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DurableError::Execution { message, .. } => {
+                assert_eq!(message, "mapped error message");
+            }
+            other => panic!("Expected Execution error, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_child_handler_error_mapper_skipped_for_suspend() {
+        // Requirement 6.3: Suspend errors skip the mapper
+        let client = Arc::new(MockDurableServiceClient::new());
+        let state = create_test_state(client);
+        let op_id = create_test_op_id();
+        let logger = create_test_logger();
+        let parent_ctx = create_test_parent_ctx(state.clone());
+
+        let config = ChildConfig::default().set_error_mapper(Arc::new(|_err| {
+            DurableError::execution("should not be mapped")
+        }));
+
+        let result: Result<i32, DurableError> = child_handler(
+            |_ctx| async { Err(DurableError::suspend()) },
+            &state,
+            &op_id,
+            &parent_ctx,
+            &config,
+            &logger,
+        )
+        .await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DurableError::Suspend { .. } => {}
+            other => panic!("Expected Suspend error, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_child_handler_error_mapper_none_preserves_behavior() {
+        // Requirement 6.2: None preserves current behavior
+        let client = create_mock_client();
+        let state = create_test_state(client);
+        let op_id = create_test_op_id();
+        let config = ChildConfig::default(); // error_mapper is None
+        let logger = create_test_logger();
+        let parent_ctx = create_test_parent_ctx(state.clone());
+
+        let result: Result<i32, DurableError> = child_handler(
+            |_ctx| async { Err(DurableError::execution("unchanged error")) },
+            &state,
+            &op_id,
+            &parent_ctx,
+            &config,
+            &logger,
+        )
+        .await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DurableError::Execution { message, .. } => {
+                assert_eq!(message, "unchanged error");
+            }
+            other => panic!("Expected Execution error, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_child_handler_summary_generator_invoked_when_over_256kb() {
+        // Requirement 7.1: summary_generator invoked when result > 256KB
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let client = create_mock_client();
+        let state = create_test_state(client);
+        let op_id = create_test_op_id();
+        let logger = create_test_logger();
+        let parent_ctx = create_test_parent_ctx(state.clone());
+
+        let generator_called = Arc::new(AtomicBool::new(false));
+        let generator_called_clone = generator_called.clone();
+
+        let config =
+            ChildConfig::default().set_summary_generator(Arc::new(move |_serialized: &str| {
+                generator_called_clone.store(true, Ordering::SeqCst);
+                r#"{"summary":"large result"}"#.to_string()
+            }));
+
+        // Create a string larger than 256KB (262144 bytes)
+        let large_string = "x".repeat(300_000);
+
+        let result: Result<String, DurableError> = child_handler(
+            |_ctx| {
+                let s = large_string.clone();
+                async move { Ok(s) }
+            },
+            &state,
+            &op_id,
+            &parent_ctx,
+            &config,
+            &logger,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        assert!(
+            generator_called.load(Ordering::SeqCst),
+            "summary_generator should have been invoked for result > 256KB"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_child_handler_summary_generator_not_invoked_when_under_256kb() {
+        // Requirement 7.2: summary_generator NOT invoked when result <= 256KB
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let client = create_mock_client();
+        let state = create_test_state(client);
+        let op_id = create_test_op_id();
+        let logger = create_test_logger();
+        let parent_ctx = create_test_parent_ctx(state.clone());
+
+        let generator_called = Arc::new(AtomicBool::new(false));
+        let generator_called_clone = generator_called.clone();
+
+        let config =
+            ChildConfig::default().set_summary_generator(Arc::new(move |_serialized: &str| {
+                generator_called_clone.store(true, Ordering::SeqCst);
+                r#"{"summary":"should not be called"}"#.to_string()
+            }));
+
+        // Use a small result that serializes to well under 256KB
+        let result: Result<String, DurableError> = child_handler(
+            |_ctx| async { Ok("small result".to_string()) },
+            &state,
+            &op_id,
+            &parent_ctx,
+            &config,
+            &logger,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        assert!(
+            !generator_called.load(Ordering::SeqCst),
+            "summary_generator should NOT have been invoked for result <= 256KB"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_child_handler_summary_generator_none_preserves_behavior() {
+        // Requirement 7.3: None preserves current behavior
+        let client = create_mock_client();
+        let state = create_test_state(client);
+        let op_id = create_test_op_id();
+        let logger = create_test_logger();
+        let parent_ctx = create_test_parent_ctx(state.clone());
+
+        // No summary_generator configured - default None
+        let config = ChildConfig::default();
+
+        // Use a large result - should still succeed without summary generation
+        let large_string = "y".repeat(300_000);
+
+        let result: Result<String, DurableError> = child_handler(
+            |_ctx| {
+                let s = large_string.clone();
+                async move { Ok(s) }
+            },
+            &state,
+            &op_id,
+            &parent_ctx,
+            &config,
+            &logger,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "y".repeat(300_000));
     }
 }

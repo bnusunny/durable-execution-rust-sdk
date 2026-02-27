@@ -12,7 +12,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use crate::context::{
     LogInfo, Logger, OperationIdentifier, WaitForConditionConfig, WaitForConditionContext,
 };
-use crate::error::{DurableError, ErrorObject, TerminationReason};
+use crate::error::{DurableError, ErrorObject};
 use crate::operation::{OperationType, OperationUpdate};
 use crate::serdes::{JsonSerDes, SerDes, SerDesContext};
 use crate::state::{CheckpointedResult, ExecutionState};
@@ -86,42 +86,10 @@ where
     // Determine current attempt and state from checkpoint or initial config
     let (current_attempt, user_state) = get_current_state::<S>(&checkpoint_result, &config)?;
 
-    let max_attempts = config.max_attempts.unwrap_or(usize::MAX);
-
-    // Check if max attempts exceeded
-    if current_attempt > max_attempts {
-        logger.error(
-            &format!(
-                "Max attempts ({}) exceeded for wait_for_condition",
-                max_attempts
-            ),
-            &log_info,
-        );
-
-        // Checkpoint failure
-        let error = ErrorObject::new(
-            "MaxAttemptsExceeded",
-            format!(
-                "Max attempts ({}) exceeded for wait_for_condition",
-                max_attempts
-            ),
-        );
-        let fail_update = create_fail_update(op_id, error);
-        state.create_checkpoint(fail_update, true).await?;
-
-        return Err(DurableError::Execution {
-            message: format!(
-                "Max attempts ({}) exceeded for wait_for_condition",
-                max_attempts
-            ),
-            termination_reason: TerminationReason::ExecutionError,
-        });
-    }
-
     // Create context for this check
     let check_ctx = WaitForConditionContext {
         attempt: current_attempt,
-        max_attempts: config.max_attempts,
+        max_attempts: None,
     };
 
     logger.debug(
@@ -145,13 +113,16 @@ where
             );
 
             let serdes = JsonSerDes::<T>::new();
-            let serdes_ctx = SerDesContext::new(&op_id.operation_id, state.durable_execution_arn());
-            let serialized =
-                serdes
-                    .serialize(&result, &serdes_ctx)
-                    .map_err(|e| DurableError::SerDes {
-                        message: format!("Failed to serialize wait_for_condition result: {}", e),
-                    })?;
+            let serdes_ctx =
+                SerDesContext::new(&op_id.operation_id, state.durable_execution_arn());
+            let serialized = serdes.serialize(&result, &serdes_ctx).map_err(|e| {
+                DurableError::SerDes {
+                    message: format!(
+                        "Failed to serialize wait_for_condition result: {}",
+                        e
+                    ),
+                }
+            })?;
 
             let succeed_update = create_succeed_update(op_id, Some(serialized));
             state.create_checkpoint(succeed_update, true).await?;
@@ -159,60 +130,72 @@ where
             Ok(result)
         }
         Err(e) => {
-            // Condition not met - checkpoint RETRY with state payload
+            // Condition not met — consult wait_strategy for delay and max_attempts enforcement
             logger.debug(
                 &format!("Condition not met on attempt {}: {}", current_attempt, e),
                 &log_info,
             );
 
-            if current_attempt >= max_attempts {
-                // No more retries - fail
-                let error = ErrorObject::new(
-                    "MaxAttemptsExceeded",
-                    format!(
-                        "Max attempts ({}) exceeded for wait_for_condition. Last error: {}",
-                        max_attempts, e
-                    ),
-                );
-                let fail_update = create_fail_update(op_id, error);
-                state.create_checkpoint(fail_update, true).await?;
+            let decision = (config.wait_strategy)(&user_state, current_attempt);
 
-                return Err(DurableError::Execution {
-                    message: format!(
-                        "Max attempts ({}) exceeded for wait_for_condition",
-                        max_attempts
-                    ),
-                    termination_reason: TerminationReason::ExecutionError,
-                });
+            match decision {
+                crate::config::WaitDecision::Done => {
+                    // Strategy says done — max attempts exceeded
+                    logger.error(
+                        &format!(
+                            "Max attempts exceeded for wait_for_condition on attempt {}",
+                            current_attempt
+                        ),
+                        &log_info,
+                    );
+
+                    let error = ErrorObject::new(
+                        "MaxAttemptsExceeded",
+                        format!(
+                            "Max attempts exceeded for wait_for_condition. Last error: {}",
+                            e
+                        ),
+                    );
+                    let fail_update = create_fail_update(op_id, error);
+                    state.create_checkpoint(fail_update, true).await?;
+
+                    Err(DurableError::Execution {
+                        message: "Max attempts exceeded for wait_for_condition".to_string(),
+                        termination_reason: crate::error::TerminationReason::ExecutionError,
+                    })
+                }
+                crate::config::WaitDecision::Continue { delay } => {
+                    // Prepare state for next attempt
+                    let next_state = WaitForConditionState {
+                        user_state: user_state.clone(),
+                        attempt: current_attempt + 1,
+                    };
+
+                    let state_serdes = JsonSerDes::<WaitForConditionState<S>>::new();
+                    let serdes_ctx =
+                        SerDesContext::new(&op_id.operation_id, state.durable_execution_arn());
+                    let serialized_state =
+                        state_serdes
+                            .serialize(&next_state, &serdes_ctx)
+                            .map_err(|e| DurableError::SerDes {
+                                message: format!(
+                                    "Failed to serialize wait_for_condition state: {}",
+                                    e
+                                ),
+                            })?;
+
+                    let retry_update = create_retry_update(
+                        op_id,
+                        Some(serialized_state),
+                        Some(delay.to_seconds()),
+                    );
+                    state.create_checkpoint(retry_update, true).await?;
+
+                    Err(DurableError::Suspend {
+                        scheduled_timestamp: None,
+                    })
+                }
             }
-
-            // Prepare state for next attempt
-            let next_state = WaitForConditionState {
-                user_state: user_state.clone(),
-                attempt: current_attempt + 1,
-            };
-
-            let state_serdes = JsonSerDes::<WaitForConditionState<S>>::new();
-            let serdes_ctx = SerDesContext::new(&op_id.operation_id, state.durable_execution_arn());
-            let serialized_state =
-                state_serdes
-                    .serialize(&next_state, &serdes_ctx)
-                    .map_err(|e| DurableError::SerDes {
-                        message: format!("Failed to serialize wait_for_condition state: {}", e),
-                    })?;
-
-            // Checkpoint RETRY with payload and delay
-            let retry_update = create_retry_update(
-                op_id,
-                Some(serialized_state),
-                Some(config.interval.to_seconds()),
-            );
-            state.create_checkpoint(retry_update, true).await?;
-
-            // Suspend execution - Lambda will re-invoke after the delay
-            Err(DurableError::Suspend {
-                scheduled_timestamp: None,
-            })
         }
     }
 }
@@ -382,6 +365,7 @@ fn create_succeed_update(op_id: &OperationIdentifier, result: Option<String>) ->
 }
 
 /// Creates a Fail operation update.
+#[allow(dead_code)]
 fn create_fail_update(op_id: &OperationIdentifier, error: ErrorObject) -> OperationUpdate {
     let mut update = OperationUpdate::fail(&op_id.operation_id, OperationType::Step, error)
         .with_sub_type("wait_for_condition");
@@ -473,13 +457,12 @@ mod tests {
         Arc::new(TracingLogger)
     }
 
-    fn create_test_config<S: Clone>(initial_state: S) -> WaitForConditionConfig<S> {
-        WaitForConditionConfig {
+    fn create_test_config<S: Clone + Send + Sync + 'static>(initial_state: S) -> WaitForConditionConfig<S> {
+        WaitForConditionConfig::from_interval(
             initial_state,
-            interval: Duration::from_seconds(5),
-            max_attempts: Some(3),
-            timeout: None,
-        }
+            Duration::from_seconds(5),
+            Some(3),
+        )
     }
 
     // ==========================================================================
@@ -542,12 +525,11 @@ mod tests {
             name: "test".to_string(),
         };
 
-        let config = WaitForConditionConfig {
+        let config = WaitForConditionConfig::from_interval(
             initial_state,
-            interval: Duration::from_seconds(5),
-            max_attempts: Some(3),
-            timeout: None,
-        };
+            Duration::from_seconds(5),
+            Some(3),
+        );
 
         let result = wait_for_condition_handler(
             |state: &TestState, _ctx: &WaitForConditionContext| {
@@ -722,12 +704,11 @@ mod tests {
         let logger = create_test_logger();
 
         // Config with max_attempts = 1 (only one try)
-        let config = WaitForConditionConfig {
-            initial_state: 0i32,
-            interval: Duration::from_seconds(5),
-            max_attempts: Some(1),
-            timeout: None,
-        };
+        let config = WaitForConditionConfig::from_interval(
+            0i32,
+            Duration::from_seconds(5),
+            Some(1),
+        );
 
         // Condition that always fails
         let result = wait_for_condition_handler(
@@ -798,12 +779,11 @@ mod tests {
         let op_id = create_test_op_id();
         let logger = create_test_logger();
 
-        let config = WaitForConditionConfig {
-            initial_state: TestState { counter: 0 },
-            interval: Duration::from_seconds(5),
-            max_attempts: Some(5),
-            timeout: None,
-        };
+        let config = WaitForConditionConfig::from_interval(
+            TestState { counter: 0 },
+            Duration::from_seconds(5),
+            Some(5),
+        );
 
         let result = wait_for_condition_handler(
             |state: &TestState, ctx: &WaitForConditionContext| {
@@ -839,14 +819,13 @@ mod tests {
             value: String,
         }
 
-        let config = WaitForConditionConfig {
-            initial_state: TestState {
+        let config = WaitForConditionConfig::from_interval(
+            TestState {
                 value: "initial".to_string(),
             },
-            interval: Duration::from_seconds(5),
-            max_attempts: Some(3),
-            timeout: None,
-        };
+            Duration::from_seconds(5),
+            Some(3),
+        );
 
         let result = wait_for_condition_handler(
             |state: &TestState, ctx: &WaitForConditionContext| {
@@ -877,12 +856,11 @@ mod tests {
         let op_id = create_test_op_id();
         let logger = create_test_logger();
 
-        let config = WaitForConditionConfig {
-            initial_state: 0i32,
-            interval: Duration::from_seconds(5),
-            max_attempts: Some(3),
-            timeout: None,
-        };
+        let config = WaitForConditionConfig::from_interval(
+            0i32,
+            Duration::from_seconds(5),
+            Some(3),
+        );
 
         // Condition that returns an error (not met)
         let result = wait_for_condition_handler(

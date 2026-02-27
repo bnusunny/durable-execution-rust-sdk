@@ -54,6 +54,18 @@ path = "src/bin/step/named/step_named.rs"
 name = "step_with_config"
 path = "src/bin/step/with_config/step_with_config.rs"
 
+[[bin]]
+name = "step_retry_exponential_backoff"
+path = "src/bin/step/retry_exponential_backoff/step_retry_exponential_backoff.rs"
+
+[[bin]]
+name = "step_retry_with_filter"
+path = "src/bin/step/retry_with_filter/step_retry_with_filter.rs"
+
+[[bin]]
+name = "step_error_determinism"
+path = "src/bin/step/error_determinism/step_error_determinism.rs"
+
 # Wait examples
 [[bin]]
 name = "wait_basic"
@@ -84,6 +96,50 @@ path = "src/bin/callback/concurrent/callback_concurrent.rs"
 name = "wait_for_callback"
 path = "src/bin/callback/wait_for_callback/wait_for_callback.rs"
 
+[[bin]]
+name = "wfc_timeout"
+path = "src/bin/callback/wait_for_callback/wfc_timeout.rs"
+
+[[bin]]
+name = "wfc_failure"
+path = "src/bin/callback/wait_for_callback/wfc_failure.rs"
+
+[[bin]]
+name = "wfc_heartbeat"
+path = "src/bin/callback/wait_for_callback/wfc_heartbeat.rs"
+
+[[bin]]
+name = "wfc_nested"
+path = "src/bin/callback/wait_for_callback/wfc_nested.rs"
+
+[[bin]]
+name = "wfc_multiple"
+path = "src/bin/callback/wait_for_callback/wfc_multiple.rs"
+
+[[bin]]
+name = "wfc_child_context"
+path = "src/bin/callback/wait_for_callback/wfc_child_context.rs"
+
+[[bin]]
+name = "wfc_custom_serdes"
+path = "src/bin/callback/wait_for_callback/wfc_custom_serdes.rs"
+
+[[bin]]
+name = "callback_heartbeat"
+path = "src/bin/callback/heartbeat/callback_heartbeat.rs"
+
+[[bin]]
+name = "callback_failure"
+path = "src/bin/callback/failure/callback_failure.rs"
+
+[[bin]]
+name = "callback_custom_serdes"
+path = "src/bin/callback/custom_serdes/callback_custom_serdes.rs"
+
+[[bin]]
+name = "callback_mixed_ops"
+path = "src/bin/callback/mixed_ops/callback_mixed_ops.rs"
+
 # Map examples
 [[bin]]
 name = "map_basic"
@@ -101,6 +157,22 @@ path = "src/bin/map/failure_tolerance/map_failure_tolerance.rs"
 name = "map_min_successful"
 path = "src/bin/map/min_successful/map_min_successful.rs"
 
+[[bin]]
+name = "map_empty_array"
+path = "src/bin/map/empty_array/map_empty_array.rs"
+
+[[bin]]
+name = "map_error_preservation"
+path = "src/bin/map/error_preservation/map_error_preservation.rs"
+
+[[bin]]
+name = "map_high_concurrency"
+path = "src/bin/map/high_concurrency/map_high_concurrency.rs"
+
+[[bin]]
+name = "map_large_scale"
+path = "src/bin/map/large_scale/map_large_scale.rs"
+
 # Parallel examples
 [[bin]]
 name = "parallel_basic"
@@ -114,6 +186,38 @@ path = "src/bin/parallel/first_successful/parallel_first_successful.rs"
 name = "parallel_heterogeneous"
 path = "src/bin/parallel/heterogeneous/parallel_heterogeneous.rs"
 
+[[bin]]
+name = "parallel_empty_array"
+path = "src/bin/parallel/empty_array/parallel_empty_array.rs"
+
+[[bin]]
+name = "parallel_with_wait"
+path = "src/bin/parallel/with_wait/parallel_with_wait.rs"
+
+[[bin]]
+name = "parallel_error_preservation"
+path = "src/bin/parallel/error_preservation/parallel_error_preservation.rs"
+
+[[bin]]
+name = "parallel_min_successful"
+path = "src/bin/parallel/min_successful/parallel_min_successful.rs"
+
+[[bin]]
+name = "parallel_min_successful_callback"
+path = "src/bin/parallel/min_successful_callback/parallel_min_successful_callback.rs"
+
+[[bin]]
+name = "parallel_tolerated_failure_count"
+path = "src/bin/parallel/tolerated_failure_count/parallel_tolerated_failure_count.rs"
+
+[[bin]]
+name = "parallel_tolerated_failure_pct"
+path = "src/bin/parallel/tolerated_failure_pct/parallel_tolerated_failure_pct.rs"
+
+[[bin]]
+name = "parallel_failure_threshold_exceeded"
+path = "src/bin/parallel/failure_threshold_exceeded/parallel_failure_threshold_exceeded.rs"
+
 # Child context examples
 [[bin]]
 name = "child_context_basic"
@@ -122,6 +226,48 @@ path = "src/bin/child_context/basic/child_context_basic.rs"
 [[bin]]
 name = "child_context_nested"
 path = "src/bin/child_context/nested/child_context_nested.rs"
+
+[[bin]]
+name = "child_context_large_data"
+path = "src/bin/child_context/large_data/child_context_large_data.rs"
+
+[[bin]]
+name = "child_context_checkpoint_size_limit"
+path = "src/bin/child_context/checkpoint_size_limit/child_context_checkpoint_size_limit.rs"
+
+[[bin]]
+name = "child_context_with_failing_step"
+path = "src/bin/child_context/with_failing_step/child_context_with_failing_step.rs"
+
+# Context validation examples (new category)
+[[bin]]
+name = "context_validation_parent_in_child"
+path = "src/bin/context_validation/parent_in_child/context_validation_parent_in_child.rs"
+
+[[bin]]
+name = "context_validation_parent_in_step"
+path = "src/bin/context_validation/parent_in_step/context_validation_parent_in_step.rs"
+
+[[bin]]
+name = "context_validation_parent_in_wait_condition"
+path = "src/bin/context_validation/parent_in_wait_condition/context_validation_parent_in_wait_condition.rs"
+
+# Concurrency examples (new category)
+[[bin]]
+name = "concurrent_operations"
+path = "src/bin/concurrency/concurrent_operations/concurrent_operations.rs"
+
+[[bin]]
+name = "concurrent_wait"
+path = "src/bin/concurrency/concurrent_wait/concurrent_wait.rs"
+
+[[bin]]
+name = "concurrent_callback_wait"
+path = "src/bin/concurrency/concurrent_callback_wait/concurrent_callback_wait.rs"
+
+[[bin]]
+name = "concurrent_callback_submitter"
+path = "src/bin/concurrency/concurrent_callback_submitter/concurrent_callback_submitter.rs"
 
 # Comprehensive examples
 [[bin]]
@@ -154,6 +300,18 @@ path = "src/bin/promise_combinators/race/promise_race.rs"
 [[bin]]
 name = "promise_any"
 path = "src/bin/promise_combinators/any/promise_any.rs"
+
+[[bin]]
+name = "all_with_wait"
+path = "src/bin/promise_combinators/all_with_wait/all_with_wait.rs"
+
+[[bin]]
+name = "race_with_timeout"
+path = "src/bin/promise_combinators/race_with_timeout/race_with_timeout.rs"
+
+[[bin]]
+name = "replay_behavior"
+path = "src/bin/promise_combinators/replay_behavior/replay_behavior.rs"
 
 # Wait for condition examples
 [[bin]]
@@ -192,3 +350,28 @@ path = "src/bin/parallel_processing.rs"
 [[bin]]
 name = "callback_workflow"
 path = "src/bin/callback_workflow.rs"
+
+# Advanced examples (new category)
+[[bin]]
+name = "checkpointing_eager"
+path = "src/bin/advanced/checkpointing_eager/checkpointing_eager.rs"
+
+[[bin]]
+name = "checkpointing_batched"
+path = "src/bin/advanced/checkpointing_batched/checkpointing_batched.rs"
+
+[[bin]]
+name = "checkpointing_optimistic"
+path = "src/bin/advanced/checkpointing_optimistic/checkpointing_optimistic.rs"
+
+[[bin]]
+name = "retry_exhaustion"
+path = "src/bin/advanced/retry_exhaustion/retry_exhaustion.rs"
+
+[[bin]]
+name = "large_payload"
+path = "src/bin/advanced/large_payload/large_payload.rs"
+
+[[bin]]
+name = "handler_error"
+path = "src/bin/advanced/handler_error/handler_error.rs"

@@ -38,26 +38,36 @@
 pub mod checkpoint_server;
 pub mod cloud_runner;
 pub mod error;
+pub mod history_poller;
 pub mod local_runner;
 pub mod mock_client;
 pub mod operation;
+pub mod operation_handle;
+pub mod run_future;
 pub mod test_result;
 pub mod time_control;
 pub mod types;
 
+// Property-based tests module (test-only)
+#[cfg(test)]
+mod nodejs_event_pbt;
+
 // Re-export core types from this crate
-pub use checkpoint_server::{CheckpointWorkerManager, CheckpointWorkerParams};
-pub use cloud_runner::{CloudDurableTestRunner, CloudTestRunnerConfig};
+pub use checkpoint_server::{CheckpointWorkerManager, CheckpointWorkerParams, NodeJsHistoryEvent};
+pub use cloud_runner::{CloudDurableTestRunner, CloudTestRunnerConfig, LambdaHistoryApiClient};
 pub use error::TestError;
+pub use history_poller::{HistoryApiClient, HistoryPage, PollResult, TerminalState};
 pub use local_runner::{LocalDurableTestRunner, TestEnvironmentConfig};
 pub use mock_client::{CheckpointCall, GetOperationsCall, MockDurableServiceClient};
 pub use operation::{
     CallbackDetails, CallbackSender, ContextDetails, DurableOperation, InvokeDetails, StepDetails,
     WaitDetails,
 };
+pub use operation_handle::OperationHandle;
+pub use run_future::RunFuture;
 pub use test_result::{HistoryEvent, PrintConfig, TestResult};
 pub use time_control::{TimeControl, TimeControlGuard};
-pub use types::{ExecutionStatus, Invocation, TestResultError, WaitingOperationStatus};
+pub use types::{ExecutionStatus, InvokeRequest, Invocation, TestResultError, WaitingOperationStatus};
 
 // Re-export key types from the SDK for convenience
 pub use aws_durable_execution_sdk::{

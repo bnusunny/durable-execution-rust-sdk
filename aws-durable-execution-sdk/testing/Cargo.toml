@@ -44,3 +44,4 @@ aws-config.workspace = true
 [dev-dependencies]
 proptest.workspace = true
 tokio-test.workspace = true
+regex = "1.10"

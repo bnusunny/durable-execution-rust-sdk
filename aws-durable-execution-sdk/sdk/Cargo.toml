@@ -49,6 +49,9 @@ hex.workspace = true
 # Date/time handling
 chrono.workspace = true
 
+# Regex for error pattern matching
+regex.workspace = true
+
 # Static assertions for compile-time checks
 static_assertions.workspace = true
 

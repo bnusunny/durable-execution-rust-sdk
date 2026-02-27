@@ -859,7 +859,12 @@ pub mod lambda;
 pub mod macros;
 pub mod operation;
 pub mod replay_safe;
+pub mod retry_presets;
+pub mod runtime;
 pub mod serdes;
+pub mod structured_json_logger;
+pub mod summary_generators;
+pub mod termination;
 pub mod state;
 pub mod traits;
 pub mod types;
@@ -922,6 +927,15 @@ pub use replay_safe::{
     timestamp_from_execution, timestamp_seconds_from_execution, uuid_from_operation,
     uuid_string_from_operation, uuid_to_string,
 };
+
+// Re-export runtime support
+pub use runtime::run_durable_handler;
+
+// Re-export termination manager
+pub use termination::TerminationManager;
+
+// Re-export structured JSON logger
+pub use structured_json_logger::{JsonLogContext, LogLevel, StructuredJsonLogger};
 
 // Re-export macro if enabled
 #[cfg(feature = "macros")]

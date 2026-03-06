@@ -38,7 +38,7 @@ jobs:
 
       - name: Configure AWS credentials
         if: github.actor != 'nektos/act'
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.ACTIONS_INTEGRATION_ROLE_ARN }}
           role-session-name: rust-sdk-integration-test

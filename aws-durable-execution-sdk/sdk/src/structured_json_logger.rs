@@ -256,6 +256,11 @@ fn days_to_ymd(days: u64) -> (u64, u64, u64) {
 mod tests {
     use super::*;
     use serde_json::Value;
+    use std::sync::Mutex;
+
+    /// Mutex to serialize tests that mutate the `AWS_LAMBDA_LOG_LEVEL` env var,
+    /// preventing race conditions when tests run in parallel.
+    static ENV_MUTEX: Mutex<()> = Mutex::new(());
 
     fn make_logger_with_context() -> StructuredJsonLogger {
         let mut logger = StructuredJsonLogger::new(LogLevel::Debug);
@@ -436,6 +441,7 @@ mod tests {
 
     #[test]
     fn test_from_env_debug() {
+        let _lock = ENV_MUTEX.lock().unwrap();
         std::env::set_var("AWS_LAMBDA_LOG_LEVEL", "DEBUG");
         let logger = StructuredJsonLogger::from_env();
         assert_eq!(logger.min_level, LogLevel::Debug);
@@ -444,6 +450,7 @@ mod tests {
 
     #[test]
     fn test_from_env_info() {
+        let _lock = ENV_MUTEX.lock().unwrap();
         std::env::set_var("AWS_LAMBDA_LOG_LEVEL", "INFO");
         let logger = StructuredJsonLogger::from_env();
         assert_eq!(logger.min_level, LogLevel::Info);
@@ -452,6 +459,7 @@ mod tests {
 
     #[test]
     fn test_from_env_warn() {
+        let _lock = ENV_MUTEX.lock().unwrap();
         std::env::set_var("AWS_LAMBDA_LOG_LEVEL", "WARN");
         let logger = StructuredJsonLogger::from_env();
         assert_eq!(logger.min_level, LogLevel::Warn);
@@ -460,6 +468,7 @@ mod tests {
 
     #[test]
     fn test_from_env_error() {
+        let _lock = ENV_MUTEX.lock().unwrap();
         std::env::set_var("AWS_LAMBDA_LOG_LEVEL", "ERROR");
         let logger = StructuredJsonLogger::from_env();
         assert_eq!(logger.min_level, LogLevel::Error);
@@ -468,6 +477,7 @@ mod tests {
 
     #[test]
     fn test_from_env_case_insensitive() {
+        let _lock = ENV_MUTEX.lock().unwrap();
         std::env::set_var("AWS_LAMBDA_LOG_LEVEL", "warn");
         let logger = StructuredJsonLogger::from_env();
         assert_eq!(logger.min_level, LogLevel::Warn);
@@ -484,6 +494,7 @@ mod tests {
 
     #[test]
     fn test_from_env_invalid_defaults_to_debug() {
+        let _lock = ENV_MUTEX.lock().unwrap();
         std::env::set_var("AWS_LAMBDA_LOG_LEVEL", "TRACE");
         let logger = StructuredJsonLogger::from_env();
         assert_eq!(logger.min_level, LogLevel::Debug);
@@ -500,6 +511,7 @@ mod tests {
 
     #[test]
     fn test_from_env_missing_defaults_to_debug() {
+        let _lock = ENV_MUTEX.lock().unwrap();
         std::env::remove_var("AWS_LAMBDA_LOG_LEVEL");
         let logger = StructuredJsonLogger::from_env();
         assert_eq!(logger.min_level, LogLevel::Debug);

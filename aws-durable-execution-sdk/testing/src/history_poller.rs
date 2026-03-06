@@ -156,7 +156,7 @@ impl<C: HistoryApiClient> HistoryPoller<C> {
                 .await
             {
                 Ok(page) => return Ok(page),
-                Err(e) if attempts < self.max_retries as u64 => {
+                Err(_e) if attempts < self.max_retries as u64 => {
                     attempts += 1;
                     let delay_ms = (attempts.pow(2) - 1) * 150 + 1000;
                     tokio::time::sleep(Duration::from_millis(delay_ms)).await;

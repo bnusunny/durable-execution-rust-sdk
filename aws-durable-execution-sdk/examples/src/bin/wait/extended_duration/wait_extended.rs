@@ -2,7 +2,7 @@
 //!
 //! Using extended duration helpers for longer wait periods.
 
-use aws_durable_execution_sdk::{durable_execution, DurableError, Duration};
+use durable_execution_sdk::{durable_execution, DurableError, Duration};
 
 /// Demonstrate various duration helpers.
 ///

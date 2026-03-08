@@ -17,7 +17,7 @@
 //! cargo build --example wfc_custom_serdes
 //! ```
 
-use aws_durable_execution_sdk::{durable_execution, CallbackConfig, DurableError, SerDesAny};
+use durable_execution_sdk::{durable_execution, CallbackConfig, DurableError, SerDesAny};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 

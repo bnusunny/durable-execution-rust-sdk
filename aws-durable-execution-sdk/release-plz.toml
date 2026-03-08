@@ -8,11 +8,11 @@ git_release_enable = true
 
 # Don't publish the examples package
 [[package]]
-name = "aws-durable-execution-sdk-examples"
+name = "durable-execution-sdk-examples"
 publish = false
 changelog_update = false
 
 # Publish order is handled automatically based on dependencies:
-# 1. aws-durable-execution-sdk-macros (no deps)
-# 2. aws-durable-execution-sdk (depends on macros)
-# 3. aws-durable-execution-sdk-testing (depends on sdk)
+# 1. durable-execution-sdk-macros (no deps)
+# 2. durable-execution-sdk (depends on macros)
+# 3. durable-execution-sdk-testing (depends on sdk)

@@ -8,11 +8,11 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use aws_durable_execution_sdk::client::{
+use durable_execution_sdk::client::{
     CheckpointResponse, DurableServiceClient, GetOperationsResponse, NewExecutionState,
 };
-use aws_durable_execution_sdk::error::{DurableError, ErrorObject};
-use aws_durable_execution_sdk::operation::{
+use durable_execution_sdk::error::{DurableError, ErrorObject};
+use durable_execution_sdk::operation::{
     CallbackDetails, ChainedInvokeDetails, ContextDetails, ExecutionDetails, Operation,
     OperationAction, OperationStatus, OperationType, OperationUpdate, StepDetails, WaitDetails,
 };

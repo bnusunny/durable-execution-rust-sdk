@@ -19,7 +19,7 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use aws_durable_execution_sdk::replay_safe::{uuid_from_operation, timestamp_from_execution};
+//! use durable_execution_sdk::replay_safe::{uuid_from_operation, timestamp_from_execution};
 //!
 //! async fn my_workflow(ctx: DurableContext) -> Result<(), DurableError> {
 //!     // Generate a deterministic UUID for this operation
@@ -75,7 +75,7 @@ use crate::state::ExecutionState;
 /// # Example
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::replay_safe::{uuid_from_operation, uuid_to_string};
+/// use durable_execution_sdk::replay_safe::{uuid_from_operation, uuid_to_string};
 ///
 /// let operation_id = "abc123";
 /// let uuid_bytes = uuid_from_operation(operation_id, 0);
@@ -130,7 +130,7 @@ pub fn uuid_from_operation(operation_id: &str, seed: u64) -> [u8; 16] {
 /// # Example
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::replay_safe::{uuid_from_operation, uuid_to_string};
+/// use durable_execution_sdk::replay_safe::{uuid_from_operation, uuid_to_string};
 ///
 /// let uuid_bytes = uuid_from_operation("my-operation", 0);
 /// let uuid_string = uuid_to_string(&uuid_bytes);
@@ -165,7 +165,7 @@ pub fn uuid_to_string(uuid_bytes: &[u8; 16]) -> String {
 /// # Example
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::replay_safe::uuid_string_from_operation;
+/// use durable_execution_sdk::replay_safe::uuid_string_from_operation;
 ///
 /// let uuid = uuid_string_from_operation("my-operation", 0);
 /// println!("Generated UUID: {}", uuid);
@@ -196,7 +196,7 @@ pub fn uuid_string_from_operation(operation_id: &str, seed: u64) -> String {
 /// # Example
 ///
 /// ```rust,ignore
-/// use aws_durable_execution_sdk::replay_safe::timestamp_from_execution;
+/// use durable_execution_sdk::replay_safe::timestamp_from_execution;
 ///
 /// async fn my_workflow(ctx: DurableContext) -> Result<(), DurableError> {
 ///     // Get the execution start timestamp (replay-safe)
@@ -246,7 +246,7 @@ pub fn timestamp_from_execution(state: &ExecutionState) -> Option<i64> {
 /// # Example
 ///
 /// ```rust,ignore
-/// use aws_durable_execution_sdk::replay_safe::timestamp_seconds_from_execution;
+/// use durable_execution_sdk::replay_safe::timestamp_seconds_from_execution;
 ///
 /// async fn my_workflow(ctx: DurableContext) -> Result<(), DurableError> {
 ///     if let Some(timestamp_secs) = timestamp_seconds_from_execution(ctx.state()) {

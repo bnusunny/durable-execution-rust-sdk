@@ -8,7 +8,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use crate::checkpoint_server::NodeJsHistoryEvent;
 use crate::error::TestError;
 use crate::types::{ExecutionStatus, Invocation, TestResultError};
-use aws_durable_execution_sdk::{Operation, OperationStatus};
+use durable_execution_sdk::{Operation, OperationStatus};
 
 /// Result of a durable execution test.
 ///
@@ -22,7 +22,7 @@ use aws_durable_execution_sdk::{Operation, OperationStatus};
 /// # Examples
 ///
 /// ```ignore
-/// use aws_durable_execution_sdk_testing::{TestResult, ExecutionStatus};
+/// use durable_execution_sdk_testing::{TestResult, ExecutionStatus};
 ///
 /// // After running a test
 /// let result: TestResult<String> = runner.run("input").await?;
@@ -706,7 +706,7 @@ impl<T: DeserializeOwned> TestResult<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aws_durable_execution_sdk::{Operation, OperationStatus, OperationType};
+    use durable_execution_sdk::{Operation, OperationStatus, OperationType};
 
     fn create_test_operation(
         name: &str,
@@ -1008,7 +1008,7 @@ mod tests {
 #[cfg(test)]
 mod property_tests {
     use super::*;
-    use aws_durable_execution_sdk::{Operation, OperationStatus, OperationType};
+    use durable_execution_sdk::{Operation, OperationStatus, OperationType};
     use proptest::prelude::*;
 
     /// Strategy to generate a random operation type

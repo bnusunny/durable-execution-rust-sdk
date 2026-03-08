@@ -7,7 +7,7 @@
 //! # Example
 //!
 //! ```
-//! use aws_durable_execution_sdk::summary_generators;
+//! use durable_execution_sdk::summary_generators;
 //!
 //! let gen = summary_generators::parallel_summary();
 //! let input = r#"[{"status":"ok"},{"error":"timeout"}]"#;

@@ -2,7 +2,7 @@
 //!
 //! Using custom serialization for step results.
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     durable_execution,
     serdes::{custom_serdes, SerDesError},
     DurableError,
@@ -16,7 +16,7 @@ pub struct SensitiveData {
 }
 
 /// Create a custom serializer that masks sensitive data.
-pub fn create_masked_serdes() -> impl aws_durable_execution_sdk::serdes::SerDes<SensitiveData> {
+pub fn create_masked_serdes() -> impl durable_execution_sdk::serdes::SerDes<SensitiveData> {
     custom_serdes::<SensitiveData, _, _>(
         |value, _ctx| {
             // Custom serialization - could encrypt or mask data

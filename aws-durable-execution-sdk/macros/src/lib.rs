@@ -30,7 +30,7 @@ use syn::{parse_macro_input, spanned::Spanned, FnArg, ItemFn, Pat, ReturnType};
 /// # Example
 ///
 /// ```rust,ignore
-/// use aws_durable_execution_sdk::{durable_execution, DurableContext, DurableError};
+/// use durable_execution_sdk::{durable_execution, DurableContext, DurableError};
 /// use serde::{Deserialize, Serialize};
 ///
 /// #[derive(Deserialize)]
@@ -172,15 +172,15 @@ pub fn durable_execution(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #(#fn_attrs)*
         async fn #inner_fn_name(
             #event_param_name: #event_type,
-            #ctx_param_name: ::aws_durable_execution_sdk::DurableContext,
+            #ctx_param_name: ::durable_execution_sdk::DurableContext,
         ) -> #return_type
         #fn_block
 
         // The Lambda handler wrapper — thin delegation to the runtime
         #fn_vis async fn #fn_name(
-            lambda_event: ::lambda_runtime::LambdaEvent<::aws_durable_execution_sdk::DurableExecutionInvocationInput>,
-        ) -> ::std::result::Result<::aws_durable_execution_sdk::DurableExecutionInvocationOutput, ::lambda_runtime::Error> {
-            ::aws_durable_execution_sdk::run_durable_handler(lambda_event, #inner_fn_name).await
+            lambda_event: ::lambda_runtime::LambdaEvent<::durable_execution_sdk::DurableExecutionInvocationInput>,
+        ) -> ::std::result::Result<::durable_execution_sdk::DurableExecutionInvocationOutput, ::lambda_runtime::Error> {
+            ::durable_execution_sdk::run_durable_handler(lambda_event, #inner_fn_name).await
         }
     };
 

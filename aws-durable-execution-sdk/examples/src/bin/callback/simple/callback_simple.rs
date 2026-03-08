@@ -3,7 +3,7 @@
 //! Creating a callback ID for external systems to use.
 //! Callbacks allow external systems to signal your workflow.
 
-use aws_durable_execution_sdk::{durable_execution, DurableError};
+use durable_execution_sdk::{durable_execution, DurableError};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

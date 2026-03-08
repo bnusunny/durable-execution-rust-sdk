@@ -3,7 +3,7 @@
 //! Demonstrates using `CheckpointingMode::Optimistic` which executes multiple
 //! operations before checkpointing for best performance.
 
-use aws_durable_execution_sdk::{durable_execution, DurableError};
+use durable_execution_sdk::{durable_execution, DurableError};
 
 /// Execute steps demonstrating optimistic checkpointing mode.
 ///

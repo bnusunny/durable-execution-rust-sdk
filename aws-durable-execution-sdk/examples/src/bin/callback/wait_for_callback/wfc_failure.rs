@@ -17,7 +17,7 @@
 //! cargo build --example wfc_failure
 //! ```
 
-use aws_durable_execution_sdk::{durable_execution, DurableError};
+use durable_execution_sdk::{durable_execution, DurableError};
 use serde::{Deserialize, Serialize};
 
 /// Result indicating whether the callback succeeded or the submitter failed.

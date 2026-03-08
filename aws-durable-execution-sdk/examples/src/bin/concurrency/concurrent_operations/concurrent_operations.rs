@@ -3,7 +3,7 @@
 //! Demonstrates multiple `ctx.step()` calls executed concurrently via `tokio::join!`.
 //! Each step runs independently and the results are collected together.
 
-use aws_durable_execution_sdk::{durable_execution, DurableError};
+use durable_execution_sdk::{durable_execution, DurableError};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

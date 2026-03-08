@@ -5,7 +5,7 @@
 //! with 6 items where 2 will fail (items 3 and 6). Since the tolerance is 2,
 //! the overall operation succeeds.
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     durable_execution, CompletionConfig, DurableContext, DurableError, MapConfig,
 };
 use serde::{Deserialize, Serialize};

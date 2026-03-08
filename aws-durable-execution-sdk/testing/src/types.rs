@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 /// # Examples
 ///
 /// ```
-/// use aws_durable_execution_sdk_testing::ExecutionStatus;
+/// use durable_execution_sdk_testing::ExecutionStatus;
 ///
 /// let status = ExecutionStatus::Succeeded;
 /// assert!(status.is_terminal());
@@ -76,7 +76,7 @@ impl std::fmt::Display for ExecutionStatus {
 /// # Examples
 ///
 /// ```
-/// use aws_durable_execution_sdk_testing::TestResultError;
+/// use durable_execution_sdk_testing::TestResultError;
 ///
 /// let error = TestResultError::new("ValidationError", "Invalid input");
 /// assert_eq!(error.error_type, Some("ValidationError".to_string()));
@@ -141,8 +141,8 @@ impl std::fmt::Display for TestResultError {
 
 impl std::error::Error for TestResultError {}
 
-impl From<aws_durable_execution_sdk::ErrorObject> for TestResultError {
-    fn from(error: aws_durable_execution_sdk::ErrorObject) -> Self {
+impl From<durable_execution_sdk::ErrorObject> for TestResultError {
+    fn from(error: durable_execution_sdk::ErrorObject) -> Self {
         Self {
             error_type: Some(error.error_type),
             error_message: Some(error.error_message),
@@ -160,7 +160,7 @@ impl From<aws_durable_execution_sdk::ErrorObject> for TestResultError {
 /// # Examples
 ///
 /// ```
-/// use aws_durable_execution_sdk_testing::Invocation;
+/// use durable_execution_sdk_testing::Invocation;
 ///
 /// let invocation = Invocation::new();
 /// assert!(invocation.start_timestamp.is_none());
@@ -240,7 +240,7 @@ impl Default for Invocation {
 /// # Examples
 ///
 /// ```
-/// use aws_durable_execution_sdk_testing::WaitingOperationStatus;
+/// use durable_execution_sdk_testing::WaitingOperationStatus;
 ///
 /// let status = WaitingOperationStatus::Completed;
 /// assert_eq!(format!("{}", status), "Completed");
@@ -276,7 +276,7 @@ impl std::fmt::Display for WaitingOperationStatus {
 /// # Examples
 ///
 /// ```
-/// use aws_durable_execution_sdk_testing::InvokeRequest;
+/// use durable_execution_sdk_testing::InvokeRequest;
 ///
 /// // With a payload
 /// let req = InvokeRequest::with_payload("hello");

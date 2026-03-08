@@ -29,7 +29,7 @@ use thiserror::Error;
 /// # Examples
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::{DurableResult, DurableError};
+/// use durable_execution_sdk::{DurableResult, DurableError};
 ///
 /// fn process_data(data: &str) -> DurableResult<String> {
 ///     if data.is_empty() {
@@ -56,7 +56,7 @@ pub type DurableResult<T> = Result<T, DurableError>;
 /// # Examples
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::{StepResult, DurableError};
+/// use durable_execution_sdk::{StepResult, DurableError};
 ///
 /// fn validate_input(input: &str) -> StepResult<String> {
 ///     if input.len() > 100 {
@@ -83,7 +83,7 @@ pub type StepResult<T> = Result<T, DurableError>;
 /// # Examples
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::{CheckpointResult, DurableError};
+/// use durable_execution_sdk::{CheckpointResult, DurableError};
 ///
 /// fn save_checkpoint(data: &[u8]) -> CheckpointResult<()> {
 ///     if data.len() > 1_000_000 {
@@ -111,7 +111,7 @@ pub type CheckpointResult<T> = Result<T, DurableError>;
 /// Creating common error types:
 ///
 /// ```
-/// use aws_durable_execution_sdk::DurableError;
+/// use durable_execution_sdk::DurableError;
 ///
 /// // Execution error (fails workflow without retry)
 /// let exec_err = DurableError::execution("Order validation failed");
@@ -128,7 +128,7 @@ pub type CheckpointResult<T> = Result<T, DurableError>;
 /// Checking error types:
 ///
 /// ```
-/// use aws_durable_execution_sdk::DurableError;
+/// use durable_execution_sdk::DurableError;
 ///
 /// let err = DurableError::size_limit("Payload too large");
 /// assert!(err.is_size_limit());
@@ -589,7 +589,7 @@ pub struct AwsError {
 /// # Examples
 ///
 /// ```
-/// use aws_durable_execution_sdk::ErrorObject;
+/// use durable_execution_sdk::ErrorObject;
 ///
 /// // Basic error object
 /// let err = ErrorObject::new("ValidationError", "Invalid input");
@@ -609,7 +609,7 @@ pub struct AwsError {
 /// Serialization:
 ///
 /// ```
-/// use aws_durable_execution_sdk::ErrorObject;
+/// use durable_execution_sdk::ErrorObject;
 ///
 /// let err = ErrorObject::new("TestError", "Test message");
 /// let json = serde_json::to_string(&err).unwrap();

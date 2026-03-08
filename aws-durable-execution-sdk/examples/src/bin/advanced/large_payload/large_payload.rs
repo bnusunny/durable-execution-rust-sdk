@@ -3,7 +3,7 @@
 //! Demonstrates a handler that processes a large input payload and produces
 //! a large output, exercising `ctx.complete_execution_if_large()`.
 
-use aws_durable_execution_sdk::{durable_execution, DurableError};
+use durable_execution_sdk::{durable_execution, DurableError};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

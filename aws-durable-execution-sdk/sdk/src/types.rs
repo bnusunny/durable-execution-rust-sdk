@@ -7,7 +7,7 @@
 //! # Example
 //!
 //! ```rust
-//! use aws_durable_execution_sdk::types::{OperationId, ExecutionArn, CallbackId};
+//! use durable_execution_sdk::types::{OperationId, ExecutionArn, CallbackId};
 //!
 //! // Create from String or &str (no validation)
 //! let op_id = OperationId::from("op-123");
@@ -57,7 +57,7 @@ impl std::error::Error for ValidationError {}
 /// # Construction
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::types::OperationId;
+/// use durable_execution_sdk::types::OperationId;
 ///
 /// // From String (no validation)
 /// let id1 = OperationId::from("op-123".to_string());
@@ -76,7 +76,7 @@ impl std::error::Error for ValidationError {}
 /// # String Access
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::types::OperationId;
+/// use durable_execution_sdk::types::OperationId;
 ///
 /// let id = OperationId::from("op-123");
 ///
@@ -180,7 +180,7 @@ impl From<&str> for OperationId {
 /// # Construction
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::types::ExecutionArn;
+/// use durable_execution_sdk::types::ExecutionArn;
 ///
 /// // From String (no validation)
 /// let arn1 = ExecutionArn::from("arn:aws:lambda:us-east-1:123456789012:function:my-func:durable:abc123".to_string());
@@ -201,7 +201,7 @@ impl From<&str> for OperationId {
 /// # String Access
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::types::ExecutionArn;
+/// use durable_execution_sdk::types::ExecutionArn;
 ///
 /// let arn = ExecutionArn::from("arn:aws:lambda:us-east-1:123456789012:function:my-func:durable:abc123");
 ///
@@ -335,7 +335,7 @@ impl From<&str> for ExecutionArn {
 /// # Construction
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::types::CallbackId;
+/// use durable_execution_sdk::types::CallbackId;
 ///
 /// // From String (no validation)
 /// let id1 = CallbackId::from("callback-123".to_string());
@@ -351,7 +351,7 @@ impl From<&str> for ExecutionArn {
 /// # String Access
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::types::CallbackId;
+/// use durable_execution_sdk::types::CallbackId;
 ///
 /// let id = CallbackId::from("callback-123");
 ///

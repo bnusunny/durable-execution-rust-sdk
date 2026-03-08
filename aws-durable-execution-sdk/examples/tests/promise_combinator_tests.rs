@@ -11,14 +11,14 @@
 //! These tests use `#[tokio::test(flavor = "current_thread")]` to ensure each test
 //! has its own isolated tokio runtime for time control.
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     all, all_settled, any, race, CompletionConfig, DurableContext, DurableError, MapConfig,
     OperationType,
 };
-use aws_durable_execution_sdk_examples::test_helper::{
+use durable_execution_sdk_examples::test_helper::{
     assert_nodejs_event_signatures, assert_nodejs_event_signatures_unordered,
 };
-use aws_durable_execution_sdk_testing::{
+use durable_execution_sdk_testing::{
     ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig,
 };
 use serde::{Deserialize, Serialize};
@@ -725,12 +725,12 @@ async fn all_with_wait_handler(
 ) -> Result<Vec<String>, DurableError> {
     // Perform waits before the all! combinator
     ctx.wait(
-        aws_durable_execution_sdk::Duration::from_seconds(1),
+        durable_execution_sdk::Duration::from_seconds(1),
         Some("wait_1"),
     )
     .await?;
     ctx.wait(
-        aws_durable_execution_sdk::Duration::from_seconds(2),
+        durable_execution_sdk::Duration::from_seconds(2),
         Some("wait_2"),
     )
     .await?;

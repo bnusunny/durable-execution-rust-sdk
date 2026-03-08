@@ -30,13 +30,13 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            aws-durable-execution-sdk/target
+            durable-execution-sdk/target
           key: ${{ runner.os }}-cargo-check-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-check-
 
       - name: Run cargo check (workspace)
-        working-directory: aws-durable-execution-sdk
+        working-directory: durable-execution-sdk
         run: cargo check --workspace --all-features
 
   fmt:
@@ -51,7 +51,7 @@ jobs:
           components: rustfmt
 
       - name: Check formatting (workspace)
-        working-directory: aws-durable-execution-sdk
+        working-directory: durable-execution-sdk
         run: cargo fmt --all -- --check
 
   clippy:
@@ -71,13 +71,13 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            aws-durable-execution-sdk/target
+            durable-execution-sdk/target
           key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-clippy-
 
       - name: Run clippy (workspace)
-        working-directory: aws-durable-execution-sdk
+        working-directory: durable-execution-sdk
         run: cargo clippy --workspace --all-features -- -D warnings
 
   test:
@@ -95,18 +95,18 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            aws-durable-execution-sdk/target
+            durable-execution-sdk/target
           key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-test-
 
       - name: Run tests (workspace including examples)
-        working-directory: aws-durable-execution-sdk
+        working-directory: durable-execution-sdk
         run: cargo test --workspace --all-features || cargo test --workspace --all-features
 
       - name: Build all example binaries
-        working-directory: aws-durable-execution-sdk
-        run: cargo build --package aws-durable-execution-sdk-examples --bins
+        working-directory: durable-execution-sdk
+        run: cargo build --package durable-execution-sdk-examples --bins
 
   doc:
     name: Documentation
@@ -123,13 +123,13 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            aws-durable-execution-sdk/target
+            durable-execution-sdk/target
           key: ${{ runner.os }}-cargo-doc-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-doc-
 
       - name: Check documentation (workspace)
-        working-directory: aws-durable-execution-sdk
+        working-directory: durable-execution-sdk
         run: cargo doc --workspace --no-deps --all-features
         env:
           RUSTDOCFLAGS: -D warnings
@@ -149,13 +149,13 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            aws-durable-execution-sdk/target
+            durable-execution-sdk/target
           key: ${{ runner.os }}-cargo-msrv-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-msrv-
 
       - name: Check MSRV (workspace)
-        working-directory: aws-durable-execution-sdk
+        working-directory: durable-execution-sdk
         run: cargo check --workspace --all-features
 
   security:
@@ -171,14 +171,14 @@ jobs:
         run: cargo install cargo-audit --locked
 
       - name: Run cargo audit
-        working-directory: aws-durable-execution-sdk
+        working-directory: durable-execution-sdk
         run: cargo audit
 
       - name: Install cargo-deny
         run: cargo install cargo-deny --locked
 
       - name: Run cargo deny
-        working-directory: aws-durable-execution-sdk
+        working-directory: durable-execution-sdk
         run: cargo deny check
 
   coverage:
@@ -199,7 +199,7 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            aws-durable-execution-sdk/target
+            durable-execution-sdk/target
           key: ${{ runner.os }}-cargo-coverage-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-coverage-
@@ -208,13 +208,13 @@ jobs:
         uses: taiki-e/install-action@cargo-llvm-cov
 
       - name: Generate coverage
-        working-directory: aws-durable-execution-sdk
-        run: cargo llvm-cov --workspace --all-features --exclude aws-durable-execution-sdk-examples --codecov --output-path codecov.json
+        working-directory: durable-execution-sdk
+        run: cargo llvm-cov --workspace --all-features --exclude durable-execution-sdk-examples --codecov --output-path codecov.json
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: ./aws-durable-execution-sdk/codecov.json
+          files: ./durable-execution-sdk/codecov.json
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 

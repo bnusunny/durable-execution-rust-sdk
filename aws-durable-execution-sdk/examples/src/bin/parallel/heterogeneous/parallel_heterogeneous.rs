@@ -2,7 +2,7 @@
 //!
 //! Running different types of operations using child contexts.
 
-use aws_durable_execution_sdk::{durable_execution, DurableError, Duration};
+use durable_execution_sdk::{durable_execution, DurableError, Duration};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

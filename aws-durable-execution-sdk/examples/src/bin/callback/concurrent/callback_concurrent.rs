@@ -2,7 +2,7 @@
 //!
 //! Creating multiple callbacks and waiting for them concurrently.
 
-use aws_durable_execution_sdk::{durable_execution, CallbackConfig, DurableError, Duration};
+use durable_execution_sdk::{durable_execution, CallbackConfig, DurableError, Duration};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -3,10 +3,10 @@
 //! These tests verify that context misuse (using a parent context in the wrong scope)
 //! is detected by the SDK and produces appropriate errors or documented behavior.
 
-use aws_durable_execution_sdk::DurableContext;
-use aws_durable_execution_sdk::DurableError;
-use aws_durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures;
-use aws_durable_execution_sdk_testing::{
+use durable_execution_sdk::DurableContext;
+use durable_execution_sdk::DurableError;
+use durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures;
+use durable_execution_sdk_testing::{
     ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig,
 };
 
@@ -170,7 +170,7 @@ async fn test_context_validation_parent_in_step() {
 // Context Validation: Parent in Wait Condition Example Handler
 // ============================================================================
 
-use aws_durable_execution_sdk::{Duration, WaitForConditionConfig, WaitForConditionContext};
+use durable_execution_sdk::{Duration, WaitForConditionConfig, WaitForConditionContext};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

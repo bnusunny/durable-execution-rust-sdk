@@ -5,9 +5,9 @@
 
 use std::future::Future;
 use std::pin::Pin;
-use aws_durable_execution_sdk::all_settled;
-use aws_durable_execution_sdk::error::DurableError;
-use aws_durable_execution_sdk::concurrency::BatchResult;
+use durable_execution_sdk::all_settled;
+use durable_execution_sdk::error::DurableError;
+use durable_execution_sdk::concurrency::BatchResult;
 
 type DynFut<T> = Pin<Box<dyn Future<Output = Result<T, DurableError>> + Send>>;
 

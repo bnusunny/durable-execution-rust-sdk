@@ -24,7 +24,7 @@
 //! enabling the common use case of combining different step operations:
 //!
 //! ```rust,ignore
-//! use aws_durable_execution_sdk::all;
+//! use durable_execution_sdk::all;
 //!
 //! // Clone contexts for each future
 //! let ctx1 = ctx.clone();
@@ -50,7 +50,7 @@
 //! - **Small, fixed number of futures** - Known at compile time
 //!
 //! ```rust,ignore
-//! use aws_durable_execution_sdk::{all, any};
+//! use durable_execution_sdk::{all, any};
 //!
 //! // Different closures = different types - use macros!
 //! let ctx1 = ctx.clone();
@@ -137,7 +137,7 @@
 /// ## Basic Usage
 ///
 /// ```rust,ignore
-/// use aws_durable_execution_sdk::all;
+/// use durable_execution_sdk::all;
 ///
 /// // Clone contexts for each future to satisfy lifetime requirements
 /// let ctx1 = ctx.clone();
@@ -155,7 +155,7 @@
 /// ## Parallel Data Fetching
 ///
 /// ```rust,ignore
-/// use aws_durable_execution_sdk::all;
+/// use durable_execution_sdk::all;
 ///
 /// // Clone contexts for parallel operations
 /// let ctx1 = ctx.clone();
@@ -178,7 +178,7 @@
 /// ## Error Handling
 ///
 /// ```rust,ignore
-/// use aws_durable_execution_sdk::all;
+/// use durable_execution_sdk::all;
 ///
 /// let ctx1 = ctx.clone();
 /// let ctx2 = ctx.clone();
@@ -245,7 +245,7 @@ macro_rules! all {
 /// ## Basic Fallback Pattern
 ///
 /// ```rust,ignore
-/// use aws_durable_execution_sdk::any;
+/// use durable_execution_sdk::any;
 ///
 /// // Clone contexts for each future
 /// let ctx1 = ctx.clone();
@@ -263,7 +263,7 @@ macro_rules! all {
 /// ## Redundant Service Calls
 ///
 /// ```rust,ignore
-/// use aws_durable_execution_sdk::any;
+/// use durable_execution_sdk::any;
 ///
 /// let ctx1 = ctx.clone();
 /// let ctx2 = ctx.clone();
@@ -278,7 +278,7 @@ macro_rules! all {
 /// ## Handling All Failures
 ///
 /// ```rust,ignore
-/// use aws_durable_execution_sdk::any;
+/// use durable_execution_sdk::any;
 ///
 /// let ctx1 = ctx.clone();
 /// let ctx2 = ctx.clone();
@@ -344,7 +344,7 @@ macro_rules! any {
 /// ## Timeout Pattern
 ///
 /// ```rust,ignore
-/// use aws_durable_execution_sdk::race;
+/// use durable_execution_sdk::race;
 ///
 /// let ctx1 = ctx.clone();
 /// let ctx2 = ctx.clone();
@@ -369,7 +369,7 @@ macro_rules! any {
 /// ## Competitive Operations
 ///
 /// ```rust,ignore
-/// use aws_durable_execution_sdk::race;
+/// use durable_execution_sdk::race;
 ///
 /// let ctx1 = ctx.clone();
 /// let ctx2 = ctx.clone();
@@ -384,7 +384,7 @@ macro_rules! any {
 /// ## First Failure Wins
 ///
 /// ```rust,ignore
-/// use aws_durable_execution_sdk::race;
+/// use durable_execution_sdk::race;
 ///
 /// let ctx1 = ctx.clone();
 /// let ctx2 = ctx.clone();
@@ -461,7 +461,7 @@ macro_rules! race {
 /// ## Collecting All Outcomes
 ///
 /// ```rust,ignore
-/// use aws_durable_execution_sdk::all_settled;
+/// use durable_execution_sdk::all_settled;
 ///
 /// let ctx1 = ctx.clone();
 /// let ctx2 = ctx.clone();
@@ -481,7 +481,7 @@ macro_rules! race {
 /// ## Processing Successes and Failures Separately
 ///
 /// ```rust,ignore
-/// use aws_durable_execution_sdk::all_settled;
+/// use durable_execution_sdk::all_settled;
 ///
 /// let ctx1 = ctx.clone();
 /// let ctx2 = ctx.clone();
@@ -511,7 +511,7 @@ macro_rules! race {
 /// ## Partial Success Handling
 ///
 /// ```rust,ignore
-/// use aws_durable_execution_sdk::all_settled;
+/// use durable_execution_sdk::all_settled;
 ///
 /// let ctx1 = ctx.clone();
 /// let ctx2 = ctx.clone();
@@ -538,7 +538,7 @@ macro_rules! race {
 /// Results are returned in the same order as input futures:
 ///
 /// ```rust,ignore
-/// use aws_durable_execution_sdk::all_settled;
+/// use durable_execution_sdk::all_settled;
 ///
 /// let ctx1 = ctx.clone();
 /// let ctx2 = ctx.clone();

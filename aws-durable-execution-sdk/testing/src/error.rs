@@ -3,7 +3,7 @@
 //! This module defines the error types used throughout the testing framework,
 //! wrapping SDK errors and adding testing-specific error variants.
 
-use aws_durable_execution_sdk::{DurableError, OperationType};
+use durable_execution_sdk::{DurableError, OperationType};
 use thiserror::Error;
 
 use crate::types::WaitingOperationStatus;
@@ -16,7 +16,7 @@ use crate::types::WaitingOperationStatus;
 /// # Examples
 ///
 /// ```
-/// use aws_durable_execution_sdk_testing::TestError;
+/// use durable_execution_sdk_testing::TestError;
 ///
 /// // Operation not found
 /// let err = TestError::OperationNotFound("my-step".to_string());
@@ -24,8 +24,8 @@ use crate::types::WaitingOperationStatus;
 ///
 /// // Type mismatch
 /// let err = TestError::OperationTypeMismatch {
-///     expected: aws_durable_execution_sdk::OperationType::Step,
-///     found: aws_durable_execution_sdk::OperationType::Wait,
+///     expected: durable_execution_sdk::OperationType::Step,
+///     found: durable_execution_sdk::OperationType::Wait,
 /// };
 /// assert!(err.to_string().contains("Step"));
 /// ```

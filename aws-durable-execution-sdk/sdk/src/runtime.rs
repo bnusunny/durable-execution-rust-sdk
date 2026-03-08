@@ -32,7 +32,7 @@ use crate::state::{CheckpointBatcherConfig, ExecutionState};
 use crate::termination::TerminationManager;
 
 /// SDK name for user-agent identification.
-const SDK_NAME: &str = "aws-durable-execution-sdk-rust";
+const SDK_NAME: &str = "durable-execution-sdk-rust";
 
 /// SDK version for user-agent identification (from Cargo.toml).
 const SDK_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -179,7 +179,7 @@ async fn checkpoint_large_result(
 /// # Example
 ///
 /// ```rust,ignore
-/// use aws_durable_execution_sdk::runtime::run_durable_handler;
+/// use durable_execution_sdk::runtime::run_durable_handler;
 ///
 /// // Called automatically by #[durable_execution], but can be used directly:
 /// pub async fn my_handler(

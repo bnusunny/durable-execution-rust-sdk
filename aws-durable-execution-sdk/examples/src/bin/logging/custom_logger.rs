@@ -2,7 +2,7 @@
 //!
 //! Using custom logging with the durable execution SDK.
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     custom_logger, durable_execution, simple_custom_logger, DurableError, ReplayAwareLogger,
     ReplayLoggingConfig, TracingLogger,
 };

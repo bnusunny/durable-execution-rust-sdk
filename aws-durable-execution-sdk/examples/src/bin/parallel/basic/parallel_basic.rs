@@ -3,7 +3,7 @@
 //! Running multiple operations in parallel using `ctx.map()` with indices.
 //! For heterogeneous parallel operations, use child contexts.
 
-use aws_durable_execution_sdk::{durable_execution, DurableContext, DurableError, MapConfig};
+use durable_execution_sdk::{durable_execution, DurableContext, DurableError, MapConfig};
 
 /// Execute multiple independent operations in parallel.
 ///

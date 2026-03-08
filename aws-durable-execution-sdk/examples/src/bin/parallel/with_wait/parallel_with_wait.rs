@@ -3,7 +3,7 @@
 //! Demonstrates parallel branches that include `ctx.wait()` calls within each branch.
 //! Each branch waits for a different duration before performing a step operation.
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     durable_execution, CompletionReason, DurableContext, DurableError, Duration, MapConfig,
 };
 

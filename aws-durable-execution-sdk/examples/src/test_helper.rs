@@ -16,7 +16,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use aws_durable_execution_sdk_examples::test_helper::{assert_event_signatures, EventSignature};
+//! use durable_execution_sdk_examples::test_helper::{assert_event_signatures, EventSignature};
 //!
 //! #[tokio::test]
 //! async fn test_my_workflow() {
@@ -30,9 +30,9 @@
 //! }
 //! ```
 
-use aws_durable_execution_sdk::{Operation, OperationType};
-use aws_durable_execution_sdk_testing::checkpoint_server::NodeJsHistoryEvent;
-use aws_durable_execution_sdk_testing::TestResult;
+use durable_execution_sdk::{Operation, OperationType};
+use durable_execution_sdk_testing::checkpoint_server::NodeJsHistoryEvent;
+use durable_execution_sdk_testing::TestResult;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs;
@@ -618,7 +618,7 @@ macro_rules! event_sig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aws_durable_execution_sdk::{Operation, OperationType};
+    use durable_execution_sdk::{Operation, OperationType};
 
     fn create_test_operation(name: Option<&str>, op_type: OperationType) -> Operation {
         let mut op = Operation::new(format!("op-{}", uuid::Uuid::new_v4()), op_type);
@@ -687,12 +687,12 @@ mod tests {
     // Node.js-Compatible History Tests
     // ========================================================================
 
-    use aws_durable_execution_sdk_testing::checkpoint_server::{
+    use durable_execution_sdk_testing::checkpoint_server::{
         ExecutionStartedDetails, ExecutionStartedDetailsWrapper, NodeJsEventDetails,
         NodeJsEventType, NodeJsHistoryEvent, PayloadWrapper, RetryDetails, StepSucceededDetails,
         StepSucceededDetailsWrapper,
     };
-    use aws_durable_execution_sdk_testing::TestResult;
+    use durable_execution_sdk_testing::TestResult;
 
     fn create_test_nodejs_event(
         event_type: NodeJsEventType,

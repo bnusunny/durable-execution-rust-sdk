@@ -4,7 +4,7 @@
 //! produces an error. The parent context should not be used for durable operations
 //! within a child context's closure — only the child context parameter should be used.
 
-use aws_durable_execution_sdk::{durable_execution, DurableError};
+use durable_execution_sdk::{durable_execution, DurableError};
 
 /// Attempt to use the parent context inside a child context closure.
 ///

@@ -23,10 +23,10 @@ mod tests {
         InvocationCompletedDetailsWrapper, NodeJsEventDetails, NodeJsEventType, NodeJsHistoryEvent,
         PayloadWrapper, RetryDetails, StepSucceededDetails, StepSucceededDetailsWrapper,
     };
-    use aws_durable_execution_sdk::operation::{
+    use durable_execution_sdk::operation::{
         Operation, OperationAction, OperationType, OperationUpdate,
     };
-    use aws_durable_execution_sdk::ErrorObject;
+    use durable_execution_sdk::ErrorObject;
 
     // ============================================================================
     // Proptest Strategies for Generating Test Data

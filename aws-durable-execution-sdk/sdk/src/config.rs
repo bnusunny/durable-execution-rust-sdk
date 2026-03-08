@@ -39,7 +39,7 @@ use crate::sealed::Sealed;
 /// # Example
 ///
 /// ```
-/// use aws_durable_execution_sdk::config::JitterStrategy;
+/// use durable_execution_sdk::config::JitterStrategy;
 ///
 /// let none = JitterStrategy::None;
 /// assert_eq!(none.apply(10.0, 1), 10.0);
@@ -134,8 +134,8 @@ fn deterministic_random_factor(attempt: u32) -> f64 {
 /// # Example
 ///
 /// ```
-/// use aws_durable_execution_sdk::config::WaitDecision;
-/// use aws_durable_execution_sdk::Duration;
+/// use durable_execution_sdk::config::WaitDecision;
+/// use durable_execution_sdk::Duration;
 ///
 /// let cont = WaitDecision::Continue { delay: Duration::from_seconds(5) };
 /// let done = WaitDecision::Done;
@@ -166,8 +166,8 @@ pub enum WaitDecision {
 /// # Example
 ///
 /// ```
-/// use aws_durable_execution_sdk::config::{WaitStrategyConfig, JitterStrategy, create_wait_strategy, WaitDecision};
-/// use aws_durable_execution_sdk::Duration;
+/// use durable_execution_sdk::config::{WaitStrategyConfig, JitterStrategy, create_wait_strategy, WaitDecision};
+/// use durable_execution_sdk::Duration;
 ///
 /// let config = WaitStrategyConfig {
 ///     max_attempts: Some(10),
@@ -295,7 +295,7 @@ pub fn create_wait_strategy<T: Send + Sync + 'static>(
 /// ## Example
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::CheckpointingMode;
+/// use durable_execution_sdk::CheckpointingMode;
 ///
 /// // Use eager mode for maximum durability
 /// let eager = CheckpointingMode::Eager;
@@ -456,8 +456,8 @@ impl Clone for Box<dyn RetryStrategy> {
 /// # Example
 ///
 /// ```
-/// use aws_durable_execution_sdk::config::ExponentialBackoff;
-/// use aws_durable_execution_sdk::Duration;
+/// use durable_execution_sdk::config::ExponentialBackoff;
+/// use durable_execution_sdk::Duration;
 ///
 /// // Retry up to 5 times with exponential backoff starting at 1 second
 /// let strategy = ExponentialBackoff::new(5, Duration::from_seconds(1));
@@ -602,8 +602,8 @@ impl ExponentialBackoffBuilder {
 /// # Example
 ///
 /// ```
-/// use aws_durable_execution_sdk::config::FixedDelay;
-/// use aws_durable_execution_sdk::Duration;
+/// use durable_execution_sdk::config::FixedDelay;
+/// use durable_execution_sdk::Duration;
 ///
 /// // Retry up to 3 times with 5 second delay between attempts
 /// let strategy = FixedDelay::new(3, Duration::from_seconds(5));
@@ -667,8 +667,8 @@ impl RetryStrategy for FixedDelay {
 /// # Example
 ///
 /// ```
-/// use aws_durable_execution_sdk::config::LinearBackoff;
-/// use aws_durable_execution_sdk::Duration;
+/// use durable_execution_sdk::config::LinearBackoff;
+/// use durable_execution_sdk::Duration;
 ///
 /// // Retry up to 5 times: 2s, 4s, 6s, 8s, 10s
 /// let strategy = LinearBackoff::new(5, Duration::from_seconds(2));
@@ -743,7 +743,7 @@ impl RetryStrategy for LinearBackoff {
 /// # Example
 ///
 /// ```
-/// use aws_durable_execution_sdk::config::NoRetry;
+/// use durable_execution_sdk::config::NoRetry;
 ///
 /// let strategy = NoRetry;
 /// ```
@@ -770,7 +770,7 @@ impl RetryStrategy for NoRetry {
 /// # Example
 ///
 /// ```
-/// use aws_durable_execution_sdk::config::ErrorPattern;
+/// use durable_execution_sdk::config::ErrorPattern;
 ///
 /// let contains = ErrorPattern::Contains("timeout".to_string());
 /// let regex = ErrorPattern::Regex(regex::Regex::new(r"(?i)connection.*refused").unwrap());
@@ -809,7 +809,7 @@ impl std::fmt::Debug for ErrorPattern {
 /// # Example
 ///
 /// ```
-/// use aws_durable_execution_sdk::config::{RetryableErrorFilter, ErrorPattern};
+/// use durable_execution_sdk::config::{RetryableErrorFilter, ErrorPattern};
 ///
 /// let filter = RetryableErrorFilter {
 ///     patterns: vec![
@@ -878,8 +878,8 @@ impl RetryableErrorFilter {
 /// # Example
 ///
 /// ```
-/// use aws_durable_execution_sdk::config::custom_retry;
-/// use aws_durable_execution_sdk::Duration;
+/// use durable_execution_sdk::config::custom_retry;
+/// use durable_execution_sdk::Duration;
 ///
 /// // Custom strategy: retry up to 3 times, but only for specific errors
 /// let strategy = custom_retry(|attempt, error| {
@@ -959,7 +959,7 @@ pub enum StepSemantics {
 /// Using default configuration:
 ///
 /// ```
-/// use aws_durable_execution_sdk::StepConfig;
+/// use durable_execution_sdk::StepConfig;
 ///
 /// let config = StepConfig::default();
 /// // Default uses AtLeastOncePerRetry semantics
@@ -968,7 +968,7 @@ pub enum StepSemantics {
 /// Configuring step semantics:
 ///
 /// ```
-/// use aws_durable_execution_sdk::{StepConfig, StepSemantics};
+/// use durable_execution_sdk::{StepConfig, StepSemantics};
 ///
 /// // For non-idempotent operations, use AtMostOncePerRetry
 /// let config = StepConfig {
@@ -1060,7 +1060,7 @@ impl<P, R> std::fmt::Debug for InvokeConfig<P, R> {
 /// Basic map configuration with concurrency limit:
 ///
 /// ```
-/// use aws_durable_execution_sdk::MapConfig;
+/// use durable_execution_sdk::MapConfig;
 ///
 /// let config = MapConfig {
 ///     max_concurrency: Some(5),
@@ -1071,7 +1071,7 @@ impl<P, R> std::fmt::Debug for InvokeConfig<P, R> {
 /// Map with failure tolerance:
 ///
 /// ```
-/// use aws_durable_execution_sdk::{MapConfig, CompletionConfig};
+/// use durable_execution_sdk::{MapConfig, CompletionConfig};
 ///
 /// let config = MapConfig {
 ///     max_concurrency: Some(10),
@@ -1191,7 +1191,7 @@ impl ChildConfig {
     /// # Example
     ///
     /// ```
-    /// use aws_durable_execution_sdk::ChildConfig;
+    /// use durable_execution_sdk::ChildConfig;
     ///
     /// let config = ChildConfig::with_replay_children();
     /// assert!(config.replay_children);
@@ -1280,7 +1280,7 @@ impl CompletionConfig {
     /// # Example
     ///
     /// ```
-    /// use aws_durable_execution_sdk::CompletionConfig;
+    /// use durable_execution_sdk::CompletionConfig;
     ///
     /// let config = CompletionConfig::first_successful();
     /// assert_eq!(config.min_successful, Some(1));
@@ -1297,7 +1297,7 @@ impl CompletionConfig {
     /// # Example
     ///
     /// ```
-    /// use aws_durable_execution_sdk::CompletionConfig;
+    /// use durable_execution_sdk::CompletionConfig;
     ///
     /// let config = CompletionConfig::all_completed();
     /// assert!(config.min_successful.is_none());
@@ -1311,7 +1311,7 @@ impl CompletionConfig {
     /// # Example
     ///
     /// ```
-    /// use aws_durable_execution_sdk::CompletionConfig;
+    /// use durable_execution_sdk::CompletionConfig;
     ///
     /// let config = CompletionConfig::all_successful();
     /// assert_eq!(config.tolerated_failure_count, Some(0));
@@ -1397,7 +1397,7 @@ impl ItemBatcher {
     /// # Example
     ///
     /// ```
-    /// use aws_durable_execution_sdk::ItemBatcher;
+    /// use durable_execution_sdk::ItemBatcher;
     ///
     /// let batcher = ItemBatcher::new(2, 1024);
     /// let items = vec!["a", "b", "c", "d", "e"];

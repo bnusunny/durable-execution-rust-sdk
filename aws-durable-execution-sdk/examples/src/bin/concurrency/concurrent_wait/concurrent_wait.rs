@@ -3,7 +3,7 @@
 //! Demonstrates multiple `ctx.wait()` calls executed concurrently via `tokio::join!`.
 //! Each wait operation runs independently and completes after its specified duration.
 
-use aws_durable_execution_sdk::{durable_execution, DurableError, Duration};
+use durable_execution_sdk::{durable_execution, DurableError, Duration};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

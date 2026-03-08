@@ -3,9 +3,9 @@
 //! These tests verify that the step examples execute correctly and produce
 //! the expected operation history.
 
-use aws_durable_execution_sdk::{DurableContext, DurableError, StepConfig, StepSemantics};
-use aws_durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures;
-use aws_durable_execution_sdk_testing::{
+use durable_execution_sdk::{DurableContext, DurableError, StepConfig, StepSemantics};
+use durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures;
+use durable_execution_sdk_testing::{
     ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig,
 };
 use serde::{Deserialize, Serialize};
@@ -228,7 +228,7 @@ async fn test_step_with_config() {
 // Step Retry Exponential Backoff Example Handler
 // ============================================================================
 
-use aws_durable_execution_sdk::{Duration, ExponentialBackoff, JitterStrategy};
+use durable_execution_sdk::{Duration, ExponentialBackoff, JitterStrategy};
 
 /// Handler from step/retry_exponential_backoff example (without macro for testing)
 async fn step_retry_exponential_backoff_handler(
@@ -293,7 +293,7 @@ async fn test_step_retry_exponential_backoff() {
 // Step Retry With Filter Example Handler
 // ============================================================================
 
-use aws_durable_execution_sdk::{ErrorPattern, RetryableErrorFilter};
+use durable_execution_sdk::{ErrorPattern, RetryableErrorFilter};
 
 /// Handler from step/retry_with_filter example (without macro for testing)
 async fn step_retry_with_filter_handler(

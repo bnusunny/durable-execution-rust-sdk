@@ -12,7 +12,7 @@
 //! # Examples
 //!
 //! ```ignore
-//! use aws_durable_execution_sdk_testing::TimeControl;
+//! use durable_execution_sdk_testing::TimeControl;
 //! use std::time::Duration;
 //!
 //! #[tokio::test]
@@ -74,7 +74,7 @@ pub fn is_time_paused() -> bool {
 /// # Examples
 ///
 /// ```ignore
-/// use aws_durable_execution_sdk_testing::TimeControl;
+/// use durable_execution_sdk_testing::TimeControl;
 /// use std::time::Duration;
 ///
 /// #[tokio::test]
@@ -115,7 +115,7 @@ impl TimeControl {
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::TimeControl;
+    /// use durable_execution_sdk_testing::TimeControl;
     ///
     /// #[tokio::test]
     /// async fn test_enable_time_control() {
@@ -236,7 +236,7 @@ impl TimeControl {
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::TimeControl;
+    /// use durable_execution_sdk_testing::TimeControl;
     ///
     /// #[tokio::test]
     /// async fn test_disable_time_control() {
@@ -268,7 +268,7 @@ impl TimeControl {
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::TimeControl;
+    /// use durable_execution_sdk_testing::TimeControl;
     ///
     /// #[tokio::test]
     /// async fn test_is_enabled() {
@@ -305,7 +305,7 @@ impl TimeControl {
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::TimeControl;
+    /// use durable_execution_sdk_testing::TimeControl;
     /// use std::time::Duration;
     ///
     /// #[tokio::test]
@@ -333,7 +333,7 @@ impl TimeControl {
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::TimeControl;
+    /// use durable_execution_sdk_testing::TimeControl;
     ///
     /// #[tokio::test]
     /// async fn test_advance_seconds() {
@@ -360,7 +360,7 @@ impl TimeControl {
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::TimeControl;
+    /// use durable_execution_sdk_testing::TimeControl;
     ///
     /// #[tokio::test]
     /// async fn test_advance_millis() {
@@ -384,7 +384,7 @@ impl TimeControl {
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::TimeControl;
+    /// use durable_execution_sdk_testing::TimeControl;
     ///
     /// #[tokio::test]
     /// async fn test_reset() {
@@ -406,7 +406,7 @@ impl TimeControl {
 /// # Examples
 ///
 /// ```ignore
-/// use aws_durable_execution_sdk_testing::TimeControlGuard;
+/// use durable_execution_sdk_testing::TimeControlGuard;
 ///
 /// #[tokio::test]
 /// async fn test_with_guard() {
@@ -432,7 +432,7 @@ impl TimeControlGuard {
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::TimeControlGuard;
+    /// use durable_execution_sdk_testing::TimeControlGuard;
     ///
     /// #[tokio::test]
     /// async fn test_guard_creation() {

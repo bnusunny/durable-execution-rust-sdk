@@ -25,7 +25,7 @@
 //! Each parallel branch and map item is checkpointed independently,
 //! allowing fine-grained resumption after interruptions.
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     durable_execution, CompletionConfig, DurableContext, DurableError, MapConfig,
 };
 use serde::{Deserialize, Serialize};

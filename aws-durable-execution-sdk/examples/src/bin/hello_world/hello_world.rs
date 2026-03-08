@@ -3,7 +3,7 @@
 //! A simple hello world example with no durable operations.
 //! This demonstrates the basic structure of a durable function.
 
-use aws_durable_execution_sdk::{durable_execution, DurableError};
+use durable_execution_sdk::{durable_execution, DurableError};
 
 /// Simple durable function that returns a greeting.
 ///

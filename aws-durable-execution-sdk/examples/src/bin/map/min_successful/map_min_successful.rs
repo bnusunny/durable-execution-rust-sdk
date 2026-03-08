@@ -2,7 +2,7 @@
 //!
 //! Processing items with a quorum requirement using `CompletionConfig`.
 
-use aws_durable_execution_sdk::{durable_execution, CompletionConfig, DurableError, MapConfig};
+use durable_execution_sdk::{durable_execution, CompletionConfig, DurableError, MapConfig};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

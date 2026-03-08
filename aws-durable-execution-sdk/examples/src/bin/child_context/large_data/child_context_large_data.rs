@@ -4,7 +4,7 @@
 //! exercising `ChildConfig::set_summary_generator()` to store a compact
 //! summary instead of the full payload.
 
-use aws_durable_execution_sdk::{durable_execution, ChildConfig, DurableError};
+use durable_execution_sdk::{durable_execution, ChildConfig, DurableError};
 use std::sync::Arc;
 
 /// Run a child context producing a large result with a summary generator.

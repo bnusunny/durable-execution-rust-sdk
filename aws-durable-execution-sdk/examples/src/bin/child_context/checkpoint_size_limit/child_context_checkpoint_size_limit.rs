@@ -4,7 +4,7 @@
 //! checkpoint size limit, using `ChildConfig::set_summary_generator()`
 //! as mitigation to keep checkpoints compact.
 
-use aws_durable_execution_sdk::{durable_execution, ChildConfig, DurableError};
+use durable_execution_sdk::{durable_execution, ChildConfig, DurableError};
 use std::sync::Arc;
 
 /// Run a child context with a moderately large result and summary generator.

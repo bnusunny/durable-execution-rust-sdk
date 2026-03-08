@@ -11,7 +11,7 @@
 //! - 5.5: WHEN serializing to JSON, THE Event_Processor SHALL format timestamps as ISO 8601 strings
 //! - 6.3: THE generated history file SHALL be parseable by the Node.js SDK's history comparison utilities
 
-use aws_durable_execution_sdk_testing::checkpoint_server::{
+use durable_execution_sdk_testing::checkpoint_server::{
     ExecutionStartedDetails, ExecutionStartedDetailsWrapper, ExecutionSucceededDetails,
     ExecutionSucceededDetailsWrapper, NodeJsEventDetails, NodeJsEventType, NodeJsHistoryEvent,
     PayloadWrapper, RetryDetails, StepStartedDetails, StepStartedDetailsWrapper,

@@ -3,11 +3,11 @@
 //! These tests verify advanced SDK features including checkpointing modes,
 //! retry exhaustion, large payloads, and handler-level errors.
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     DurableContext, DurableError, Duration, ExponentialBackoff, StepConfig,
 };
-use aws_durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures;
-use aws_durable_execution_sdk_testing::{
+use durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures;
+use durable_execution_sdk_testing::{
     ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig,
 };
 use serde::{Deserialize, Serialize};

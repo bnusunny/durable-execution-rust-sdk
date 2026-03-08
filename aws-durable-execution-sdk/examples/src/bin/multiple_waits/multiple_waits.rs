@@ -2,7 +2,7 @@
 //!
 //! Using multiple wait operations in a workflow.
 
-use aws_durable_execution_sdk::{durable_execution, DurableError, Duration};
+use durable_execution_sdk::{durable_execution, DurableError, Duration};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

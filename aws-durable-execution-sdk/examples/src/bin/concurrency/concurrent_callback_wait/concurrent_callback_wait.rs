@@ -4,7 +4,7 @@
 //! via `tokio::join!`. This shows how callback operations can be composed with
 //! other durable operations in parallel.
 
-use aws_durable_execution_sdk::{durable_execution, CallbackConfig, DurableError, Duration};
+use durable_execution_sdk::{durable_execution, CallbackConfig, DurableError, Duration};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -2,7 +2,7 @@
 //!
 //! Using `ctx.run_in_child_context()` to create isolated nested workflows.
 
-use aws_durable_execution_sdk::{durable_execution, DurableError};
+use durable_execution_sdk::{durable_execution, DurableError};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

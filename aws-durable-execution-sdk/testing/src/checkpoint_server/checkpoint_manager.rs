@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     Operation, OperationAction, OperationStatus, OperationType, OperationUpdate,
 };
 
@@ -374,7 +374,7 @@ impl CheckpointManager {
                 .and_then(|d| d.attempt)
                 .unwrap_or(0);
 
-            operation.step_details = Some(aws_durable_execution_sdk::StepDetails {
+            operation.step_details = Some(durable_execution_sdk::StepDetails {
                 result: None,
                 attempt: Some(current_attempt + 1),
                 next_attempt_timestamp,
@@ -407,7 +407,7 @@ impl CheckpointManager {
         let callback_details = if update.operation_type == OperationType::Callback {
             // Generate a unique callback_id for the callback operation
             let callback_id = Uuid::new_v4().to_string();
-            Some(aws_durable_execution_sdk::CallbackDetails {
+            Some(durable_execution_sdk::CallbackDetails {
                 callback_id: Some(callback_id),
                 result: None,
                 error: None,
@@ -422,7 +422,7 @@ impl CheckpointManager {
             if let Some(ref wait_options) = update.wait_options {
                 // Calculate scheduled_end_timestamp as now + (wait_seconds * 1000) milliseconds
                 let scheduled_end_timestamp = now + (wait_options.wait_seconds as i64 * 1000);
-                Some(aws_durable_execution_sdk::WaitDetails {
+                Some(durable_execution_sdk::WaitDetails {
                     scheduled_end_timestamp: Some(scheduled_end_timestamp),
                 })
             } else {
@@ -440,7 +440,7 @@ impl CheckpointManager {
                 let next_attempt_timestamp = step_options
                     .next_attempt_delay_seconds
                     .map(|delay| now + (delay as i64 * 1000));
-                Some(aws_durable_execution_sdk::StepDetails {
+                Some(durable_execution_sdk::StepDetails {
                     result: None,
                     attempt: Some(1), // Start with attempt 1
                     next_attempt_timestamp,
@@ -449,7 +449,7 @@ impl CheckpointManager {
                 })
             } else if update.action == OperationAction::Retry {
                 // Retry without step_options - still create step_details
-                Some(aws_durable_execution_sdk::StepDetails {
+                Some(durable_execution_sdk::StepDetails {
                     result: None,
                     attempt: Some(1),
                     next_attempt_timestamp: None,
@@ -503,7 +503,7 @@ impl CheckpointManager {
         &mut self,
         callback_id: &str,
         result: Option<String>,
-        error: Option<aws_durable_execution_sdk::ErrorObject>,
+        error: Option<durable_execution_sdk::ErrorObject>,
     ) {
         let now = chrono::Utc::now().timestamp_millis();
         for events in self.operation_data_map.values_mut() {
@@ -826,8 +826,8 @@ mod tests {
 
     #[test]
     fn test_retry_operation_generates_step_failed_event() {
-        use aws_durable_execution_sdk::error::ErrorObject;
-        use aws_durable_execution_sdk::StepOptions;
+        use durable_execution_sdk::error::ErrorObject;
+        use durable_execution_sdk::StepOptions;
 
         let mut manager = CheckpointManager::new("exec-1");
         manager.initialize("{}");

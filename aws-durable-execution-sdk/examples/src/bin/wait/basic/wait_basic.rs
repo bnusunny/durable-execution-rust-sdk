@@ -3,7 +3,7 @@
 //! Basic usage of `ctx.wait()` to pause execution for a duration.
 //! Wait operations suspend the Lambda and resume later.
 
-use aws_durable_execution_sdk::{durable_execution, DurableError, Duration};
+use durable_execution_sdk::{durable_execution, DurableError, Duration};
 
 /// Pause execution for 2 seconds.
 ///

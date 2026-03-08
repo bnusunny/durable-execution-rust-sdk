@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-use aws_durable_execution_sdk::ErrorObject;
+use durable_execution_sdk::ErrorObject;
 
 use crate::error::TestError;
 

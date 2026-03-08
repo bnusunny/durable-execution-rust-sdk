@@ -1,5 +1,5 @@
 [package]
-name = "aws-durable-execution-sdk-examples"
+name = "durable-execution-sdk-examples"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,10 +9,10 @@ publish = false
 
 [dependencies]
 # Core SDK dependency
-aws-durable-execution-sdk = { workspace = true, features = ["macros"] }
+durable-execution-sdk = { workspace = true, features = ["macros"] }
 
 # Testing utilities (for integration tests)
-aws-durable-execution-sdk-testing.workspace = true
+durable-execution-sdk-testing.workspace = true
 
 # Async runtime
 tokio.workspace = true

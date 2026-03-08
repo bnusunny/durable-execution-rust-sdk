@@ -3,11 +3,11 @@
 //! These tests verify that concurrent durable operations using `tokio::join!`
 //! execute correctly and produce deterministic replay behavior.
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     CallbackConfig, DurableContext, DurableError, Duration, OperationType,
 };
-use aws_durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures_unordered;
-use aws_durable_execution_sdk_testing::{
+use durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures_unordered;
+use durable_execution_sdk_testing::{
     ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig,
 };
 use serde::{Deserialize, Serialize};

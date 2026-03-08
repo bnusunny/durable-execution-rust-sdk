@@ -6,7 +6,7 @@
 //! # Examples
 //!
 //! ```ignore
-//! use aws_durable_execution_sdk_testing::{
+//! use durable_execution_sdk_testing::{
 //!     CloudDurableTestRunner, CloudTestRunnerConfig, ExecutionStatus,
 //! };
 //!
@@ -37,7 +37,7 @@ use crate::operation::{CallbackSender, DurableOperation};
 use crate::operation_handle::{OperationHandle, OperationMatcher};
 use crate::test_result::TestResult;
 use crate::types::{ExecutionStatus, TestResultError};
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     DurableServiceClient, LambdaDurableServiceClient, Operation, OperationStatus, OperationType,
 };
 
@@ -48,7 +48,7 @@ use aws_durable_execution_sdk::{
 /// # Examples
 ///
 /// ```
-/// use aws_durable_execution_sdk_testing::CloudTestRunnerConfig;
+/// use durable_execution_sdk_testing::CloudTestRunnerConfig;
 /// use std::time::Duration;
 ///
 /// let config = CloudTestRunnerConfig {
@@ -413,7 +413,7 @@ impl CallbackSender for CloudCallbackSender {
 /// # Examples
 ///
 /// ```ignore
-/// use aws_durable_execution_sdk_testing::CloudDurableTestRunner;
+/// use durable_execution_sdk_testing::CloudDurableTestRunner;
 ///
 /// // Create runner with default AWS config
 /// let runner = CloudDurableTestRunner::<String>::new("my-function")
@@ -485,7 +485,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::CloudDurableTestRunner;
+    /// use durable_execution_sdk_testing::CloudDurableTestRunner;
     ///
     /// let runner = CloudDurableTestRunner::<String>::new("my-function")
     ///     .await
@@ -529,7 +529,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::CloudDurableTestRunner;
+    /// use durable_execution_sdk_testing::CloudDurableTestRunner;
     /// use aws_sdk_lambda::Client as LambdaClient;
     ///
     /// let config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
@@ -571,7 +571,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::{CloudDurableTestRunner, CloudTestRunnerConfig};
+    /// use durable_execution_sdk_testing::{CloudDurableTestRunner, CloudTestRunnerConfig};
     /// use std::time::Duration;
     ///
     /// let runner = CloudDurableTestRunner::<String>::new("my-function")
@@ -648,7 +648,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::CloudDurableTestRunner;
+    /// use durable_execution_sdk_testing::CloudDurableTestRunner;
     ///
     /// let mut runner = CloudDurableTestRunner::<String>::new("my-function")
     ///     .await
@@ -997,7 +997,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::CloudDurableTestRunner;
+    /// use durable_execution_sdk_testing::CloudDurableTestRunner;
     ///
     /// let mut runner = CloudDurableTestRunner::<String>::new("my-function")
     ///     .await
@@ -1034,7 +1034,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::CloudDurableTestRunner;
+    /// use durable_execution_sdk_testing::CloudDurableTestRunner;
     ///
     /// let mut runner = CloudDurableTestRunner::<String>::new("my-function")
     ///     .await
@@ -1076,7 +1076,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::CloudDurableTestRunner;
+    /// use durable_execution_sdk_testing::CloudDurableTestRunner;
     ///
     /// let mut runner = CloudDurableTestRunner::<String>::new("my-function")
     ///     .await
@@ -1118,7 +1118,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::CloudDurableTestRunner;
+    /// use durable_execution_sdk_testing::CloudDurableTestRunner;
     ///
     /// let mut runner = CloudDurableTestRunner::<String>::new("my-function")
     ///     .await
@@ -1146,7 +1146,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::CloudDurableTestRunner;
+    /// use durable_execution_sdk_testing::CloudDurableTestRunner;
     ///
     /// let mut runner = CloudDurableTestRunner::<String>::new("my-function")
     ///     .await
@@ -1205,15 +1205,15 @@ mod tests {
         let mut storage = OperationStorage::new();
 
         // Add operations
-        let mut op1 = Operation::new("op-001", aws_durable_execution_sdk::OperationType::Step);
+        let mut op1 = Operation::new("op-001", durable_execution_sdk::OperationType::Step);
         op1.name = Some("step1".to_string());
         storage.add_operation(op1);
 
-        let mut op2 = Operation::new("op-002", aws_durable_execution_sdk::OperationType::Wait);
+        let mut op2 = Operation::new("op-002", durable_execution_sdk::OperationType::Wait);
         op2.name = Some("wait1".to_string());
         storage.add_operation(op2);
 
-        let mut op3 = Operation::new("op-003", aws_durable_execution_sdk::OperationType::Step);
+        let mut op3 = Operation::new("op-003", durable_execution_sdk::OperationType::Step);
         op3.name = Some("step1".to_string()); // Same name as op1
         storage.add_operation(op3);
 

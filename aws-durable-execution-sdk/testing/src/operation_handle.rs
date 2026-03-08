@@ -11,7 +11,7 @@ use tokio::sync::{watch, RwLock};
 
 use serde::de::DeserializeOwned;
 
-use aws_durable_execution_sdk::{Operation, OperationStatus, OperationType};
+use durable_execution_sdk::{Operation, OperationStatus, OperationType};
 
 use crate::error::TestError;
 use crate::operation::{
@@ -43,7 +43,7 @@ pub enum OperationMatcher {
 /// # Examples
 ///
 /// ```ignore
-/// use aws_durable_execution_sdk_testing::OperationHandle;
+/// use durable_execution_sdk_testing::OperationHandle;
 ///
 /// // Pre-register a handle before run()
 /// let handle = runner.get_operation_handle("my-callback");
@@ -517,7 +517,7 @@ impl OperationHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aws_durable_execution_sdk::{
+    use durable_execution_sdk::{
         CallbackDetails as SdkCallbackDetails, ChainedInvokeDetails as SdkChainedInvokeDetails,
         ContextDetails as SdkContextDetails, OperationType, StepDetails as SdkStepDetails,
         WaitDetails as SdkWaitDetails,

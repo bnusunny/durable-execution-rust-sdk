@@ -14,7 +14,7 @@ use crate::error::DurableError;
 /// # Example
 ///
 /// ```
-/// use aws_durable_execution_sdk::Duration;
+/// use durable_execution_sdk::Duration;
 ///
 /// let five_seconds = Duration::from_seconds(5);
 /// let two_minutes = Duration::from_minutes(2);
@@ -49,7 +49,7 @@ impl Duration {
     /// # Example
     ///
     /// ```
-    /// use aws_durable_execution_sdk::Duration;
+    /// use durable_execution_sdk::Duration;
     ///
     /// let duration = Duration::from_seconds(30);
     /// assert_eq!(duration.to_seconds(), 30);
@@ -67,7 +67,7 @@ impl Duration {
     /// # Example
     ///
     /// ```
-    /// use aws_durable_execution_sdk::Duration;
+    /// use durable_execution_sdk::Duration;
     ///
     /// let duration = Duration::from_minutes(5);
     /// assert_eq!(duration.to_seconds(), 300);
@@ -87,7 +87,7 @@ impl Duration {
     /// # Example
     ///
     /// ```
-    /// use aws_durable_execution_sdk::Duration;
+    /// use durable_execution_sdk::Duration;
     ///
     /// let duration = Duration::from_hours(2);
     /// assert_eq!(duration.to_seconds(), 7200);
@@ -107,7 +107,7 @@ impl Duration {
     /// # Example
     ///
     /// ```
-    /// use aws_durable_execution_sdk::Duration;
+    /// use durable_execution_sdk::Duration;
     ///
     /// let duration = Duration::from_days(1);
     /// assert_eq!(duration.to_seconds(), 86400);
@@ -127,7 +127,7 @@ impl Duration {
     /// # Example
     ///
     /// ```
-    /// use aws_durable_execution_sdk::Duration;
+    /// use durable_execution_sdk::Duration;
     ///
     /// let duration = Duration::from_weeks(1);
     /// assert_eq!(duration.to_seconds(), 604800);
@@ -149,7 +149,7 @@ impl Duration {
     /// # Example
     ///
     /// ```
-    /// use aws_durable_execution_sdk::Duration;
+    /// use durable_execution_sdk::Duration;
     ///
     /// let duration = Duration::from_months(1);
     /// assert_eq!(duration.to_seconds(), 2592000); // 30 days
@@ -171,7 +171,7 @@ impl Duration {
     /// # Example
     ///
     /// ```
-    /// use aws_durable_execution_sdk::Duration;
+    /// use durable_execution_sdk::Duration;
     ///
     /// let duration = Duration::from_years(1);
     /// assert_eq!(duration.to_seconds(), 31536000); // 365 days
@@ -187,7 +187,7 @@ impl Duration {
     /// # Example
     ///
     /// ```
-    /// use aws_durable_execution_sdk::Duration;
+    /// use durable_execution_sdk::Duration;
     ///
     /// let duration = Duration::from_minutes(2);
     /// assert_eq!(duration.to_seconds(), 120);
@@ -208,7 +208,7 @@ impl Duration {
     /// # Example
     ///
     /// ```
-    /// use aws_durable_execution_sdk::Duration;
+    /// use durable_execution_sdk::Duration;
     ///
     /// let valid = Duration::from_seconds(1);
     /// assert!(valid.validate_for_wait().is_ok());

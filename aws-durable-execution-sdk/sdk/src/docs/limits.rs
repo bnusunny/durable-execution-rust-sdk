@@ -1,7 +1,7 @@
 //! # Execution Limits and Constraints
 //!
 //! For detailed documentation on execution limits, see the
-//! [LIMITS.md](https://github.com/aws/aws-durable-execution-sdk-rust/blob/main/aws-durable-execution-sdk/docs/LIMITS.md)
+//! [LIMITS.md](https://github.com/aws/durable-execution-sdk-rust/blob/main/durable-execution-sdk/docs/LIMITS.md)
 //! file in the repository.
 //!
 //! ## Quick Summary

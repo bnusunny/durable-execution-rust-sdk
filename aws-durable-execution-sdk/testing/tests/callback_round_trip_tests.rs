@@ -10,8 +10,8 @@
 //! - 2.5: Callback response delivered to checkpoint server and handler resumes
 //! - 5.1: Full callback round-trip pattern completes with callback result incorporated
 
-use aws_durable_execution_sdk::{CallbackConfig, DurableContext, DurableError, Duration};
-use aws_durable_execution_sdk_testing::{
+use durable_execution_sdk::{CallbackConfig, DurableContext, DurableError, Duration};
+use durable_execution_sdk_testing::{
     ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig, TestResultError,
     WaitingOperationStatus,
 };

@@ -11,7 +11,7 @@ use tokio::sync::watch;
 
 use crate::error::TestError;
 use crate::types::{TestResultError, WaitingOperationStatus};
-use aws_durable_execution_sdk::{Operation, OperationStatus, OperationType};
+use durable_execution_sdk::{Operation, OperationStatus, OperationType};
 
 /// Details for a step operation.
 ///
@@ -205,7 +205,7 @@ pub trait CallbackSender: Send + Sync {
 /// # Examples
 ///
 /// ```ignore
-/// use aws_durable_execution_sdk_testing::DurableOperation;
+/// use durable_execution_sdk_testing::DurableOperation;
 ///
 /// // Get operation from test runner
 /// let op = runner.get_operation("my-step").unwrap();
@@ -928,7 +928,7 @@ impl DurableOperation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aws_durable_execution_sdk::{
+    use durable_execution_sdk::{
         CallbackDetails as SdkCallbackDetails, ChainedInvokeDetails as SdkChainedInvokeDetails,
         ContextDetails as SdkContextDetails, Operation, OperationStatus, OperationType,
         StepDetails as SdkStepDetails, WaitDetails as SdkWaitDetails,
@@ -1452,7 +1452,7 @@ mod tests {
 #[cfg(test)]
 mod property_tests {
     use super::*;
-    use aws_durable_execution_sdk::{
+    use durable_execution_sdk::{
         CallbackDetails as SdkCallbackDetails, ChainedInvokeDetails as SdkChainedInvokeDetails,
         ContextDetails as SdkContextDetails, Operation, OperationStatus, OperationType,
         StepDetails as SdkStepDetails, WaitDetails as SdkWaitDetails,

@@ -1,8 +1,8 @@
 //! Tests for serde examples using LocalDurableTestRunner.
 
-use aws_durable_execution_sdk::{DurableContext, DurableError, OperationType};
-use aws_durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures;
-use aws_durable_execution_sdk_testing::{
+use durable_execution_sdk::{DurableContext, DurableError, OperationType};
+use durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures;
+use durable_execution_sdk_testing::{
     ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig,
 };
 use serde::{Deserialize, Serialize};

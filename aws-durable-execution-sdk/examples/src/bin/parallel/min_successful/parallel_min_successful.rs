@@ -5,7 +5,7 @@
 //! This is useful for scenarios like quorum-based consensus or redundant service calls
 //! where you only need a subset of results to proceed.
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     durable_execution, CompletionConfig, DurableContext, DurableError, MapConfig,
 };
 use serde::{Deserialize, Serialize};

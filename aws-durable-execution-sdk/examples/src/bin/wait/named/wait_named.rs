@@ -2,7 +2,7 @@
 //!
 //! Using named wait operations for better observability.
 
-use aws_durable_execution_sdk::{durable_execution, DurableError, Duration};
+use durable_execution_sdk::{durable_execution, DurableError, Duration};
 
 /// Execute multiple named wait operations.
 ///

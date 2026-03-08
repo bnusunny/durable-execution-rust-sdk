@@ -17,7 +17,7 @@
 //! cargo build --example callback_mixed_ops
 //! ```
 
-use aws_durable_execution_sdk::{durable_execution, DurableError, Duration};
+use durable_execution_sdk::{durable_execution, DurableError, Duration};
 use serde::{Deserialize, Serialize};
 
 /// Response type for the callback.

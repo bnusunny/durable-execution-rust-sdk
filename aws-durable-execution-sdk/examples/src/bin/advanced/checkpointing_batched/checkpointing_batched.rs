@@ -3,7 +3,7 @@
 //! Demonstrates using `CheckpointingMode::Batched` (the default) which groups
 //! multiple operations into batches before checkpointing for balanced performance.
 
-use aws_durable_execution_sdk::{durable_execution, DurableError};
+use durable_execution_sdk::{durable_execution, DurableError};
 
 /// Execute steps demonstrating batched checkpointing mode.
 ///

@@ -3,7 +3,7 @@
 //! Demonstrates a step that exhausts all retry attempts and surfaces the final
 //! error to the handler.
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     durable_execution, DurableError, Duration, ExponentialBackoff, StepConfig,
 };
 

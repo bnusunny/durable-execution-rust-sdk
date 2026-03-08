@@ -2,7 +2,7 @@
 //!
 //! Polling until a condition is met using `ctx.wait_for_condition()`.
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     durable_execution, DurableError, Duration, WaitForConditionConfig, WaitForConditionContext,
 };
 use serde::{Deserialize, Serialize};

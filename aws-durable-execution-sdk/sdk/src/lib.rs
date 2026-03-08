@@ -41,7 +41,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! aws-durable-execution-sdk = "0.1"
+//! durable-execution-sdk = "0.1"
 //! tokio = { version = "1.0", features = ["full"] }
 //! serde = { version = "1.0", features = ["derive"] }
 //! ```
@@ -51,7 +51,7 @@
 //! Here's a simple workflow that processes an order:
 //!
 //! ```rust,ignore
-//! use aws_durable_execution_sdk::{durable_execution, DurableContext, DurableError, Duration};
+//! use durable_execution_sdk::{durable_execution, DurableContext, DurableError, Duration};
 //! use serde::{Deserialize, Serialize};
 //!
 //! #[derive(Deserialize)]
@@ -125,7 +125,7 @@
 //! }, None).await?;
 //!
 //! // Step with custom configuration
-//! use aws_durable_execution_sdk::{StepConfig, StepSemantics};
+//! use durable_execution_sdk::{StepConfig, StepSemantics};
 //!
 //! let config = StepConfig {
 //!     step_semantics: StepSemantics::AtMostOncePerRetry,
@@ -149,7 +149,7 @@
 //! duration. This is efficient because it doesn't block Lambda resources.
 //!
 //! ```rust,ignore
-//! use aws_durable_execution_sdk::Duration;
+//! use durable_execution_sdk::Duration;
 //!
 //! // Wait for 5 seconds
 //! ctx.wait(Duration::from_seconds(5), None).await?;
@@ -164,7 +164,7 @@
 //! share the callback ID with an external system, and wait for the result.
 //!
 //! ```rust,ignore
-//! use aws_durable_execution_sdk::CallbackConfig;
+//! use durable_execution_sdk::CallbackConfig;
 //!
 //! // Create a callback with 24-hour timeout
 //! let callback = ctx.create_callback::<ApprovalResponse>(Some(CallbackConfig {
@@ -184,7 +184,7 @@
 //! Process collections in parallel with configurable concurrency and failure tolerance:
 //!
 //! ```rust,ignore
-//! use aws_durable_execution_sdk::{MapConfig, CompletionConfig};
+//! use durable_execution_sdk::{MapConfig, CompletionConfig};
 //!
 //! // Process items with max 5 concurrent executions
 //! let results = ctx.map(
@@ -208,7 +208,7 @@
 //! Execute multiple independent operations concurrently:
 //!
 //! ```rust,ignore
-//! use aws_durable_execution_sdk::ParallelConfig;
+//! use durable_execution_sdk::ParallelConfig;
 //!
 //! let results = ctx.parallel(
 //!     vec![
@@ -225,7 +225,7 @@
 //! The SDK provides promise combinators for coordinating multiple durable operations:
 //!
 //! ```rust,ignore
-//! use aws_durable_execution_sdk::DurableContext;
+//! use durable_execution_sdk::DurableContext;
 //!
 //! async fn coordinate_operations(ctx: &DurableContext) -> Result<(), DurableError> {
 //!     // Wait for ALL operations to complete successfully
@@ -291,7 +291,7 @@
 //! Generate deterministic values that are safe for replay:
 //!
 //! ```rust
-//! use aws_durable_execution_sdk::replay_safe::{
+//! use durable_execution_sdk::replay_safe::{
 //!     uuid_from_operation, uuid_to_string, uuid_string_from_operation,
 //! };
 //!
@@ -315,7 +315,7 @@
 //! For timestamps, use the execution start time instead of current time:
 //!
 //! ```rust,ignore
-//! use aws_durable_execution_sdk::replay_safe::{
+//! use durable_execution_sdk::replay_safe::{
 //!     timestamp_from_execution, timestamp_seconds_from_execution,
 //! };
 //!
@@ -357,7 +357,7 @@
 //! The Duration type supports extended time periods:
 //!
 //! ```rust
-//! use aws_durable_execution_sdk::Duration;
+//! use durable_execution_sdk::Duration;
 //!
 //! // Standard durations
 //! let seconds = Duration::from_seconds(30);
@@ -390,7 +390,7 @@
 //! ### Creating Newtypes
 //!
 //! ```rust
-//! use aws_durable_execution_sdk::{OperationId, ExecutionArn, CallbackId};
+//! use durable_execution_sdk::{OperationId, ExecutionArn, CallbackId};
 //!
 //! // From String or &str (no validation, for backward compatibility)
 //! let op_id = OperationId::from("op-123");
@@ -413,7 +413,7 @@
 //! All newtypes implement `Deref<Target=str>` and `AsRef<str>` for convenient string access:
 //!
 //! ```rust
-//! use aws_durable_execution_sdk::OperationId;
+//! use durable_execution_sdk::OperationId;
 //!
 //! let op_id = OperationId::from("op-123");
 //!
@@ -431,7 +431,7 @@
 //! All newtypes implement `Hash` and `Eq`, making them suitable for use in `HashMap` and `HashSet`:
 //!
 //! ```rust
-//! use aws_durable_execution_sdk::OperationId;
+//! use durable_execution_sdk::OperationId;
 //! use std::collections::HashMap;
 //!
 //! let mut results: HashMap<OperationId, String> = HashMap::new();
@@ -446,7 +446,7 @@
 //! All newtypes use `#[serde(transparent)]` for seamless JSON serialization:
 //!
 //! ```rust
-//! use aws_durable_execution_sdk::OperationId;
+//! use durable_execution_sdk::OperationId;
 //!
 //! let op_id = OperationId::from("op-123");
 //! let json = serde_json::to_string(&op_id).unwrap();
@@ -466,7 +466,7 @@
 //! [`DurableValue`] is a trait alias for types that can be durably stored and retrieved:
 //!
 //! ```rust
-//! use aws_durable_execution_sdk::DurableValue;
+//! use durable_execution_sdk::DurableValue;
 //! use serde::{Deserialize, Serialize};
 //!
 //! // DurableValue is equivalent to: Serialize + DeserializeOwned + Send
@@ -489,8 +489,8 @@
 //! [`StepFn`] is a trait alias for step function closures:
 //!
 //! ```rust
-//! use aws_durable_execution_sdk::{StepFn, DurableValue};
-//! use aws_durable_execution_sdk::handlers::StepContext;
+//! use durable_execution_sdk::{StepFn, DurableValue};
+//! use durable_execution_sdk::handlers::StepContext;
 //!
 //! // StepFn<T> is equivalent to:
 //! // FnOnce(StepContext) -> Result<T, Box<dyn Error + Send + Sync>> + Send
@@ -523,7 +523,7 @@
 //! Instead of implementing `Logger` directly, use the factory functions:
 //!
 //! ```rust
-//! use aws_durable_execution_sdk::{custom_logger, simple_custom_logger, LogInfo};
+//! use durable_execution_sdk::{custom_logger, simple_custom_logger, LogInfo};
 //!
 //! // Simple custom logger with a single function for all levels
 //! let logger = simple_custom_logger(|level, msg, info| {
@@ -544,7 +544,7 @@
 //! Instead of implementing `SerDes` directly, use the factory function:
 //!
 //! ```rust
-//! use aws_durable_execution_sdk::serdes::{custom_serdes, SerDesContext, SerDesError};
+//! use durable_execution_sdk::serdes::{custom_serdes, SerDesContext, SerDesError};
 //!
 //! // Create a custom serializer for a specific type
 //! let serdes = custom_serdes::<String, _, _>(
@@ -573,7 +573,7 @@
 //! Control when concurrent operations complete:
 //!
 //! ```rust
-//! use aws_durable_execution_sdk::CompletionConfig;
+//! use durable_execution_sdk::CompletionConfig;
 //!
 //! // Complete when first task succeeds
 //! let first = CompletionConfig::first_successful();
@@ -602,7 +602,7 @@
 //! - **Suspend**: Signal to pause execution and return control to Lambda
 //!
 //! ```rust,ignore
-//! use aws_durable_execution_sdk::DurableError;
+//! use durable_execution_sdk::DurableError;
 //!
 //! // Create specific error types
 //! let exec_error = DurableError::execution("Something went wrong");
@@ -620,7 +620,7 @@
 //! serializers by implementing the [`SerDes`] trait:
 //!
 //! ```rust,ignore
-//! use aws_durable_execution_sdk::serdes::{SerDes, SerDesContext, SerDesError};
+//! use durable_execution_sdk::serdes::{SerDes, SerDesContext, SerDesError};
 //!
 //! struct MyCustomSerDes;
 //!
@@ -650,7 +650,7 @@
 //! The [`DurableContext`] provides convenience methods for logging with automatic context:
 //!
 //! ```rust,ignore
-//! use aws_durable_execution_sdk::{DurableContext, DurableError};
+//! use durable_execution_sdk::{DurableContext, DurableError};
 //!
 //! async fn my_workflow(ctx: DurableContext) -> Result<(), DurableError> {
 //!     // Basic logging - context is automatically included
@@ -706,7 +706,7 @@
 //! This is useful to reduce noise when replaying previously executed operations.
 //!
 //! ```rust
-//! use aws_durable_execution_sdk::{TracingLogger, ReplayAwareLogger, ReplayLoggingConfig};
+//! use durable_execution_sdk::{TracingLogger, ReplayAwareLogger, ReplayLoggingConfig};
 //! use std::sync::Arc;
 //!
 //! // Suppress all logs during replay (default)
@@ -727,7 +727,7 @@
 //! You can also provide a custom logger using the factory functions:
 //!
 //! ```rust
-//! use aws_durable_execution_sdk::{custom_logger, simple_custom_logger, LogInfo};
+//! use durable_execution_sdk::{custom_logger, simple_custom_logger, LogInfo};
 //!
 //! // Simple custom logger with a single function for all levels
 //! let logger = simple_custom_logger(|level, msg, info| {
@@ -748,7 +748,7 @@
 //! The SDK provides a [`Duration`] type with convenient constructors:
 //!
 //! ```rust
-//! use aws_durable_execution_sdk::Duration;
+//! use durable_execution_sdk::Duration;
 //!
 //! let five_seconds = Duration::from_seconds(5);
 //! let two_minutes = Duration::from_minutes(2);
@@ -813,7 +813,7 @@
 //! - [`CheckpointResult<T>`](CheckpointResult): Alias for `Result<T, DurableError>` - checkpoint operation results
 //!
 //! ```rust,ignore
-//! use aws_durable_execution_sdk::{DurableResult, StepResult, DurableError};
+//! use durable_execution_sdk::{DurableResult, StepResult, DurableError};
 //!
 //! // Use in function signatures for clarity
 //! fn process_order(order_id: &str) -> DurableResult<String> {
@@ -939,4 +939,4 @@ pub use structured_json_logger::{JsonLogContext, LogLevel, StructuredJsonLogger}
 
 // Re-export macro if enabled
 #[cfg(feature = "macros")]
-pub use aws_durable_execution_sdk_macros::durable_execution;
+pub use durable_execution_sdk_macros::durable_execution;

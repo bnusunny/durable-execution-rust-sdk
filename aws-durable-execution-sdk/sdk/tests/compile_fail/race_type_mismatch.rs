@@ -5,8 +5,8 @@
 
 use std::future::Future;
 use std::pin::Pin;
-use aws_durable_execution_sdk::race;
-use aws_durable_execution_sdk::error::DurableError;
+use durable_execution_sdk::race;
+use durable_execution_sdk::error::DurableError;
 
 type DynFut<T> = Pin<Box<dyn Future<Output = Result<T, DurableError>> + Send>>;
 

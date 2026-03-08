@@ -3,7 +3,7 @@
 //! Demonstrates that combinator results are deterministic across replays
 //! by using multiple combinators in sequence.
 
-use aws_durable_execution_sdk::{all, durable_execution, race, DurableError};
+use durable_execution_sdk::{all, durable_execution, race, DurableError};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

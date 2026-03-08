@@ -3,7 +3,7 @@
 //! Basic usage of `ctx.step()` to checkpoint a simple operation.
 //! Steps are the fundamental unit of work in durable executions.
 
-use aws_durable_execution_sdk::{durable_execution, DurableError};
+use durable_execution_sdk::{durable_execution, DurableError};
 
 /// Execute a single step and return its result.
 ///

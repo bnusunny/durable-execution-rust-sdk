@@ -26,14 +26,14 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            durable-execution-sdk/target
+            aws-durable-execution-sdk/target
           key: ${{ runner.os }}-cargo-bench-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-bench-
 
       - name: Check for benchmarks
         id: check
-        working-directory: durable-execution-sdk
+        working-directory: aws-durable-execution-sdk
         run: |
           if find . -path '*/benches/*.rs' | grep -q .; then
             echo "has_benchmarks=true" >> $GITHUB_OUTPUT
@@ -44,7 +44,7 @@ jobs:
 
       - name: Run benchmarks
         if: steps.check.outputs.has_benchmarks == 'true'
-        working-directory: durable-execution-sdk
+        working-directory: aws-durable-execution-sdk
         run: cargo bench --workspace --all-features -- --output-format bencher | tee output.txt
 
       - name: Store benchmark result
@@ -52,7 +52,7 @@ jobs:
         uses: benchmark-action/github-action-benchmark@v1
         with:
           tool: 'cargo'
-          output-file-path: durable-execution-sdk/output.txt
+          output-file-path: aws-durable-execution-sdk/output.txt
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: false
           alert-threshold: '150%'

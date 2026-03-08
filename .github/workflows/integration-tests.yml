@@ -31,7 +31,7 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            durable-execution-sdk/target
+            aws-durable-execution-sdk/target
           key: ${{ runner.os }}-cargo-integ-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-integ-
@@ -45,14 +45,14 @@ jobs:
           aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
 
       - name: Build test Lambda functions
-        working-directory: durable-execution-sdk
+        working-directory: aws-durable-execution-sdk
         run: |
           cargo build --release --package durable-execution-sdk-examples
           
       - name: Package Lambda functions
         run: |
           mkdir -p lambda-packages
-          cd durable-execution-sdk/target/release/examples
+          cd aws-durable-execution-sdk/target/release/examples
           for binary in simple_workflow parallel_processing callback_workflow; do
             if [ -f "$binary" ]; then
               cp $binary bootstrap
@@ -88,7 +88,7 @@ jobs:
           echo "callback=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query 'Stacks[0].Outputs[?OutputKey==`CallbackWorkflowFunction`].OutputValue' --output text)" >> $GITHUB_OUTPUT
 
       - name: Run integration tests
-        working-directory: durable-execution-sdk
+        working-directory: aws-durable-execution-sdk
         env:
           SIMPLE_WORKFLOW_FUNCTION: ${{ steps.functions.outputs.simple }}
           PARALLEL_PROCESSING_FUNCTION: ${{ steps.functions.outputs.parallel }}

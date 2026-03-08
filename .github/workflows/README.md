@@ -148,7 +148,7 @@ Release
 All workflows use GitHub Actions cache for:
 - `~/.cargo/registry` - Cargo registry index
 - `~/.cargo/git` - Git dependencies
-- `durable-execution-sdk/target` - Build artifacts
+- `aws-durable-execution-sdk/target` - Build artifacts
 
 Cache keys include `Cargo.lock` hash for invalidation on dependency changes.
 

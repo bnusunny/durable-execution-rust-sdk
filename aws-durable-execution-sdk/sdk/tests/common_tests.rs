@@ -4,9 +4,9 @@
 
 mod common;
 
+use common::*;
 use durable_execution_sdk::client::DurableServiceClient;
 use durable_execution_sdk::operation::{OperationStatus, OperationType, OperationUpdate};
-use common::*;
 use proptest::prelude::*;
 use std::sync::Arc;
 

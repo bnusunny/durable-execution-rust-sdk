@@ -12,16 +12,12 @@ use std::sync::Arc;
 
 use durable_execution_sdk::concurrency::{BatchItem, BatchResult, CompletionReason};
 use durable_execution_sdk::config::{CompletionConfig, MapConfig, ParallelConfig};
-use durable_execution_sdk::context::{
-    DurableContext, Logger, OperationIdentifier, TracingLogger,
-};
+use durable_execution_sdk::context::{DurableContext, Logger, OperationIdentifier, TracingLogger};
 use durable_execution_sdk::error::{DurableError, ErrorObject};
 use durable_execution_sdk::handlers::map::map_handler;
 use durable_execution_sdk::handlers::parallel::parallel_handler;
 use durable_execution_sdk::lambda::InitialExecutionState;
-use durable_execution_sdk::operation::{
-    ContextDetails, Operation, OperationStatus, OperationType,
-};
+use durable_execution_sdk::operation::{ContextDetails, Operation, OperationStatus, OperationType};
 use durable_execution_sdk::state::ExecutionState;
 
 use common::*;

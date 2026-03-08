@@ -1,4 +1,4 @@
-name: Release
+name: Release PR
 
 on:
   workflow_dispatch:
@@ -46,6 +46,7 @@ jobs:
   release-plz:
     name: Release PR
     runs-on: ubuntu-latest
+    needs: pre-release-validation
     permissions:
       contents: write
       pull-requests: write
@@ -66,50 +67,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
-
-  publish:
-    name: Publish to crates.io
-    runs-on: ubuntu-latest
-    needs: pre-release-validation
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Run release-plz release
-        uses: release-plz/action@v0.5
-        with:
-          command: release
-          manifest_path: aws-durable-execution-sdk/Cargo.toml
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
-
-  create-github-release:
-    name: Create GitHub Release
-    runs-on: ubuntu-latest
-    needs: publish
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Extract version from Cargo.toml
-        id: version
-        run: |
-          VERSION=$(grep -m1 '^version = ' aws-durable-execution-sdk/Cargo.toml | cut -d'"' -f2)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: Release v${{ steps.version.outputs.version }}
-          generate_release_notes: true
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -2,7 +2,7 @@ version: 2
 updates:
   # Rust dependencies
   - package-ecosystem: "cargo"
-    directory: "/durable-execution-sdk"
+    directory: "/aws-durable-execution-sdk"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10

@@ -10,7 +10,7 @@
 //! - **`ctx.map()` with first_successful**: Best for processing collections where
 //!   you want the first success
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     durable_execution, race, CompletionConfig, DurableContext, DurableError, MapConfig,
 };
 

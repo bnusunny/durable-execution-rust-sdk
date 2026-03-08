@@ -12,14 +12,14 @@ mod common;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
-use aws_durable_execution_sdk::client::CheckpointResponse;
-use aws_durable_execution_sdk::config::CallbackConfig;
-use aws_durable_execution_sdk::context::DurableContext;
-use aws_durable_execution_sdk::duration::Duration;
-use aws_durable_execution_sdk::error::DurableError;
-use aws_durable_execution_sdk::lambda::InitialExecutionState;
-use aws_durable_execution_sdk::operation::OperationType;
-use aws_durable_execution_sdk::state::ExecutionState;
+use durable_execution_sdk::client::CheckpointResponse;
+use durable_execution_sdk::config::CallbackConfig;
+use durable_execution_sdk::context::DurableContext;
+use durable_execution_sdk::duration::Duration;
+use durable_execution_sdk::error::DurableError;
+use durable_execution_sdk::lambda::InitialExecutionState;
+use durable_execution_sdk::operation::OperationType;
+use durable_execution_sdk::state::ExecutionState;
 use proptest::prelude::*;
 
 use common::*;
@@ -408,7 +408,7 @@ async fn test_wait_for_callback_creates_correct_checkpoint_structure() {
 /// 3. Result is returned and deserialized correctly
 #[tokio::test]
 async fn test_wait_for_callback_result_return() {
-    use aws_durable_execution_sdk::operation::{CallbackDetails, OperationStatus};
+    use durable_execution_sdk::operation::{CallbackDetails, OperationStatus};
 
     // The expected result that will be returned by the callback
     let expected_result = "approval_granted";
@@ -438,10 +438,10 @@ async fn test_wait_for_callback_result_return() {
             // Fourth call: Child context completion - return completed callback with result
             .with_checkpoint_response(Ok(CheckpointResponse {
                 checkpoint_token: "token-4".to_string(),
-                new_execution_state: Some(aws_durable_execution_sdk::client::NewExecutionState {
+                new_execution_state: Some(durable_execution_sdk::client::NewExecutionState {
                     operations: vec![{
                         // Return the callback as completed with the result
-                        let mut op = aws_durable_execution_sdk::operation::Operation::new(
+                        let mut op = durable_execution_sdk::operation::Operation::new(
                             "__CALLBACK_PLACEHOLDER__",
                             OperationType::Callback,
                         );
@@ -505,8 +505,8 @@ async fn test_wait_for_callback_result_return() {
 /// Test that wait_for_callback properly handles callback timeout.
 #[tokio::test]
 async fn test_wait_for_callback_timeout_error() {
-    use aws_durable_execution_sdk::error::ErrorObject;
-    use aws_durable_execution_sdk::operation::{CallbackDetails, OperationStatus};
+    use durable_execution_sdk::error::ErrorObject;
+    use durable_execution_sdk::operation::{CallbackDetails, OperationStatus};
 
     let callback_id = "test-callback-timeout-id";
 
@@ -522,9 +522,9 @@ async fn test_wait_for_callback_timeout_error() {
             // Fourth call: Child context completion - return timed out callback
             .with_checkpoint_response(Ok(CheckpointResponse {
                 checkpoint_token: "token-4".to_string(),
-                new_execution_state: Some(aws_durable_execution_sdk::client::NewExecutionState {
+                new_execution_state: Some(durable_execution_sdk::client::NewExecutionState {
                     operations: vec![{
-                        let mut op = aws_durable_execution_sdk::operation::Operation::new(
+                        let mut op = durable_execution_sdk::operation::Operation::new(
                             "__CALLBACK_PLACEHOLDER__",
                             OperationType::Callback,
                         );

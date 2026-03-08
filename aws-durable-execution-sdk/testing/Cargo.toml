@@ -1,5 +1,5 @@
 [package]
-name = "aws-durable-execution-sdk-testing"
+name = "durable-execution-sdk-testing"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -10,7 +10,7 @@ categories = ["development-tools::testing"]
 
 [dependencies]
 # Core SDK dependency
-aws-durable-execution-sdk.workspace = true
+durable-execution-sdk.workspace = true
 
 # Async runtime - with test-util for time control
 tokio = { version = "1.0", features = ["full", "sync", "time", "rt-multi-thread", "test-util"] }

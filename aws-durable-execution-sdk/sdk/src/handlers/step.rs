@@ -25,7 +25,7 @@ use crate::traits::{DurableValue, StepFn};
 /// Creating a basic step context:
 ///
 /// ```
-/// use aws_durable_execution_sdk::handlers::StepContext;
+/// use durable_execution_sdk::handlers::StepContext;
 ///
 /// let ctx = StepContext::new("op-123", "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc");
 /// assert_eq!(ctx.operation_id, "op-123");
@@ -36,7 +36,7 @@ use crate::traits::{DurableValue, StepFn};
 /// Using the builder pattern:
 ///
 /// ```
-/// use aws_durable_execution_sdk::handlers::StepContext;
+/// use durable_execution_sdk::handlers::StepContext;
 ///
 /// let ctx = StepContext::new("op-123", "arn:aws:lambda:us-east-1:123456789012:function:test:durable:abc")
 ///     .with_parent_id("parent-456")
@@ -126,7 +126,7 @@ impl StepContext {
     /// # Examples
     ///
     /// ```
-    /// use aws_durable_execution_sdk::handlers::StepContext;
+    /// use durable_execution_sdk::handlers::StepContext;
     /// use serde::Deserialize;
     ///
     /// #[derive(Deserialize, Debug, PartialEq)]

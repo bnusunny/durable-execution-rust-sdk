@@ -5,7 +5,7 @@
 //! should not be used for durable operations within a child context — only the
 //! child context parameter should be used.
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     durable_execution, DurableError, Duration, WaitForConditionConfig, WaitForConditionContext,
 };
 use serde::{Deserialize, Serialize};

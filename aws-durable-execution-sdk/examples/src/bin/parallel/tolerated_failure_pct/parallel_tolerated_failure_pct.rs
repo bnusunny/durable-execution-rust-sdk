@@ -4,7 +4,7 @@
 //! Uses `ctx.map()` with 10 items where 2 fail (20% failure rate).
 //! Since the tolerance is 25%, the overall operation succeeds.
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     durable_execution, CompletionConfig, DurableContext, DurableError, MapConfig,
 };
 use serde::{Deserialize, Serialize};

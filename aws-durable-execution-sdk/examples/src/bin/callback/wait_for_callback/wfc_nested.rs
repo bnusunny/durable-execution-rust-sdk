@@ -17,7 +17,7 @@
 //! cargo build --example wfc_nested
 //! ```
 
-use aws_durable_execution_sdk::{durable_execution, DurableError};
+use durable_execution_sdk::{durable_execution, DurableError};
 use serde::{Deserialize, Serialize};
 
 /// Response received from the external system via callback inside a child context.

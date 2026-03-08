@@ -9,7 +9,7 @@
 //!   want to collect all outcomes regardless of success/failure
 //! - **`ctx.map()`**: Best for processing collections with automatic iteration
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     all_settled, durable_execution, CompletionConfig, DurableContext, DurableError, MapConfig,
 };
 use serde::{Deserialize, Serialize};

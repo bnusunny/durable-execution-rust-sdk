@@ -3,7 +3,7 @@
 //! A complete order processing workflow demonstrating multiple
 //! durable operations working together.
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     durable_execution, CallbackConfig, CompletionConfig, DurableContext, DurableError, Duration,
     MapConfig,
 };

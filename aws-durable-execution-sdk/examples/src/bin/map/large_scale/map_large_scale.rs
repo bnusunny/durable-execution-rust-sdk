@@ -3,7 +3,7 @@
 //! Demonstrates `ctx.map()` processing 50 items with `MapConfig` configured
 //! with `max_concurrency: Some(10)` for controlled batch-like processing.
 
-use aws_durable_execution_sdk::{durable_execution, DurableContext, DurableError, MapConfig};
+use durable_execution_sdk::{durable_execution, DurableContext, DurableError, MapConfig};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

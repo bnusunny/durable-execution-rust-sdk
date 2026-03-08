@@ -9,11 +9,11 @@
 //! Note: Full end-to-end callback completion testing requires external systems to send
 //! callback responses. This is tested in integration tests against deployed Lambda functions.
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     CallbackConfig, DurableContext, DurableError, Duration, OperationType,
 };
-use aws_durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures;
-use aws_durable_execution_sdk_testing::{
+use durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures;
+use durable_execution_sdk_testing::{
     ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig,
 };
 use serde::{Deserialize, Serialize};
@@ -859,7 +859,7 @@ pub struct WfcCustomSerdesPayload {
 /// A custom `SerDesAny` implementation for `WfcCustomSerdesPayload`.
 struct WfcCustomPayloadSerDes;
 
-impl aws_durable_execution_sdk::SerDesAny for WfcCustomPayloadSerDes {
+impl durable_execution_sdk::SerDesAny for WfcCustomPayloadSerDes {
     fn serialize_any(&self, value: &dyn std::any::Any) -> Result<String, DurableError> {
         let payload = value
             .downcast_ref::<WfcCustomSerdesPayload>()
@@ -1100,7 +1100,7 @@ pub struct CallbackCustomSerdesPayload {
 /// A custom `SerDesAny` implementation for `CallbackCustomSerdesPayload`.
 struct CallbackCustomPayloadSerDes;
 
-impl aws_durable_execution_sdk::SerDesAny for CallbackCustomPayloadSerDes {
+impl durable_execution_sdk::SerDesAny for CallbackCustomPayloadSerDes {
     fn serialize_any(&self, value: &dyn std::any::Any) -> Result<String, DurableError> {
         let payload = value
             .downcast_ref::<CallbackCustomSerdesPayload>()

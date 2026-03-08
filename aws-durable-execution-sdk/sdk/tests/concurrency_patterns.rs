@@ -10,19 +10,19 @@ mod common;
 
 use std::sync::Arc;
 
-use aws_durable_execution_sdk::concurrency::{BatchItem, BatchResult, CompletionReason};
-use aws_durable_execution_sdk::config::{CompletionConfig, MapConfig, ParallelConfig};
-use aws_durable_execution_sdk::context::{
+use durable_execution_sdk::concurrency::{BatchItem, BatchResult, CompletionReason};
+use durable_execution_sdk::config::{CompletionConfig, MapConfig, ParallelConfig};
+use durable_execution_sdk::context::{
     DurableContext, Logger, OperationIdentifier, TracingLogger,
 };
-use aws_durable_execution_sdk::error::{DurableError, ErrorObject};
-use aws_durable_execution_sdk::handlers::map::map_handler;
-use aws_durable_execution_sdk::handlers::parallel::parallel_handler;
-use aws_durable_execution_sdk::lambda::InitialExecutionState;
-use aws_durable_execution_sdk::operation::{
+use durable_execution_sdk::error::{DurableError, ErrorObject};
+use durable_execution_sdk::handlers::map::map_handler;
+use durable_execution_sdk::handlers::parallel::parallel_handler;
+use durable_execution_sdk::lambda::InitialExecutionState;
+use durable_execution_sdk::operation::{
     ContextDetails, Operation, OperationStatus, OperationType,
 };
-use aws_durable_execution_sdk::state::ExecutionState;
+use durable_execution_sdk::state::ExecutionState;
 
 use common::*;
 

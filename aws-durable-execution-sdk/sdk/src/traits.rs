@@ -18,9 +18,9 @@
 //! # Example
 //!
 //! ```rust
-//! use aws_durable_execution_sdk::traits::{DurableValue, StepFn};
-//! use aws_durable_execution_sdk::handlers::StepContext;
-//! use aws_durable_execution_sdk::DurableError;
+//! use durable_execution_sdk::traits::{DurableValue, StepFn};
+//! use durable_execution_sdk::handlers::StepContext;
+//! use durable_execution_sdk::DurableError;
 //!
 //! // Using DurableValue in a generic function
 //! fn process_value<T: DurableValue>(value: T) -> String {
@@ -68,7 +68,7 @@ use crate::handlers::StepContext;
 /// # Example
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::traits::DurableValue;
+/// use durable_execution_sdk::traits::DurableValue;
 /// use serde::{Deserialize, Serialize};
 ///
 /// // This type automatically implements DurableValue
@@ -126,8 +126,8 @@ impl<T> DurableValue for T where T: Serialize + DeserializeOwned + Send {}
 /// # Example
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::traits::StepFn;
-/// use aws_durable_execution_sdk::handlers::StepContext;
+/// use durable_execution_sdk::traits::StepFn;
+/// use durable_execution_sdk::handlers::StepContext;
 ///
 /// // A closure that implements StepFn<i32>
 /// let step_fn = |_ctx: StepContext| -> Result<i32, Box<dyn std::error::Error + Send + Sync>> {

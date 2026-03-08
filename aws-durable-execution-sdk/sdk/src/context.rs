@@ -532,7 +532,7 @@ pub enum ReplayLoggingConfig {
 /// # Example
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::{TracingLogger, ReplayAwareLogger, ReplayLoggingConfig};
+/// use durable_execution_sdk::{TracingLogger, ReplayAwareLogger, ReplayLoggingConfig};
 /// use std::sync::Arc;
 ///
 /// // Create a replay-aware logger that suppresses all logs during replay
@@ -573,7 +573,7 @@ impl ReplayAwareLogger {
     /// # Example
     ///
     /// ```rust
-    /// use aws_durable_execution_sdk::{TracingLogger, ReplayAwareLogger, ReplayLoggingConfig};
+    /// use durable_execution_sdk::{TracingLogger, ReplayAwareLogger, ReplayLoggingConfig};
     /// use std::sync::Arc;
     ///
     /// let logger = ReplayAwareLogger::new(
@@ -684,7 +684,7 @@ impl Logger for ReplayAwareLogger {
 /// # Example
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::context::{custom_logger, LogInfo};
+/// use durable_execution_sdk::context::{custom_logger, LogInfo};
 /// use std::sync::Arc;
 ///
 /// // Create a custom logger that prints to stdout
@@ -774,7 +774,7 @@ where
 /// # Example
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::context::{custom_logger, LogInfo};
+/// use durable_execution_sdk::context::{custom_logger, LogInfo};
 /// use std::sync::Arc;
 ///
 /// // Create a custom logger that prints to stdout
@@ -825,7 +825,7 @@ where
 /// # Example
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::context::{simple_custom_logger, LogInfo};
+/// use durable_execution_sdk::context::{simple_custom_logger, LogInfo};
 /// use std::sync::Arc;
 ///
 /// // Create a simple logger that prints all messages with their level
@@ -2506,7 +2506,7 @@ impl<S> WaitForConditionConfig<S> {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use aws_durable_execution_sdk::{WaitForConditionConfig, Duration};
+    /// use durable_execution_sdk::{WaitForConditionConfig, Duration};
     ///
     /// let config = WaitForConditionConfig::from_interval(
     ///     my_initial_state,

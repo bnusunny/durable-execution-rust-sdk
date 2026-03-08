@@ -4,7 +4,7 @@
 //! `BatchResult::empty()` behavior is returned with zero items and an
 //! `AllCompleted` completion reason.
 
-use aws_durable_execution_sdk::{durable_execution, DurableContext, DurableError};
+use durable_execution_sdk::{durable_execution, DurableContext, DurableError};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

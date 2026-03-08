@@ -3,7 +3,7 @@
 //! Demonstrates `MapConfig` with `max_concurrency: Some(10)` processing 15 items
 //! concurrently. Each item performs a step that returns a processed string.
 
-use aws_durable_execution_sdk::{durable_execution, DurableContext, DurableError, MapConfig};
+use durable_execution_sdk::{durable_execution, DurableContext, DurableError, MapConfig};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

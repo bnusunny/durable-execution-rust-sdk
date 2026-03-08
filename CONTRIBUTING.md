@@ -13,7 +13,7 @@ Thank you for your interest in contributing to the AWS Durable Execution SDK!
 ### Building
 
 ```bash
-cd aws-durable-execution-sdk
+cd durable-execution-sdk
 cargo build
 ```
 

@@ -5,7 +5,7 @@
 //! Waits are performed before the combinator since `all!` branches
 //! cannot contain suspend-producing operations like `ctx.wait()`.
 
-use aws_durable_execution_sdk::{all, durable_execution, DurableError, Duration};
+use durable_execution_sdk::{all, durable_execution, DurableError, Duration};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

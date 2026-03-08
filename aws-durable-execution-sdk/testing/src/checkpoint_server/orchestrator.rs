@@ -33,7 +33,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tokio::sync::{Mutex, RwLock};
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     DurableContext, DurableError, DurableServiceClient, Operation, OperationStatus, OperationType,
 };
 
@@ -375,8 +375,8 @@ where
         payload: I,
     ) -> Result<TestExecutionResult<O>, crate::error::TestError> {
         use super::types::{ApiType, StartDurableExecutionRequest};
-        use aws_durable_execution_sdk::lambda::InitialExecutionState;
-        use aws_durable_execution_sdk::state::ExecutionState;
+        use durable_execution_sdk::lambda::InitialExecutionState;
+        use durable_execution_sdk::state::ExecutionState;
 
         // Clear previous state
         self.operation_storage.write().await.clear();
@@ -478,7 +478,7 @@ where
                     Ok(test_result)
                 } else {
                     self.execution_complete.store(true, Ordering::SeqCst);
-                    let error_obj = aws_durable_execution_sdk::ErrorObject::from(&error);
+                    let error_obj = durable_execution_sdk::ErrorObject::from(&error);
                     let test_error = TestResultError::new(error_obj.error_type, error.to_string());
                     let mut test_result =
                         TestExecutionResult::failure(test_error.clone(), operations, execution_arn);
@@ -688,8 +688,8 @@ where
 
             // Create new execution state for re-invocation with the current operations
             // This is critical for the handler to see the updated operation states
-            use aws_durable_execution_sdk::lambda::InitialExecutionState;
-            use aws_durable_execution_sdk::state::ExecutionState;
+            use durable_execution_sdk::lambda::InitialExecutionState;
+            use durable_execution_sdk::state::ExecutionState;
 
             // Convert operation_events to Operations for the initial state
             let current_operations: Vec<Operation> = invocation_result
@@ -746,7 +746,7 @@ where
                         continue;
                     } else {
                         self.execution_complete.store(true, Ordering::SeqCst);
-                        let error_obj = aws_durable_execution_sdk::ErrorObject::from(&error);
+                        let error_obj = durable_execution_sdk::ErrorObject::from(&error);
                         let test_error =
                             TestResultError::new(error_obj.error_type, error.to_string());
                         invocations.push(invocation.with_error(test_error.clone()));
@@ -1298,8 +1298,8 @@ where
         is_initial: bool,
     ) -> Result<InvokeHandlerResult<O>, crate::error::TestError> {
         use super::types::{ApiType, StartDurableExecutionRequest, StartInvocationRequest};
-        use aws_durable_execution_sdk::lambda::InitialExecutionState;
-        use aws_durable_execution_sdk::state::ExecutionState;
+        use durable_execution_sdk::lambda::InitialExecutionState;
+        use durable_execution_sdk::state::ExecutionState;
 
         // Check for active invocations (prevent concurrent invocations in time-skip mode)
         if self.skip_time_config.enabled && self.invocation_active.load(Ordering::SeqCst) {
@@ -1475,7 +1475,7 @@ where
                 } else {
                     // Handler failed with an actual error
                     self.execution_complete.store(true, Ordering::SeqCst);
-                    let error_obj = aws_durable_execution_sdk::ErrorObject::from(&error);
+                    let error_obj = durable_execution_sdk::ErrorObject::from(&error);
                     let test_error = TestResultError::new(error_obj.error_type, error.to_string());
                     let invocation_with_error = invocation.with_error(test_error.clone());
                     Ok(InvokeHandlerResult::Failed {
@@ -1617,7 +1617,7 @@ pub enum InvokeHandlerResult<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aws_durable_execution_sdk::{ErrorObject, StepDetails, WaitDetails};
+    use durable_execution_sdk::{ErrorObject, StepDetails, WaitDetails};
 
     #[test]
     fn test_skip_time_config_default() {
@@ -1636,7 +1636,7 @@ mod tests {
     fn test_operation_storage_add_and_get() {
         let mut storage = OperationStorage::new();
 
-        let op = Operation::new("op-1", aws_durable_execution_sdk::OperationType::Step);
+        let op = Operation::new("op-1", durable_execution_sdk::OperationType::Step);
         storage.add_operation(op);
 
         assert_eq!(storage.len(), 1);
@@ -1647,19 +1647,19 @@ mod tests {
     fn test_operation_storage_update() {
         let mut storage = OperationStorage::new();
 
-        let mut op = Operation::new("op-1", aws_durable_execution_sdk::OperationType::Step);
-        op.status = aws_durable_execution_sdk::OperationStatus::Started;
+        let mut op = Operation::new("op-1", durable_execution_sdk::OperationType::Step);
+        op.status = durable_execution_sdk::OperationStatus::Started;
         storage.add_operation(op);
 
-        let mut updated_op = Operation::new("op-1", aws_durable_execution_sdk::OperationType::Step);
-        updated_op.status = aws_durable_execution_sdk::OperationStatus::Succeeded;
+        let mut updated_op = Operation::new("op-1", durable_execution_sdk::OperationType::Step);
+        updated_op.status = durable_execution_sdk::OperationStatus::Succeeded;
         storage.update_operation(updated_op);
 
         assert_eq!(storage.len(), 1);
         let retrieved = storage.get_by_id("op-1").unwrap();
         assert_eq!(
             retrieved.status,
-            aws_durable_execution_sdk::OperationStatus::Succeeded
+            durable_execution_sdk::OperationStatus::Succeeded
         );
     }
 
@@ -2353,7 +2353,7 @@ mod tests {
 #[cfg(test)]
 mod property_tests {
     use super::*;
-    use aws_durable_execution_sdk::{OperationType, WaitDetails};
+    use durable_execution_sdk::{OperationType, WaitDetails};
     use proptest::prelude::*;
 
     /// Strategy for generating wait durations in seconds (1 to 60 seconds)

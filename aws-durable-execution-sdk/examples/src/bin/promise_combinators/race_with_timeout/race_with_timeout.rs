@@ -3,7 +3,7 @@
 //! Demonstrates `race!` macro used as a timeout pattern where two step
 //! operations race against each other. The first to complete wins.
 
-use aws_durable_execution_sdk::{durable_execution, race, DurableError};
+use durable_execution_sdk::{durable_execution, race, DurableError};
 
 /// Use `race!` as a timeout pattern.
 ///

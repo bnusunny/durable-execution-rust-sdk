@@ -21,7 +21,7 @@ use crate::error::{DurableError, ErrorObject};
 /// # Examples
 ///
 /// ```
-/// use aws_durable_execution_sdk::concurrency::ExecutionCounters;
+/// use durable_execution_sdk::concurrency::ExecutionCounters;
 ///
 /// let counters = ExecutionCounters::new(5);
 /// assert_eq!(counters.total_tasks(), 5);
@@ -363,8 +363,8 @@ impl std::fmt::Display for BatchItemStatus {
 /// # Examples
 ///
 /// ```
-/// use aws_durable_execution_sdk::concurrency::{BatchItem, BatchItemStatus};
-/// use aws_durable_execution_sdk::ErrorObject;
+/// use durable_execution_sdk::concurrency::{BatchItem, BatchItemStatus};
+/// use durable_execution_sdk::ErrorObject;
 ///
 /// // Succeeded item
 /// let success = BatchItem::succeeded(0, 42);
@@ -472,13 +472,13 @@ impl<T> BatchItem<T> {
 /// # Examples
 ///
 /// ```
-/// use aws_durable_execution_sdk::concurrency::{BatchResult, BatchItem, CompletionReason};
+/// use durable_execution_sdk::concurrency::{BatchResult, BatchItem, CompletionReason};
 ///
 /// // Create a batch result with some items
 /// let items = vec![
 ///     BatchItem::succeeded(0, "first"),
 ///     BatchItem::succeeded(1, "second"),
-///     BatchItem::failed(2, aws_durable_execution_sdk::ErrorObject::new("Error", "Failed")),
+///     BatchItem::failed(2, durable_execution_sdk::ErrorObject::new("Error", "Failed")),
 /// ];
 /// let result = BatchResult::new(items, CompletionReason::AllCompleted);
 ///

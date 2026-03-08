@@ -1,9 +1,9 @@
 # AWS Durable Execution SDK for Rust
 
-[![CI](https://github.com/aws/aws-durable-execution-sdk-rust/actions/workflows/pr.yml/badge.svg)](https://github.com/aws/aws-durable-execution-sdk-rust/actions/workflows/pr.yml)
-[![Crates.io](https://img.shields.io/crates/v/aws-durable-execution-sdk.svg)](https://crates.io/crates/aws-durable-execution-sdk)
-[![Documentation](https://docs.rs/aws-durable-execution-sdk/badge.svg)](https://docs.rs/aws-durable-execution-sdk)
-[![License](https://img.shields.io/crates/l/aws-durable-execution-sdk.svg)](LICENSE)
+[![CI](https://github.com/aws/durable-execution-sdk-rust/actions/workflows/pr.yml/badge.svg)](https://github.com/aws/durable-execution-sdk-rust/actions/workflows/pr.yml)
+[![Crates.io](https://img.shields.io/crates/v/durable-execution-sdk.svg)](https://crates.io/crates/durable-execution-sdk)
+[![Documentation](https://docs.rs/durable-execution-sdk/badge.svg)](https://docs.rs/durable-execution-sdk)
+[![License](https://img.shields.io/crates/l/durable-execution-sdk.svg)](LICENSE)
 
 Build reliable, long-running workflows on AWS Lambda with automatic checkpointing and replay.
 
@@ -17,7 +17,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-aws-durable-execution-sdk = "0.1"
+durable-execution-sdk = "0.1"
 tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 ```
@@ -26,13 +26,13 @@ For testing support, add the testing crate:
 
 ```toml
 [dev-dependencies]
-aws-durable-execution-sdk-testing = "0.1"
+durable-execution-sdk-testing = "0.1"
 ```
 
 ## Quick Start
 
 ```rust
-use aws_durable_execution_sdk::{durable_execution, DurableContext, DurableError, Duration};
+use durable_execution_sdk::{durable_execution, DurableContext, DurableError, Duration};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
@@ -87,7 +87,7 @@ Two execution modes for different use cases:
 - **AtMostOncePerRetry** — Checkpoint before execution. Guarantees at-most-once execution for non-idempotent operations.
 
 ```rust
-use aws_durable_execution_sdk::{StepConfig, StepSemantics};
+use durable_execution_sdk::{StepConfig, StepSemantics};
 
 let config = StepConfig {
     step_semantics: StepSemantics::AtMostOncePerRetry,
@@ -101,7 +101,7 @@ let result = ctx.step(|_| Ok(42), Some(config)).await?;
 Process collections with configurable concurrency:
 
 ```rust
-use aws_durable_execution_sdk::MapConfig;
+use durable_execution_sdk::MapConfig;
 
 let results = ctx.map(
     vec![1, 2, 3, 4, 5],
@@ -120,7 +120,7 @@ let results = ctx.map(
 Reduce checkpoint overhead for large collections using `ItemBatcher`:
 
 ```rust
-use aws_durable_execution_sdk::{MapConfig, ItemBatcher};
+use durable_execution_sdk::{MapConfig, ItemBatcher};
 
 let results = ctx.map(
     large_item_list,
@@ -181,7 +181,7 @@ let first_success = ctx.any(vec![
 Wait for external systems to signal your workflow:
 
 ```rust
-use aws_durable_execution_sdk::CallbackConfig;
+use durable_execution_sdk::CallbackConfig;
 
 // Option 1: wait_for_callback - combines callback creation with notification (recommended)
 // The submitter function runs inside a checkpointed child context, ensuring
@@ -233,7 +233,7 @@ let result = callback.result().await?;
 Configure automatic retries for steps with built-in strategies:
 
 ```rust
-use aws_durable_execution_sdk::{StepConfig, ExponentialBackoff, FixedDelay, LinearBackoff, NoRetry};
+use durable_execution_sdk::{StepConfig, ExponentialBackoff, FixedDelay, LinearBackoff, NoRetry};
 
 // Exponential backoff: 1s, 2s, 4s, 8s, ...
 let config = StepConfig {
@@ -257,7 +257,7 @@ let config = StepConfig {
 Filter which errors are retryable:
 
 ```rust
-use aws_durable_execution_sdk::RetryableErrorFilter;
+use durable_execution_sdk::RetryableErrorFilter;
 
 let filter = RetryableErrorFilter::new(vec!["TimeoutError".to_string()]);
 assert!(filter.is_retryable_with_type("request timed out", "TimeoutError"));
@@ -268,7 +268,7 @@ assert!(filter.is_retryable_with_type("request timed out", "TimeoutError"));
 Generate deterministic values that are safe for replay:
 
 ```rust
-use aws_durable_execution_sdk::replay_safe::{
+use durable_execution_sdk::replay_safe::{
     uuid_string_from_operation,
     timestamp_from_execution,
 };
@@ -286,7 +286,7 @@ if let Some(timestamp_ms) = timestamp_from_execution(ctx.state()) {
 ## Extended Duration Support
 
 ```rust
-use aws_durable_execution_sdk::Duration;
+use durable_execution_sdk::Duration;
 
 let seconds = Duration::from_seconds(30);
 let minutes = Duration::from_minutes(5);
@@ -302,7 +302,7 @@ let years = Duration::from_years(1);      // 365 days
 The SDK provides typed errors for different failure scenarios:
 
 ```rust
-use aws_durable_execution_sdk::DurableError;
+use durable_execution_sdk::DurableError;
 
 // Execution errors (workflow fails, no Lambda retry)
 DurableError::execution("Invalid order");
@@ -334,7 +334,7 @@ ctx.log_info_with("Processing order", &[
 ]);
 ```
 
-All log messages automatically include `durable_execution_arn`, `operation_id`, `parent_id`, and `is_replay` for correlation. See [TRACING.md](aws-durable-execution-sdk/docs/TRACING.md) for detailed tracing configuration and best practices.
+All log messages automatically include `durable_execution_arn`, `operation_id`, `parent_id`, and `is_replay` for correlation. See [TRACING.md](durable-execution-sdk/docs/TRACING.md) for detailed tracing configuration and best practices.
 
 ## Determinism Requirements
 
@@ -348,7 +348,7 @@ Durable workflows must be deterministic — same input must produce the same seq
 | UUIDs | Use `uuid_string_from_operation` |
 | Environment variables | Capture in step at workflow start |
 
-See [DETERMINISM.md](aws-durable-execution-sdk/docs/DETERMINISM.md) for detailed guidance.
+See [DETERMINISM.md](durable-execution-sdk/docs/DETERMINISM.md) for detailed guidance.
 
 ## Execution Limits
 
@@ -361,18 +361,18 @@ See [DETERMINISM.md](aws-durable-execution-sdk/docs/DETERMINISM.md) for detailed
 | Maximum checkpoint payload | 256 KB |
 | Maximum history size | 25,000 operations |
 
-See [LIMITS.md](aws-durable-execution-sdk/docs/LIMITS.md) for complete details.
+See [LIMITS.md](durable-execution-sdk/docs/LIMITS.md) for complete details.
 
 ## Testing
 
-The `aws-durable-execution-sdk-testing` crate provides two test runners for verifying durable workflows at different levels.
+The `durable-execution-sdk-testing` crate provides two test runners for verifying durable workflows at different levels.
 
 ### Local Testing
 
 `LocalDurableTestRunner` executes workflows in-process with a simulated checkpoint server. It supports time skipping, operation inspection, and callback interaction — no AWS credentials needed.
 
 ```rust
-use aws_durable_execution_sdk_testing::{
+use durable_execution_sdk_testing::{
     LocalDurableTestRunner, TestEnvironmentConfig, ExecutionStatus,
 };
 
@@ -402,7 +402,7 @@ async fn test_order_workflow() {
 `CloudDurableTestRunner` invokes deployed Lambda functions and polls `GetDurableExecutionHistory` for real-time operation tracking. It supports operation handles for waiting on specific operations, callback interaction during execution, and configurable polling with timeout.
 
 ```rust
-use aws_durable_execution_sdk_testing::{
+use durable_execution_sdk_testing::{
     CloudDurableTestRunner, CloudTestRunnerConfig, ExecutionStatus,
 };
 use std::time::Duration;
@@ -433,7 +433,7 @@ async fn test_deployed_workflow() {
 Both runners support callback interaction through operation handles:
 
 ```rust
-use aws_durable_execution_sdk_testing::WaitingOperationStatus;
+use durable_execution_sdk_testing::WaitingOperationStatus;
 
 // Get a handle before calling run()
 let handle = runner.get_operation_handle("approval-callback");
@@ -468,7 +468,7 @@ let children = op.get_child_operations();
 
 ## Examples
 
-See the `aws-durable-execution-sdk/examples/` directory for runnable examples organized by feature:
+See the `durable-execution-sdk/examples/` directory for runnable examples organized by feature:
 
 | Category | Examples |
 |----------|----------|
@@ -500,17 +500,17 @@ Each example has a corresponding history replay test in `examples/tests/`.
 
 | Crate | Description |
 |-------|-------------|
-| `aws-durable-execution-sdk` | Core SDK with context, handlers, and client |
-| `aws-durable-execution-sdk-macros` | `#[durable_execution]` proc macro |
-| `aws-durable-execution-sdk-testing` | Local and cloud test runners, operation inspection, mocks |
+| `durable-execution-sdk` | Core SDK with context, handlers, and client |
+| `durable-execution-sdk-macros` | `#[durable_execution]` proc macro |
+| `durable-execution-sdk-testing` | Local and cloud test runners, operation inspection, mocks |
 
 ## Documentation
 
-- [API Documentation](aws-durable-execution-sdk/sdk/src/lib.rs) — Comprehensive rustdoc with examples
-- [Determinism Guide](aws-durable-execution-sdk/docs/DETERMINISM.md) — Writing replay-safe workflows
-- [Limits Reference](aws-durable-execution-sdk/docs/LIMITS.md) — Execution constraints
-- [Tracing Guide](aws-durable-execution-sdk/docs/TRACING.md) — Logging configuration and best practices
-- [Language SDK Specification](aws-durable-execution-sdk/docs/language_sdk_specification.md) — Cross-language SDK design spec
+- [API Documentation](durable-execution-sdk/sdk/src/lib.rs) — Comprehensive rustdoc with examples
+- [Determinism Guide](durable-execution-sdk/docs/DETERMINISM.md) — Writing replay-safe workflows
+- [Limits Reference](durable-execution-sdk/docs/LIMITS.md) — Execution constraints
+- [Tracing Guide](durable-execution-sdk/docs/TRACING.md) — Logging configuration and best practices
+- [Language SDK Specification](durable-execution-sdk/docs/language_sdk_specification.md) — Cross-language SDK design spec
 
 ## License
 

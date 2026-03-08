@@ -8,7 +8,7 @@
 //! - **`any!` macro**: Best for combining different step operations (heterogeneous futures)
 //! - **`ctx.map()` with first_successful**: Best for processing collections
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     any, durable_execution, CompletionConfig, DurableContext, DurableError, MapConfig,
 };
 

@@ -3,7 +3,7 @@
 //! Demonstrates configuring a step with a `RetryableErrorFilter` that retries
 //! only specific error patterns using `ErrorPattern::Contains`.
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     durable_execution, DurableError, ErrorPattern, RetryableErrorFilter, StepConfig,
 };
 

@@ -7,7 +7,7 @@
 //! the parent context inside a child context closure (rather than the child context)
 //! produces incorrect behavior or an error.
 
-use aws_durable_execution_sdk::{durable_execution, DurableError};
+use durable_execution_sdk::{durable_execution, DurableError};
 
 /// Attempt to use the parent context inside a child context to call a step.
 ///

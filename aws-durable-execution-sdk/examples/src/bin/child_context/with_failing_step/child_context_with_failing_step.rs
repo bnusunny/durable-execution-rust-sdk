@@ -4,7 +4,7 @@
 //! including `ChildConfig::set_error_mapper()` to transform the error before
 //! it propagates to the parent.
 
-use aws_durable_execution_sdk::{durable_execution, ChildConfig, DurableError};
+use durable_execution_sdk::{durable_execution, ChildConfig, DurableError};
 use std::sync::Arc;
 
 /// Run a child context where a step fails, with an error mapper.

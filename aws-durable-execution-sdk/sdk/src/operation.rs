@@ -137,7 +137,7 @@ fn parse_iso8601_to_millis(s: &str) -> Result<i64, String> {
 /// Creating a new operation:
 ///
 /// ```
-/// use aws_durable_execution_sdk::operation::{Operation, OperationType, OperationStatus};
+/// use durable_execution_sdk::operation::{Operation, OperationType, OperationStatus};
 ///
 /// let op = Operation::new("step-001", OperationType::Step);
 /// assert_eq!(op.operation_id, "step-001");
@@ -148,7 +148,7 @@ fn parse_iso8601_to_millis(s: &str) -> Result<i64, String> {
 /// Serializing and deserializing operations:
 ///
 /// ```
-/// use aws_durable_execution_sdk::operation::{Operation, OperationType, OperationStatus};
+/// use durable_execution_sdk::operation::{Operation, OperationType, OperationStatus};
 ///
 /// let mut op = Operation::new("wait-001", OperationType::Wait);
 /// op.status = OperationStatus::Succeeded;
@@ -480,7 +480,7 @@ impl Operation {
 /// # Examples
 ///
 /// ```
-/// use aws_durable_execution_sdk::operation::OperationType;
+/// use durable_execution_sdk::operation::OperationType;
 ///
 /// let step = OperationType::Step;
 /// let wait = OperationType::Wait;
@@ -537,7 +537,7 @@ impl std::fmt::Display for OperationType {
 /// # Examples
 ///
 /// ```
-/// use aws_durable_execution_sdk::operation::OperationStatus;
+/// use durable_execution_sdk::operation::OperationStatus;
 ///
 /// let succeeded = OperationStatus::Succeeded;
 /// let pending = OperationStatus::Pending;

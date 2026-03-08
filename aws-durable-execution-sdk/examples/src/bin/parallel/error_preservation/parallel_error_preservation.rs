@@ -4,7 +4,7 @@
 //! `BatchItem::get_error()` when some parallel branches fail. Uses `CompletionConfig`
 //! with `tolerated_failure_count` so the overall operation succeeds despite individual failures.
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     durable_execution, CompletionConfig, DurableContext, DurableError, MapConfig,
 };
 use serde::{Deserialize, Serialize};

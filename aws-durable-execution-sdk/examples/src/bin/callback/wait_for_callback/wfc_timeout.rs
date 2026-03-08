@@ -17,7 +17,7 @@
 //! cargo build --example wfc_timeout
 //! ```
 
-use aws_durable_execution_sdk::{durable_execution, CallbackConfig, DurableError, Duration};
+use durable_execution_sdk::{durable_execution, CallbackConfig, DurableError, Duration};
 use serde::{Deserialize, Serialize};
 
 /// Response received from the external system via callback.

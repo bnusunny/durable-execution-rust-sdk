@@ -6,8 +6,8 @@
 //! # Examples
 //!
 //! ```
-//! use aws_durable_execution_sdk_testing::MockDurableServiceClient;
-//! use aws_durable_execution_sdk::{CheckpointResponse, Operation, OperationType};
+//! use durable_execution_sdk_testing::MockDurableServiceClient;
+//! use durable_execution_sdk::{CheckpointResponse, Operation, OperationType};
 //!
 //! // Create a mock client with default responses
 //! let client = MockDurableServiceClient::new();
@@ -40,8 +40,8 @@ use crate::{
 /// # Examples
 ///
 /// ```
-/// use aws_durable_execution_sdk_testing::{MockDurableServiceClient, DurableServiceClient};
-/// use aws_durable_execution_sdk::{OperationUpdate, OperationType};
+/// use durable_execution_sdk_testing::{MockDurableServiceClient, DurableServiceClient};
+/// use durable_execution_sdk::{OperationUpdate, OperationType};
 ///
 /// # tokio_test::block_on(async {
 /// let client = MockDurableServiceClient::new();
@@ -124,7 +124,7 @@ impl GetOperationsCall {
 /// ## Basic Usage
 ///
 /// ```
-/// use aws_durable_execution_sdk_testing::MockDurableServiceClient;
+/// use durable_execution_sdk_testing::MockDurableServiceClient;
 ///
 /// let client = MockDurableServiceClient::new();
 /// ```
@@ -132,8 +132,8 @@ impl GetOperationsCall {
 /// ## With Custom Responses
 ///
 /// ```
-/// use aws_durable_execution_sdk_testing::MockDurableServiceClient;
-/// use aws_durable_execution_sdk::{CheckpointResponse, DurableError};
+/// use durable_execution_sdk_testing::MockDurableServiceClient;
+/// use durable_execution_sdk::{CheckpointResponse, DurableError};
 ///
 /// let client = MockDurableServiceClient::new()
 ///     .with_checkpoint_response(Ok(CheckpointResponse::new("token-1")))
@@ -143,8 +143,8 @@ impl GetOperationsCall {
 /// ## Verifying Calls
 ///
 /// ```
-/// use aws_durable_execution_sdk_testing::{MockDurableServiceClient, DurableServiceClient};
-/// use aws_durable_execution_sdk::{OperationUpdate, OperationType};
+/// use durable_execution_sdk_testing::{MockDurableServiceClient, DurableServiceClient};
+/// use durable_execution_sdk::{OperationUpdate, OperationType};
 ///
 /// # tokio_test::block_on(async {
 /// let client = MockDurableServiceClient::new();
@@ -189,8 +189,8 @@ impl MockDurableServiceClient {
     /// # Examples
     ///
     /// ```
-    /// use aws_durable_execution_sdk_testing::MockDurableServiceClient;
-    /// use aws_durable_execution_sdk::CheckpointResponse;
+    /// use durable_execution_sdk_testing::MockDurableServiceClient;
+    /// use durable_execution_sdk::CheckpointResponse;
     ///
     /// let client = MockDurableServiceClient::new()
     ///     .with_checkpoint_response(Ok(CheckpointResponse::new("token-1")));
@@ -213,7 +213,7 @@ impl MockDurableServiceClient {
     /// # Examples
     ///
     /// ```
-    /// use aws_durable_execution_sdk_testing::MockDurableServiceClient;
+    /// use durable_execution_sdk_testing::MockDurableServiceClient;
     ///
     /// // Add 5 default checkpoint responses
     /// let client = MockDurableServiceClient::new()
@@ -236,8 +236,8 @@ impl MockDurableServiceClient {
     /// # Examples
     ///
     /// ```
-    /// use aws_durable_execution_sdk_testing::MockDurableServiceClient;
-    /// use aws_durable_execution_sdk::{Operation, OperationType};
+    /// use durable_execution_sdk_testing::MockDurableServiceClient;
+    /// use durable_execution_sdk::{Operation, OperationType};
     ///
     /// let op = Operation::new("op-1", OperationType::Callback);
     /// let client = MockDurableServiceClient::new()
@@ -248,7 +248,7 @@ impl MockDurableServiceClient {
         token: impl Into<String>,
         operations: Vec<Operation>,
     ) -> Self {
-        use aws_durable_execution_sdk::client::NewExecutionState;
+        use durable_execution_sdk::client::NewExecutionState;
 
         let response = CheckpointResponse {
             checkpoint_token: token.into(),
@@ -273,8 +273,8 @@ impl MockDurableServiceClient {
     /// # Examples
     ///
     /// ```
-    /// use aws_durable_execution_sdk_testing::MockDurableServiceClient;
-    /// use aws_durable_execution_sdk::{GetOperationsResponse, Operation, OperationType};
+    /// use durable_execution_sdk_testing::MockDurableServiceClient;
+    /// use durable_execution_sdk::{GetOperationsResponse, Operation, OperationType};
     ///
     /// let client = MockDurableServiceClient::new()
     ///     .with_get_operations_response(Ok(GetOperationsResponse {
@@ -301,7 +301,7 @@ impl MockDurableServiceClient {
     /// # Examples
     ///
     /// ```
-    /// use aws_durable_execution_sdk_testing::{MockDurableServiceClient, DurableServiceClient};
+    /// use durable_execution_sdk_testing::{MockDurableServiceClient, DurableServiceClient};
     ///
     /// # tokio_test::block_on(async {
     /// let client = MockDurableServiceClient::new();
@@ -610,7 +610,7 @@ mod tests {
     #[tokio::test]
     async fn test_mock_client_with_checkpoint_response_with_operations() {
         let mut op = Operation::new("callback-1", OperationType::Callback);
-        op.callback_details = Some(aws_durable_execution_sdk::CallbackDetails {
+        op.callback_details = Some(durable_execution_sdk::CallbackDetails {
             callback_id: Some("cb-123".to_string()),
             result: None,
             error: None,

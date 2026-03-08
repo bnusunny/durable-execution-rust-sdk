@@ -50,7 +50,7 @@
 //! cargo build --example wait_for_callback
 //! ```
 
-use aws_durable_execution_sdk::{durable_execution, CallbackConfig, DurableError, Duration};
+use durable_execution_sdk::{durable_execution, CallbackConfig, DurableError, Duration};
 use serde::{Deserialize, Serialize};
 
 // =============================================================================

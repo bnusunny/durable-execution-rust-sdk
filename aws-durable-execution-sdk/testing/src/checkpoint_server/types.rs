@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use aws_durable_execution_sdk::{ErrorObject, Operation, OperationUpdate};
+use durable_execution_sdk::{ErrorObject, Operation, OperationUpdate};
 
 /// Unique identifier for an execution.
 pub type ExecutionId = String;

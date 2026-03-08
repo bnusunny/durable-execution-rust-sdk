@@ -11,11 +11,11 @@ mod common;
 
 use std::sync::Arc;
 
-use aws_durable_execution_sdk::error::DurableError;
-use aws_durable_execution_sdk::handlers::replay::{check_replay, ReplayResult};
-use aws_durable_execution_sdk::lambda::InitialExecutionState;
-use aws_durable_execution_sdk::operation::{Operation, OperationStatus, OperationType};
-use aws_durable_execution_sdk::state::ExecutionState;
+use durable_execution_sdk::error::DurableError;
+use durable_execution_sdk::handlers::replay::{check_replay, ReplayResult};
+use durable_execution_sdk::lambda::InitialExecutionState;
+use durable_execution_sdk::operation::{Operation, OperationStatus, OperationType};
+use durable_execution_sdk::state::ExecutionState;
 
 use common::*;
 

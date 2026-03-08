@@ -2,7 +2,7 @@
 //!
 //! Complete when the first branch succeeds using `CompletionConfig`.
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     durable_execution, CompletionConfig, DurableContext, DurableError, MapConfig,
 };
 use serde::{Deserialize, Serialize};

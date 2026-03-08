@@ -6,7 +6,7 @@
 //! # Examples
 //!
 //! ```ignore
-//! use aws_durable_execution_sdk_testing::{
+//! use durable_execution_sdk_testing::{
 //!     LocalDurableTestRunner, TestEnvironmentConfig, ExecutionStatus,
 //! };
 //!
@@ -47,7 +47,7 @@ use crate::operation::CallbackSender;
 use crate::operation_handle::{OperationHandle, OperationMatcher};
 use crate::test_result::TestResult;
 use crate::types::{ExecutionStatus, Invocation, TestResultError};
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     DurableContext, DurableError, DurableServiceClient, ErrorObject, Operation,
 };
 
@@ -109,7 +109,7 @@ impl CallbackSender for CheckpointCallbackSender {
 /// # Examples
 ///
 /// ```
-/// use aws_durable_execution_sdk_testing::TestEnvironmentConfig;
+/// use durable_execution_sdk_testing::TestEnvironmentConfig;
 ///
 /// let config = TestEnvironmentConfig {
 ///     skip_time: true,
@@ -259,7 +259,7 @@ enum RegisteredFunction {
 /// # Examples
 ///
 /// ```ignore
-/// use aws_durable_execution_sdk_testing::LocalDurableTestRunner;
+/// use durable_execution_sdk_testing::LocalDurableTestRunner;
 ///
 /// async fn my_workflow(input: String, ctx: DurableContext) -> Result<String, DurableError> {
 ///     let result = ctx.step(|_| Ok(format!("processed: {}", input)), None).await?;
@@ -318,7 +318,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::{LocalDurableTestRunner, TestEnvironmentConfig};
+    /// use durable_execution_sdk_testing::{LocalDurableTestRunner, TestEnvironmentConfig};
     ///
     /// LocalDurableTestRunner::<String, String>::setup_test_environment(TestEnvironmentConfig {
     ///     skip_time: true,
@@ -394,7 +394,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::LocalDurableTestRunner;
+    /// use durable_execution_sdk_testing::LocalDurableTestRunner;
     ///
     /// LocalDurableTestRunner::<String, String>::teardown_test_environment().await.unwrap();
     /// ```
@@ -449,7 +449,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::LocalDurableTestRunner;
+    /// use durable_execution_sdk_testing::LocalDurableTestRunner;
     ///
     /// async fn my_workflow(input: String, ctx: DurableContext) -> Result<String, DurableError> {
     ///     Ok(input)
@@ -617,7 +617,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::{LocalDurableTestRunner, InvokeRequest};
+    /// use durable_execution_sdk_testing::{LocalDurableTestRunner, InvokeRequest};
     ///
     /// let mut runner = LocalDurableTestRunner::new(my_workflow);
     ///
@@ -795,7 +795,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::LocalDurableTestRunner;
+    /// use durable_execution_sdk_testing::LocalDurableTestRunner;
     ///
     /// let mut runner = LocalDurableTestRunner::new(my_workflow_with_wait);
     /// let result = runner.run_single_invocation("hello".to_string()).await.unwrap();
@@ -804,8 +804,8 @@ where
     /// assert_eq!(result.get_status(), ExecutionStatus::Running);
     /// ```
     pub async fn run_single_invocation(&mut self, payload: I) -> Result<TestResult<O>, TestError> {
-        use aws_durable_execution_sdk::lambda::InitialExecutionState;
-        use aws_durable_execution_sdk::state::ExecutionState;
+        use durable_execution_sdk::lambda::InitialExecutionState;
+        use durable_execution_sdk::state::ExecutionState;
 
         // Clear previous operations
         self.operation_storage.write().await.clear();
@@ -906,7 +906,7 @@ where
                     Ok(test_result)
                 } else {
                     // Convert DurableError to ErrorObject to get the error type
-                    let error_obj = aws_durable_execution_sdk::ErrorObject::from(&error);
+                    let error_obj = durable_execution_sdk::ErrorObject::from(&error);
                     let test_error = TestResultError::new(error_obj.error_type, error.to_string());
                     invocation = invocation.with_error(test_error.clone());
                     let mut test_result = TestResult::failure(test_error, operations);
@@ -951,7 +951,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::LocalDurableTestRunner;
+    /// use durable_execution_sdk_testing::LocalDurableTestRunner;
     ///
     /// let mut runner = LocalDurableTestRunner::new(my_workflow_with_waits);
     /// let result = runner.run_with_orchestrator("hello".to_string()).await.unwrap();
@@ -1157,7 +1157,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::LocalDurableTestRunner;
+    /// use durable_execution_sdk_testing::LocalDurableTestRunner;
     ///
     /// let mut runner = LocalDurableTestRunner::new(my_workflow);
     ///
@@ -1210,7 +1210,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::LocalDurableTestRunner;
+    /// use durable_execution_sdk_testing::LocalDurableTestRunner;
     ///
     /// let mut runner = LocalDurableTestRunner::new(my_workflow);
     /// let _ = runner.run("input".to_string()).await.unwrap();
@@ -1241,7 +1241,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::LocalDurableTestRunner;
+    /// use durable_execution_sdk_testing::LocalDurableTestRunner;
     ///
     /// let mut runner = LocalDurableTestRunner::new(my_workflow);
     /// let _ = runner.run("input".to_string()).await.unwrap();
@@ -1276,7 +1276,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::LocalDurableTestRunner;
+    /// use durable_execution_sdk_testing::LocalDurableTestRunner;
     ///
     /// let mut runner = LocalDurableTestRunner::new(my_workflow);
     /// let _ = runner.run("input".to_string()).await.unwrap();
@@ -1316,7 +1316,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::LocalDurableTestRunner;
+    /// use durable_execution_sdk_testing::LocalDurableTestRunner;
     ///
     /// let mut runner = LocalDurableTestRunner::new(my_workflow);
     /// let _ = runner.run("input".to_string()).await.unwrap();
@@ -1352,7 +1352,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::LocalDurableTestRunner;
+    /// use durable_execution_sdk_testing::LocalDurableTestRunner;
     ///
     /// let mut runner = LocalDurableTestRunner::new(my_workflow);
     /// let _ = runner.run("input".to_string()).await.unwrap();
@@ -1385,7 +1385,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::LocalDurableTestRunner;
+    /// use durable_execution_sdk_testing::LocalDurableTestRunner;
     ///
     /// async fn helper_workflow(input: serde_json::Value, ctx: DurableContext) -> Result<serde_json::Value, DurableError> {
     ///     Ok(serde_json::json!({"processed": true}))
@@ -1431,7 +1431,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::LocalDurableTestRunner;
+    /// use durable_execution_sdk_testing::LocalDurableTestRunner;
     ///
     /// fn simple_helper(input: serde_json::Value) -> Result<serde_json::Value, DurableError> {
     ///     Ok(serde_json::json!({"result": "done"}))
@@ -1463,7 +1463,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::LocalDurableTestRunner;
+    /// use durable_execution_sdk_testing::LocalDurableTestRunner;
     ///
     /// let runner = LocalDurableTestRunner::new(main_workflow);
     /// runner.register_function("helper", |_| Ok(serde_json::json!({}))).await;
@@ -1489,7 +1489,7 @@ where
     /// # Examples
     ///
     /// ```ignore
-    /// use aws_durable_execution_sdk_testing::LocalDurableTestRunner;
+    /// use durable_execution_sdk_testing::LocalDurableTestRunner;
     ///
     /// let mut runner = LocalDurableTestRunner::new(main_workflow);
     /// runner.register_function("helper", |_| Ok(serde_json::json!({}))).await;
@@ -1518,7 +1518,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aws_durable_execution_sdk::OperationType;
+    use durable_execution_sdk::OperationType;
 
     async fn simple_handler(input: String, _ctx: DurableContext) -> Result<String, DurableError> {
         Ok(format!("processed: {}", input))
@@ -2277,7 +2277,7 @@ mod tests {
 #[cfg(test)]
 mod property_tests {
     use super::*;
-    use aws_durable_execution_sdk::OperationType;
+    use durable_execution_sdk::OperationType;
     use proptest::prelude::*;
 
     /// Strategy for generating non-empty strings (for inputs)
@@ -2652,7 +2652,7 @@ mod property_tests {
                     async move {
                         // Perform a wait operation
                         ctx.wait(
-                            aws_durable_execution_sdk::Duration::from_seconds(wait_duration),
+                            durable_execution_sdk::Duration::from_seconds(wait_duration),
                             Some("test_wait")
                         ).await?;
                         Ok::<String, DurableError>("wait completed".to_string())

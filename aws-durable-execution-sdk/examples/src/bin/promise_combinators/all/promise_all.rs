@@ -8,7 +8,7 @@
 //! - **`ctx.all()` method**: Best for homogeneous futures from iterators/loops
 //! - **`ctx.map()`**: Best for processing collections with automatic iteration
 
-use aws_durable_execution_sdk::{all, durable_execution, DurableContext, DurableError, MapConfig};
+use durable_execution_sdk::{all, durable_execution, DurableContext, DurableError, MapConfig};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

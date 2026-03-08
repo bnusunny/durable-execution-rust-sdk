@@ -6,7 +6,7 @@
 //! # Example
 //!
 //! ```
-//! use aws_durable_execution_sdk::retry_presets;
+//! use durable_execution_sdk::retry_presets;
 //!
 //! // Default: 6 attempts, exponential backoff, 5s base, 60s max, full jitter
 //! let default = retry_presets::default_retry();

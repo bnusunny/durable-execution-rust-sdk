@@ -6,4 +6,4 @@
 pub mod test_helper;
 
 /// Re-export commonly used types from the SDK
-pub use aws_durable_execution_sdk::*;
+pub use durable_execution_sdk::*;

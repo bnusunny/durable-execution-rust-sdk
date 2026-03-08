@@ -2,7 +2,7 @@
 //!
 //! Processing items with controlled concurrency using `MapConfig`.
 
-use aws_durable_execution_sdk::{durable_execution, DurableError, MapConfig};
+use durable_execution_sdk::{durable_execution, DurableError, MapConfig};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

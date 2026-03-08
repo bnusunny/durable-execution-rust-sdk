@@ -4,7 +4,7 @@
 //! including custom `max_attempts`, `base_delay`, `max_delay`, `multiplier`,
 //! and `JitterStrategy`.
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     durable_execution, DurableError, Duration, ExponentialBackoff, JitterStrategy, StepConfig,
 };
 

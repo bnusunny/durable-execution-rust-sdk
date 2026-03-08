@@ -2,7 +2,7 @@
 //!
 //! Generating deterministic UUIDs that are safe for replay.
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     durable_execution,
     replay_safe::{uuid_from_operation, uuid_string_from_operation, uuid_to_string},
     DurableError,

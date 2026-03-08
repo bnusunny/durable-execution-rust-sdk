@@ -116,7 +116,7 @@ cargo deny check
 ```bash
 # Requires AWS credentials configured
 export SIMPLE_WORKFLOW_FUNCTION=your-function-name
-cargo test --package aws-durable-execution-sdk-testing --test integration -- --ignored
+cargo test --package durable-execution-sdk-testing --test integration -- --ignored
 ```
 
 ## Workflow Dependencies
@@ -148,7 +148,7 @@ Release
 All workflows use GitHub Actions cache for:
 - `~/.cargo/registry` - Cargo registry index
 - `~/.cargo/git` - Git dependencies
-- `aws-durable-execution-sdk/target` - Build artifacts
+- `durable-execution-sdk/target` - Build artifacts
 
 Cache keys include `Cargo.lock` hash for invalidation on dependency changes.
 

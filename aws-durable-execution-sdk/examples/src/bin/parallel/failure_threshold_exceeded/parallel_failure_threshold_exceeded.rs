@@ -4,7 +4,7 @@
 //! causing the parallel operation to fail. Uses `ctx.map()` with 5 items
 //! where 3 fail, but only 1 failure is tolerated.
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     durable_execution, CompletionConfig, DurableContext, DurableError, MapConfig,
 };
 use serde::{Deserialize, Serialize};

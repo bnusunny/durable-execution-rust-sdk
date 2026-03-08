@@ -9,7 +9,7 @@ use std::thread::{self, JoinHandle};
 use tokio::sync::{mpsc, oneshot};
 use uuid::Uuid;
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     CheckpointResponse, DurableError, DurableServiceClient, ErrorObject, GetOperationsResponse,
     OperationUpdate,
 };
@@ -1049,7 +1049,7 @@ mod tests {
             checkpoint_token: result.checkpoint_token.clone(),
             operations: vec![OperationUpdate::start(
                 "op-1",
-                aws_durable_execution_sdk::OperationType::Step,
+                durable_execution_sdk::OperationType::Step,
             )
             .with_name("test-step")],
         };

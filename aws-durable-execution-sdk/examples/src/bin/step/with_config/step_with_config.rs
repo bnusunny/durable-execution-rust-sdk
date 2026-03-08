@@ -3,7 +3,7 @@
 //! Using `StepConfig` to customize step behavior including
 //! execution semantics and serialization.
 
-use aws_durable_execution_sdk::{durable_execution, DurableError, StepConfig, StepSemantics};
+use durable_execution_sdk::{durable_execution, DurableError, StepConfig, StepSemantics};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

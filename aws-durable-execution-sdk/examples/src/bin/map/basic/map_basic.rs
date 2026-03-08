@@ -2,7 +2,7 @@
 //!
 //! Processing arrays with concurrent operations using `ctx.map()`.
 
-use aws_durable_execution_sdk::{durable_execution, DurableError};
+use durable_execution_sdk::{durable_execution, DurableError};
 
 /// Process an array of items with map.
 ///

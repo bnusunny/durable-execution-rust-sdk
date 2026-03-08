@@ -10,7 +10,7 @@ use std::time::Duration;
 use crate::error::TestError;
 use crate::test_result::HistoryEvent;
 use crate::types::{ExecutionStatus, TestResultError};
-use aws_durable_execution_sdk::Operation;
+use durable_execution_sdk::Operation;
 
 /// Trait abstracting the `GetDurableExecutionHistory` API call for testability.
 ///
@@ -527,7 +527,7 @@ pub(crate) mod tests {
     // --- poll_once tests ---
 
     fn make_operation(id: &str) -> Operation {
-        Operation::new(id, aws_durable_execution_sdk::OperationType::Step)
+        Operation::new(id, durable_execution_sdk::OperationType::Step)
     }
 
     fn make_event(event_type: &str) -> crate::test_result::HistoryEvent {

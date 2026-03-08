@@ -6,7 +6,7 @@
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 
-use aws_durable_execution_sdk::operation::{
+use durable_execution_sdk::operation::{
     Operation, OperationAction, OperationType, OperationUpdate,
 };
 
@@ -519,7 +519,7 @@ impl EventProcessor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aws_durable_execution_sdk::operation::{CallbackDetails, CallbackOptions, StepDetails};
+    use durable_execution_sdk::operation::{CallbackDetails, CallbackOptions, StepDetails};
 
     #[derive(Serialize)]
     struct TestDetails {
@@ -1012,7 +1012,7 @@ mod tests {
                 }
                 OperationAction::Succeed => OperationUpdate::succeed("test-op", op_type, None),
                 OperationAction::Fail => {
-                    use aws_durable_execution_sdk::error::ErrorObject;
+                    use durable_execution_sdk::error::ErrorObject;
                     OperationUpdate::fail("test-op", op_type, ErrorObject::new("TestError", "test"))
                 }
                 _ => continue,

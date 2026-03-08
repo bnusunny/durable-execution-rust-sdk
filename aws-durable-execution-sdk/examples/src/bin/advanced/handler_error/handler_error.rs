@@ -3,7 +3,7 @@
 //! Demonstrates a top-level handler that returns a `DurableError` and verifies
 //! the error is properly serialized in the execution output.
 
-use aws_durable_execution_sdk::{durable_execution, DurableError};
+use durable_execution_sdk::{durable_execution, DurableError};
 
 /// A handler that returns a DurableError at the top level.
 ///

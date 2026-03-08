@@ -11,7 +11,7 @@ members = [
 version = "0.1.0-alpha1"
 edition = "2021"
 license = "Apache-2.0"
-repository = "https://github.com/awslabs/aws-durable-execution-sdk-rust"
+repository = "https://github.com/awslabs/durable-execution-sdk-rust"
 
 [workspace.dependencies]
 # Async runtime
@@ -73,6 +73,6 @@ trybuild = "1.0"
 uuid = { version = "1.0", features = ["v4"] }
 
 # Internal crate dependencies
-aws-durable-execution-sdk = { path = "sdk" }
-aws-durable-execution-sdk-testing = { path = "testing" }
-aws-durable-execution-sdk-macros = { path = "macros" }
+durable-execution-sdk = { path = "sdk" }
+durable-execution-sdk-testing = { path = "testing" }
+durable-execution-sdk-macros = { path = "macros" }

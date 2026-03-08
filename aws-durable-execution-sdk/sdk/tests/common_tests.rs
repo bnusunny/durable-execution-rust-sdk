@@ -4,8 +4,8 @@
 
 mod common;
 
-use aws_durable_execution_sdk::client::DurableServiceClient;
-use aws_durable_execution_sdk::operation::{OperationStatus, OperationType, OperationUpdate};
+use durable_execution_sdk::client::DurableServiceClient;
+use durable_execution_sdk::operation::{OperationStatus, OperationType, OperationUpdate};
 use common::*;
 use proptest::prelude::*;
 use std::sync::Arc;
@@ -273,7 +273,7 @@ proptest! {
     #[test]
     fn test_operation_strategy_generates_serializable_operations(op in operation_strategy()) {
         let json = serde_json::to_string(&op).unwrap();
-        let deserialized: aws_durable_execution_sdk::operation::Operation = serde_json::from_str(&json).unwrap();
+        let deserialized: durable_execution_sdk::operation::Operation = serde_json::from_str(&json).unwrap();
         prop_assert_eq!(op.operation_id, deserialized.operation_id);
         prop_assert_eq!(op.operation_type, deserialized.operation_type);
         prop_assert_eq!(op.status, deserialized.status);
@@ -304,7 +304,7 @@ proptest! {
 // Tracing Span Property Tests
 // =============================================================================
 
-use aws_durable_execution_sdk::context::{create_operation_span, OperationIdentifier};
+use durable_execution_sdk::context::{create_operation_span, OperationIdentifier};
 use std::collections::HashMap;
 use tracing::field::Visit;
 use tracing::span::Attributes;
@@ -458,7 +458,7 @@ proptest! {
 // TracingLogger Extra Field Passthrough Property Tests
 // =============================================================================
 
-use aws_durable_execution_sdk::context::{LogInfo, Logger, TracingLogger};
+use durable_execution_sdk::context::{LogInfo, Logger, TracingLogger};
 use tracing::Event;
 
 /// A test layer that captures event fields for verification.

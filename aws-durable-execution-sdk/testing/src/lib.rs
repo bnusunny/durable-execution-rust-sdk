@@ -14,7 +14,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use aws_durable_execution_sdk_testing::{
+//! use durable_execution_sdk_testing::{
 //!     LocalDurableTestRunner, TestEnvironmentConfig, ExecutionStatus,
 //! };
 //!
@@ -72,7 +72,7 @@ pub use types::{
 };
 
 // Re-export key types from the SDK for convenience
-pub use aws_durable_execution_sdk::{
+pub use durable_execution_sdk::{
     // Client types
     client::NewExecutionState,
     // Operation types

@@ -29,17 +29,17 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            aws-durable-execution-sdk/target
+            durable-execution-sdk/target
           key: ${{ runner.os }}-cargo-nightly-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-nightly-
 
       - name: Check with nightly
-        working-directory: aws-durable-execution-sdk
+        working-directory: durable-execution-sdk
         run: cargo check --workspace --all-features
 
       - name: Run tests with nightly
-        working-directory: aws-durable-execution-sdk
+        working-directory: durable-execution-sdk
         run: cargo test --workspace --all-features -- --skip test_macro_type_mismatch_compile_errors
 
       - name: Create issue on failure

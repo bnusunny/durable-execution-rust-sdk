@@ -18,12 +18,12 @@
 //! - 16.3: Time skipping uses tokio::time::advance() to skip wait durations
 //! - 16.4: Handler re-invocation when operations complete
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     DurableContext, DurableError, Duration, OperationStatus, OperationType, WaitForConditionConfig,
     WaitForConditionContext,
 };
-use aws_durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures;
-use aws_durable_execution_sdk_testing::{
+use durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures;
+use durable_execution_sdk_testing::{
     ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig,
 };
 use serde::{Deserialize, Serialize};

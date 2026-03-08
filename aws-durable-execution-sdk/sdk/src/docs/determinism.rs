@@ -1,7 +1,7 @@
 //! # Determinism in Durable Executions
 //!
 //! For detailed documentation on determinism requirements, see the
-//! [DETERMINISM.md](https://github.com/aws/aws-durable-execution-sdk-rust/blob/main/aws-durable-execution-sdk/docs/DETERMINISM.md)
+//! [DETERMINISM.md](https://github.com/aws/durable-execution-sdk-rust/blob/main/durable-execution-sdk/docs/DETERMINISM.md)
 //! file in the repository.
 //!
 //! ## Quick Summary

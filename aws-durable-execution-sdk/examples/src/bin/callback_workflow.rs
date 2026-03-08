@@ -29,7 +29,7 @@
 //! or a REST API). The external system then calls the Lambda durable execution
 //! callback API with the callback ID and result payload.
 
-use aws_durable_execution_sdk::{durable_execution, CallbackConfig, DurableError, Duration};
+use durable_execution_sdk::{durable_execution, CallbackConfig, DurableError, Duration};
 use serde::{Deserialize, Serialize};
 
 /// Input event for the approval workflow.

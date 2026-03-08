@@ -18,7 +18,7 @@
 //! # Example
 //!
 //! ```rust
-//! use aws_durable_execution_sdk::serdes::{SerDes, JsonSerDes, SerDesContext};
+//! use durable_execution_sdk::serdes::{SerDes, JsonSerDes, SerDesContext};
 //! use serde::{Serialize, Deserialize};
 //!
 //! #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -145,7 +145,7 @@ impl SerDesContext {
 /// # Example
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::serdes::{SerDes, JsonSerDes, SerDesContext};
+/// use durable_execution_sdk::serdes::{SerDes, JsonSerDes, SerDesContext};
 /// use serde::{Serialize, Deserialize};
 ///
 /// #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -206,7 +206,7 @@ pub trait SerDes<T>: Sealed + Send + Sync {
 /// # Example
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::serdes::{JsonSerDes, SerDes, SerDesContext};
+/// use durable_execution_sdk::serdes::{JsonSerDes, SerDes, SerDesContext};
 /// use serde::{Serialize, Deserialize};
 ///
 /// #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -288,7 +288,7 @@ unsafe impl<T> Sync for JsonSerDes<T> {}
 /// # Example
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::serdes::{custom_serdes, SerDes, SerDesContext, SerDesError};
+/// use durable_execution_sdk::serdes::{custom_serdes, SerDes, SerDesContext, SerDesError};
 ///
 /// // Create a custom serializer for strings that adds a prefix
 /// let serdes = custom_serdes::<String, _, _>(
@@ -367,7 +367,7 @@ where
 /// # Example
 ///
 /// ```rust
-/// use aws_durable_execution_sdk::serdes::{custom_serdes, SerDes, SerDesContext, SerDesError};
+/// use durable_execution_sdk::serdes::{custom_serdes, SerDes, SerDesContext, SerDesError};
 ///
 /// // Create a custom serializer for i32 that uses a simple format
 /// let serdes = custom_serdes::<i32, _, _>(

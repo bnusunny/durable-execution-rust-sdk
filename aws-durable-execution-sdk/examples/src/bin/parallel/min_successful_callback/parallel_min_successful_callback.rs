@@ -5,7 +5,7 @@
 //! via `create_callback_named` and waits for its result. The map operation completes
 //! and returns a `BatchResult` even though individual callbacks are still pending.
 
-use aws_durable_execution_sdk::{
+use durable_execution_sdk::{
     durable_execution, CompletionConfig, DurableContext, DurableError, MapConfig,
 };
 use serde::{Deserialize, Serialize};

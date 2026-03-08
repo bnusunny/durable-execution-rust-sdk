@@ -26,22 +26,22 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            aws-durable-execution-sdk/target
+            durable-execution-sdk/target
           key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run all tests
-        working-directory: aws-durable-execution-sdk
+        working-directory: durable-execution-sdk
         run: cargo test --workspace --all-features
 
       - name: Build documentation
-        working-directory: aws-durable-execution-sdk
+        working-directory: durable-execution-sdk
         run: cargo doc --workspace --no-deps --all-features
         env:
           RUSTDOCFLAGS: -D warnings
 
       - name: Verify examples build
-        working-directory: aws-durable-execution-sdk
-        run: cargo build --package aws-durable-execution-sdk-examples --bins
+        working-directory: durable-execution-sdk
+        run: cargo build --package durable-execution-sdk-examples --bins
 
   release-plz:
     name: Release PR
@@ -62,7 +62,7 @@ jobs:
         uses: release-plz/action@v0.5
         with:
           command: release-pr
-          manifest_path: aws-durable-execution-sdk/Cargo.toml
+          manifest_path: durable-execution-sdk/Cargo.toml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
@@ -83,7 +83,7 @@ jobs:
         uses: release-plz/action@v0.5
         with:
           command: release
-          manifest_path: aws-durable-execution-sdk/Cargo.toml
+          manifest_path: durable-execution-sdk/Cargo.toml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
@@ -100,7 +100,7 @@ jobs:
       - name: Extract version from Cargo.toml
         id: version
         run: |
-          VERSION=$(grep -m1 '^version = ' aws-durable-execution-sdk/Cargo.toml | cut -d'"' -f2)
+          VERSION=$(grep -m1 '^version = ' durable-execution-sdk/Cargo.toml | cut -d'"' -f2)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release

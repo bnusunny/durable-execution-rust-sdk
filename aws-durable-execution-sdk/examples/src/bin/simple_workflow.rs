@@ -26,7 +26,7 @@
 //! Each step is automatically checkpointed. If the Lambda function is
 //! interrupted at any point, it will resume from the last completed step.
 
-use aws_durable_execution_sdk::{durable_execution, DurableError, Duration, TerminationReason};
+use durable_execution_sdk::{durable_execution, DurableError, Duration, TerminationReason};
 use serde::{Deserialize, Serialize};
 
 /// Input event for the order processing workflow.

@@ -1,8 +1,8 @@
 //! Tests for child_context examples using LocalDurableTestRunner.
 
-use aws_durable_execution_sdk::{DurableContext, DurableError, OperationType};
-use aws_durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures;
-use aws_durable_execution_sdk_testing::{
+use durable_execution_sdk::{DurableContext, DurableError, OperationType};
+use durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures;
+use durable_execution_sdk_testing::{
     ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig,
 };
 use serde::{Deserialize, Serialize};
@@ -209,7 +209,7 @@ async fn child_context_large_data_handler(
     _event: serde_json::Value,
     ctx: DurableContext,
 ) -> Result<String, DurableError> {
-    use aws_durable_execution_sdk::ChildConfig;
+    use durable_execution_sdk::ChildConfig;
     use std::sync::Arc;
 
     let config = ChildConfig::new().set_summary_generator(Arc::new(|serialized: &str| {
@@ -292,7 +292,7 @@ async fn child_context_checkpoint_size_limit_handler(
     _event: serde_json::Value,
     ctx: DurableContext,
 ) -> Result<String, DurableError> {
-    use aws_durable_execution_sdk::ChildConfig;
+    use durable_execution_sdk::ChildConfig;
     use std::sync::Arc;
 
     let config = ChildConfig::new().set_summary_generator(Arc::new(|serialized: &str| {
@@ -377,7 +377,7 @@ async fn child_context_with_failing_step_handler(
     _event: serde_json::Value,
     ctx: DurableContext,
 ) -> Result<String, DurableError> {
-    use aws_durable_execution_sdk::ChildConfig;
+    use durable_execution_sdk::ChildConfig;
     use std::sync::Arc;
 
     let config = ChildConfig::new().set_error_mapper(Arc::new(|err: DurableError| {

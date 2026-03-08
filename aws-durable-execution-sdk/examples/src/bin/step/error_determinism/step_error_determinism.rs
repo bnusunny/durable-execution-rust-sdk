@@ -3,7 +3,7 @@
 //! Demonstrates that a step which fails deterministically produces the same
 //! error across replays, ensuring consistent error behavior.
 
-use aws_durable_execution_sdk::{durable_execution, DurableError};
+use durable_execution_sdk::{durable_execution, DurableError};
 
 /// Execute a step that always fails deterministically.
 ///

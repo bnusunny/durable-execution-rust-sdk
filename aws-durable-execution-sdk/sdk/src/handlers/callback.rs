@@ -29,13 +29,15 @@ pub struct Callback<T> {
     state: Arc<ExecutionState>,
     /// Logger for structured logging
     logger: Arc<dyn Logger>,
-    /// Phantom data for the result type (using fn() -> T for Send + Sync)
+    /// Phantom data for the result type.
+    /// Using `fn() -> T` makes `Callback<T>` unconditionally `Send + Sync`
+    /// regardless of `T`'s bounds, since `fn() -> T` is always `Send + Sync`.
     _marker: PhantomData<fn() -> T>,
 }
 
-// Ensure Callback is Send + Sync
-unsafe impl<T> Send for Callback<T> {}
-unsafe impl<T> Sync for Callback<T> {}
+// Static assertions: Callback<T> must be Send + Sync for all T,
+// including non-Send types, because PhantomData<fn() -> T> is used.
+static_assertions::assert_impl_all!(Callback<*mut ()>: Send, Sync);
 
 impl<T> std::fmt::Debug for Callback<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

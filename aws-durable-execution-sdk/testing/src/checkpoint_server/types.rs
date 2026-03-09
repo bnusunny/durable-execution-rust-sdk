@@ -60,7 +60,7 @@ pub enum WorkerResponseType {
 }
 
 /// Parameters for configuring the checkpoint worker.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct CheckpointWorkerParams {
     /// Optional checkpoint delay in milliseconds to simulate network latency
     pub checkpoint_delay: Option<u64>,

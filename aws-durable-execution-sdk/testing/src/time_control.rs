@@ -44,6 +44,14 @@ use std::time::Duration;
 
 use crate::error::TestError;
 
+/// Safely resume tokio's clock, catching any panic (e.g. if time wasn't paused
+/// or if called during stack unwinding).
+fn resume_time_safely() {
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        tokio::time::resume();
+    }));
+}
+
 /// Global flag indicating whether time control is active.
 static TIME_CONTROL_ACTIVE: AtomicBool = AtomicBool::new(false);
 
@@ -239,13 +247,8 @@ impl TimeControl {
             return Ok(());
         }
 
-        // Resume Tokio's internal clock
-        // Note: tokio::time::resume() panics if time is not paused,
-        // so we use catch_unwind to handle this case gracefully
-        use std::panic;
-        let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            tokio::time::resume();
-        }));
+        // Resume Tokio's internal clock safely (handles case where time isn't paused)
+        resume_time_safely();
         TIME_CONTROL_ACTIVE.store(false, Ordering::SeqCst);
 
         Ok(())
@@ -436,9 +439,9 @@ impl Drop for TimeControlGuard {
         // Note: This is a best-effort cleanup. For proper cleanup, users should
         // explicitly call TimeControl::disable() or use the guard in an async context.
         if TIME_CONTROL_ACTIVE.load(Ordering::SeqCst) {
-            // Resume time synchronously - this is safe because tokio::time::resume()
-            // is not async and can be called from any context
-            tokio::time::resume();
+            // Resume time synchronously, catching panics to avoid
+            // double-panic if called during stack unwinding.
+            resume_time_safely();
             TIME_CONTROL_ACTIVE.store(false, Ordering::SeqCst);
         }
     }

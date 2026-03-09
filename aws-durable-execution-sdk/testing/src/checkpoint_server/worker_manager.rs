@@ -52,6 +52,10 @@ static INSTANCE: OnceLock<Mutex<Option<Arc<CheckpointWorkerManager>>>> = OnceLoc
 
 impl CheckpointWorkerManager {
     /// Get or create the singleton instance.
+    ///
+    /// If the singleton already exists and `params` is `Some` with values that differ
+    /// from the existing instance's configuration, an error is returned. Pass `None`
+    /// to accept whatever configuration the existing instance has.
     pub fn get_instance(
         params: Option<CheckpointWorkerParams>,
     ) -> Result<Arc<CheckpointWorkerManager>, TestError> {
@@ -61,6 +65,17 @@ impl CheckpointWorkerManager {
         })?;
 
         if let Some(ref instance) = *guard {
+            // Validate that requested params match the existing instance
+            if let Some(ref requested) = params {
+                if *requested != instance.params {
+                    return Err(TestError::CheckpointServerError(format!(
+                        "CheckpointWorkerManager singleton already exists with different params. \
+                         Existing: {:?}, Requested: {:?}. \
+                         Call reset_instance_for_testing() first to reconfigure.",
+                        instance.params, requested
+                    )));
+                }
+            }
             return Ok(Arc::clone(instance));
         }
 

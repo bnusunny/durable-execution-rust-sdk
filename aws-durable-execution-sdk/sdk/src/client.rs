@@ -243,22 +243,6 @@ impl LambdaDurableServiceClient {
         }
     }
 
-    /// Creates a new LambdaDurableServiceClient with a Lambda client (for backward compatibility).
-    /// Note: This extracts the region from the Lambda client but uses direct HTTP calls.
-    ///
-    /// IMPORTANT: This method requires that the Lambda client was created with credentials.
-    /// If you're using this in a Lambda function, prefer using `from_env()` instead.
-    pub fn new(_lambda_client: aws_sdk_lambda::Client) -> Self {
-        // Note: We can't easily extract credentials from the Lambda client anymore
-        // as the credentials_provider() method is deprecated and returns None.
-        // This method is kept for backward compatibility but will panic if used.
-        // Users should use from_env() or from_aws_config() instead.
-        panic!(
-            "LambdaDurableServiceClient::new() is deprecated. \
-             Use LambdaDurableServiceClient::from_env() or from_aws_config() instead."
-        );
-    }
-
     /// Returns the Lambda service endpoint URL.
     fn endpoint_url(&self) -> String {
         self.config

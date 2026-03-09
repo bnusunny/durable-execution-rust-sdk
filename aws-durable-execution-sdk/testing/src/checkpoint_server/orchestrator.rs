@@ -868,12 +868,14 @@ where
                 OperationProcessResult::NotApplicable
             }
             OperationType::Invoke | OperationType::Context => {
-                // These operation types are handled by the SDK internally
-                if operation.status == OperationStatus::Started {
-                    OperationProcessResult::Pending(None)
-                } else {
-                    OperationProcessResult::Completed
-                }
+                // These operation types are handled by the SDK internally.
+                // Context/Invoke operations in Started state do NOT block
+                // re-invocation — they complete when the handler re-executes
+                // and their child operations (waits, steps, callbacks) are
+                // resolved. Treating them as pending would cause the
+                // orchestrator to return Running when the only unresolved
+                // items are the child operations inside them.
+                OperationProcessResult::NotApplicable
             }
         }
     }

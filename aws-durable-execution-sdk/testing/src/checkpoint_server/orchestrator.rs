@@ -360,16 +360,6 @@ where
     /// # Arguments
     ///
     /// * `payload` - The input payload to pass to the handler
-    ///
-    /// # Requirements
-    ///
-    /// - 16.4: WHEN a handler invocation returns PENDING status,
-    ///   THE Test_Execution_Orchestrator SHALL continue polling for operation
-    ///   updates and re-invoke the handler when operations complete
-    /// - 16.5: WHEN a handler invocation returns SUCCEEDED or FAILED status,
-    ///   THE Test_Execution_Orchestrator SHALL resolve the execution and stop polling
-    /// - 18.1: WHEN an execution starts, THE Test_Execution_Orchestrator SHALL
-    ///   begin polling for checkpoint data
     pub async fn execute_handler(
         &mut self,
         payload: I,
@@ -786,11 +776,6 @@ where
     /// # Returns
     ///
     /// A `ProcessOperationsResult` indicating what action should be taken next.
-    ///
-    /// # Requirements
-    ///
-    /// - 18.2: WHEN checkpoint polling receives operation updates,
-    ///   THE Test_Execution_Orchestrator SHALL process each operation based on its type
     fn process_operations(
         &mut self,
         operations: &[Operation],
@@ -864,11 +849,6 @@ where
     /// # Returns
     ///
     /// An `OperationProcessResult` indicating the operation's status.
-    ///
-    /// # Requirements
-    ///
-    /// - 18.2: WHEN checkpoint polling receives operation updates,
-    ///   THE Test_Execution_Orchestrator SHALL process each operation based on its type
     fn process_operation(
         &mut self,
         operation: &Operation,
@@ -911,14 +891,6 @@ where
     /// # Returns
     ///
     /// An `OperationProcessResult` with the scheduled end timestamp if available.
-    ///
-    /// # Requirements
-    ///
-    /// - 16.1: WHEN a wait operation is encountered, THE Test_Execution_Orchestrator
-    ///   SHALL track the wait's scheduled end timestamp
-    /// - 18.3: WHEN a WAIT operation update is received with START action,
-    ///   THE Test_Execution_Orchestrator SHALL schedule re-invocation at the
-    ///   wait's scheduled end timestamp
     fn handle_wait_update(
         &mut self,
         operation: &Operation,
@@ -955,12 +927,6 @@ where
     /// # Returns
     ///
     /// An `OperationProcessResult` with the next attempt timestamp if available.
-    ///
-    /// # Requirements
-    ///
-    /// - 18.4: WHEN a STEP operation update is received with RETRY action,
-    ///   THE Test_Execution_Orchestrator SHALL schedule re-invocation at the
-    ///   step's next attempt timestamp
     fn handle_step_update(
         &mut self,
         operation: &Operation,
@@ -999,11 +965,6 @@ where
     /// # Returns
     ///
     /// An `OperationProcessResult` indicating the callback is pending.
-    ///
-    /// # Requirements
-    ///
-    /// - 18.5: WHEN a CALLBACK operation status changes to SUCCEEDED or FAILED,
-    ///   THE Test_Execution_Orchestrator SHALL schedule handler re-invocation
     fn handle_callback_update(
         &mut self,
         operation: &Operation,
@@ -1037,14 +998,6 @@ where
     /// # Arguments
     ///
     /// * `operations` - The current list of operations from the checkpoint server
-    ///
-    /// # Requirements
-    ///
-    /// - 1.2: WHEN the handler executes and produces an operation matching the
-    ///   registered name, THE Local_Test_Runner SHALL populate the Operation_Handle
-    ///   with the operation data
-    /// - 2.2: WHEN `run()` is executing, THE Local_Test_Runner SHALL allow concurrent
-    ///   calls to `wait_for_data()` on pre-registered Operation_Handles
     async fn populate_handles(&self, operations: &[Operation]) {
         // Update the shared operations list for child enumeration
         {
@@ -1091,16 +1044,6 @@ where
     /// * `timestamp_ms` - The timestamp in milliseconds since epoch when to invoke
     /// * `execution_id` - The execution ID
     /// * `operation_id` - The operation ID to mark as SUCCEEDED before re-invoking
-    ///
-    /// # Requirements
-    ///
-    /// - 16.2: WHEN time skipping is enabled and a wait's scheduled end time is reached,
-    ///   THE Test_Execution_Orchestrator SHALL mark the wait as SUCCEEDED and schedule
-    ///   handler re-invocation
-    /// - 16.3: WHEN time skipping is enabled, THE Test_Execution_Orchestrator SHALL use
-    ///   tokio::time::advance() to skip wait durations instantly
-    /// - 17.3: WHEN a function is scheduled, THE Scheduler SHALL execute any checkpoint
-    ///   updates before invoking the handler
     pub fn schedule_invocation_at_timestamp(
         &mut self,
         timestamp_ms: i64,
@@ -1192,11 +1135,6 @@ where
     ///
     /// * `timestamp` - The timestamp when to invoke (optional, None for immediate)
     /// * `update_checkpoint` - Optional function to update checkpoint data before invocation
-    ///
-    /// # Requirements
-    ///
-    /// - 17.3: WHEN a function is scheduled, THE Scheduler SHALL execute any checkpoint
-    ///   updates before invoking the handler
     pub fn schedule_invocation_with_update(
         &mut self,
         timestamp: Option<chrono::DateTime<chrono::Utc>>,
@@ -1254,11 +1192,6 @@ where
     /// # Returns
     ///
     /// `true` if there are scheduled functions waiting to be executed.
-    ///
-    /// # Requirements
-    ///
-    /// - 17.4: WHEN the scheduler has pending functions, THE Scheduler SHALL report
-    ///   that scheduled functions exist via has_scheduled_function()
     pub fn has_scheduled_functions(&self) -> bool {
         self.scheduler.has_scheduled_function()
     }
@@ -1281,16 +1214,6 @@ where
     /// # Returns
     ///
     /// An `InvokeHandlerResult` indicating the outcome of the invocation.
-    ///
-    /// # Requirements
-    ///
-    /// - 16.4: WHEN a handler invocation returns PENDING status,
-    ///   THE Test_Execution_Orchestrator SHALL continue polling for operation
-    ///   updates and re-invoke the handler when operations complete
-    /// - 16.5: WHEN a handler invocation returns SUCCEEDED or FAILED status,
-    ///   THE Test_Execution_Orchestrator SHALL resolve the execution and stop polling
-    /// - 16.6: WHEN multiple operations are pending (waits, callbacks, steps with retries),
-    ///   THE Test_Execution_Orchestrator SHALL process them in scheduled order
     pub async fn invoke_handler(
         &mut self,
         payload: I,
@@ -1491,11 +1414,6 @@ where
     /// Flush all scheduled functions without executing them.
     ///
     /// This is useful for cleanup when execution completes or is cancelled.
-    ///
-    /// # Requirements
-    ///
-    /// - 17.5: WHEN execution completes, THE Scheduler SHALL flush any remaining
-    ///   scheduled functions
     pub fn flush_scheduled_functions(&mut self) {
         self.scheduler.flush_timers();
     }
@@ -1521,11 +1439,6 @@ where
     /// # Returns
     ///
     /// `Some(ProcessOperationsResult)` if execution is complete, `None` otherwise.
-    ///
-    /// # Requirements
-    ///
-    /// - 16.5: WHEN a handler invocation returns SUCCEEDED or FAILED status,
-    ///   THE Test_Execution_Orchestrator SHALL resolve the execution and stop polling
     fn handle_execution_update(&self, operations: &[Operation]) -> Option<ProcessOperationsResult> {
         // Find the execution operation
         let execution_op = operations

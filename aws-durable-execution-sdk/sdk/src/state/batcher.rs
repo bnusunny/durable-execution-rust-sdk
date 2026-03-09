@@ -157,10 +157,6 @@ impl CheckpointBatcher {
     /// * `service_client` - Service client for sending checkpoints
     /// * `durable_execution_arn` - The ARN of the durable execution
     /// * `checkpoint_token` - The initial checkpoint token from Lambda invocation input
-    ///
-    /// # Requirements
-    ///
-    /// - 2.9: THE Checkpointing_System SHALL use the CheckpointToken from invocation input for the first checkpoint
     pub fn new(
         config: CheckpointBatcherConfig,
         queue_rx: mpsc::Receiver<CheckpointRequest>,
@@ -256,11 +252,6 @@ impl CheckpointBatcher {
     /// 2. EXECUTION completion (SUCCEED/FAIL on EXECUTION type) must be last in the batch
     /// 3. Child operations must come after their parent CONTEXT starts
     /// 4. START and completion (SUCCEED/FAIL) for the same operation can be in the same batch
-    ///
-    /// # Requirements
-    ///
-    /// - 2.12: WHEN batching operations, THE Checkpointing_System SHALL checkpoint in execution order with EXECUTION completion last
-    /// - 2.13: THE Checkpointing_System SHALL support including both START and completion actions for STEP/CONTEXT in the same batch
     pub fn sort_checkpoint_batch(batch: Vec<CheckpointRequest>) -> Vec<CheckpointRequest> {
         if batch.len() <= 1 {
             return batch;
@@ -368,15 +359,6 @@ impl CheckpointBatcher {
     }
 
     /// Processes a batch of checkpoint requests.
-    ///
-    /// # Requirements
-    ///
-    /// - 2.9: THE Checkpointing_System SHALL use the CheckpointToken from invocation input for the first checkpoint
-    /// - 2.10: THE Checkpointing_System SHALL use the returned CheckpointToken from each checkpoint response for subsequent checkpoints
-    /// - 2.11: THE Checkpointing_System SHALL handle InvalidParameterValueException for invalid tokens by allowing propagation for retry
-    /// - 2.12: WHEN batching operations, THE Checkpointing_System SHALL checkpoint in execution order with EXECUTION completion last
-    /// - 2.13: THE Checkpointing_System SHALL support including both START and completion actions for STEP/CONTEXT in the same batch
-    /// - 18.5: THE AWS_Integration SHALL handle ThrottlingException with appropriate retry behavior
     async fn process_batch(&self, batch: Vec<CheckpointRequest>) {
         if batch.is_empty() {
             return;
@@ -446,10 +428,6 @@ impl CheckpointBatcher {
     }
 
     /// Sends a checkpoint request with retry for throttling errors.
-    ///
-    /// # Requirements
-    ///
-    /// - 18.5: THE AWS_Integration SHALL handle ThrottlingException with appropriate retry behavior
     async fn checkpoint_with_retry(
         &self,
         token: &str,

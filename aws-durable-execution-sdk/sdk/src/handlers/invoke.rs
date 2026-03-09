@@ -34,14 +34,6 @@ use crate::state::ExecutionState;
 /// # Returns
 ///
 /// The result from the invoked function, or an error if invocation fails.
-///
-/// # Requirements
-///
-/// - 7.1: Call the target Lambda function
-/// - 7.2: Support configurable timeout
-/// - 7.3: Support custom SerDes for payload and result
-/// - 7.4: Checkpoint the invocation and result
-/// - 7.5: Propagate errors from invoked function
 pub async fn invoke_handler<P, R>(
     function_name: &str,
     payload: P,
@@ -179,10 +171,6 @@ where
 }
 
 /// Creates a Start operation update for invoke.
-///
-/// # Requirements
-///
-/// - 7.6: THE Invoke_Operation SHALL support optional TenantId for tenant isolation scenarios
 fn create_invoke_start_update<P, R>(
     op_id: &OperationIdentifier,
     function_name: &str,

@@ -43,11 +43,6 @@ use std::path::Path;
 /// This type alias represents a history file in the Node.js SDK format,
 /// which is a flat JSON array of history events at the root level
 /// (not wrapped in an object with an "events" key).
-///
-/// # Requirements
-///
-/// - 5.1: THE Event_History output SHALL be a JSON array at the root level (not wrapped in an object)
-/// - 5.2: THE Event_History output SHALL NOT use an "events" wrapper key
 pub type NodeJsHistoryFile = Vec<NodeJsHistoryEvent>;
 
 /// A simplified representation of an operation for comparison purposes.
@@ -369,11 +364,6 @@ impl NodeJsEventSignature {
 ///
 /// A `NodeJsHistoryFile` (`Vec<NodeJsHistoryEvent>`) containing all events
 /// in chronological order.
-///
-/// # Requirements
-///
-/// - 5.1: THE Event_History output SHALL be a JSON array at the root level
-/// - 5.3: THE Event_History output SHALL contain History_Event objects in chronological order by EventId
 pub fn extract_nodejs_events<T>(result: &TestResult<T>) -> NodeJsHistoryFile {
     result.get_nodejs_history_events().to_vec()
 }
@@ -398,10 +388,6 @@ pub fn extract_nodejs_events<T>(result: &TestResult<T>) -> NodeJsHistoryFile {
 /// # Panics
 ///
 /// Panics if the history doesn't match and `GENERATE_HISTORY` is not set.
-///
-/// # Requirements
-///
-/// - 6.4: WHEN comparing history files, THE test_helper SHALL compare events by EventType, SubType, and Name (ignoring volatile fields like EventId, Id, and EventTimestamp)
 pub fn assert_nodejs_event_signatures<T>(result: &TestResult<T>, history_file_path: &str) {
     let events = extract_nodejs_events(result);
     let actual_signatures: Vec<NodeJsEventSignature> = events
@@ -549,11 +535,6 @@ pub fn assert_nodejs_event_signatures_unordered<T>(
 /// # Panics
 ///
 /// Panics if the file doesn't exist or can't be parsed.
-///
-/// # Requirements
-///
-/// - 5.1: THE Event_History output SHALL be a JSON array at the root level
-/// - 6.3: THE generated history file SHALL be parseable by the Node.js SDK's history comparison utilities
 pub fn load_nodejs_history_file(path: &str) -> NodeJsHistoryFile {
     let content = fs::read_to_string(path)
         .unwrap_or_else(|e| panic!("Failed to read Node.js history file '{}': {}", path, e));
@@ -571,13 +552,6 @@ pub fn load_nodejs_history_file(path: &str) -> NodeJsHistoryFile {
 ///
 /// * `events` - The Node.js history events to write
 /// * `path` - Path where the history file should be written
-///
-/// # Requirements
-///
-/// - 5.1: THE Event_History output SHALL be a JSON array at the root level (not wrapped in an object)
-/// - 5.2: THE Event_History output SHALL NOT use an "events" wrapper key
-/// - 6.1: WHEN GENERATE_HISTORY environment variable is set to "true", THE test_helper SHALL generate a history file in the Node.js-compatible format
-/// - 6.2: THE generated history file SHALL contain all events from the execution in chronological order
 fn generate_nodejs_history_file(events: &[NodeJsHistoryEvent], path: &str) {
     // Serialize as a flat JSON array (not wrapped in an object)
     let content =

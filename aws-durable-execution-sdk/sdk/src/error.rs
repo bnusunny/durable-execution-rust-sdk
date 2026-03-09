@@ -235,11 +235,6 @@ pub enum DurableError {
     /// - History size exceeds service limits
     ///
     /// This error is NOT retriable - the operation should fail without retry.
-    ///
-    /// # Requirements
-    ///
-    /// - 13.9: THE Error_System SHALL provide ErrorObject with ErrorType, ErrorMessage, StackTrace, and ErrorData fields
-    /// - 25.6: THE SDK SHALL gracefully handle execution limits by returning clear error messages
     #[error("Size limit exceeded: {message}")]
     SizeLimit {
         /// Error message describing the size limit violation
@@ -254,10 +249,6 @@ pub enum DurableError {
     ///
     /// This error occurs when the AWS API rate limit is exceeded.
     /// This error IS retriable with exponential backoff.
-    ///
-    /// # Requirements
-    ///
-    /// - 18.5: THE AWS_Integration SHALL handle ThrottlingException with appropriate retry behavior
     #[error("Throttling: {message}")]
     Throttling {
         /// Error message describing the throttling condition
@@ -274,10 +265,6 @@ pub enum DurableError {
     /// - The Lambda function does not exist
     ///
     /// This error is NOT retriable.
-    ///
-    /// # Requirements
-    ///
-    /// - 18.6: THE AWS_Integration SHALL handle ResourceNotFoundException appropriately
     #[error("Resource not found: {message}")]
     ResourceNotFound {
         /// Error message describing what resource was not found
@@ -355,10 +342,6 @@ impl DurableError {
     /// # Arguments
     ///
     /// * `message` - Description of the size limit violation
-    ///
-    /// # Requirements
-    ///
-    /// - 25.6: THE SDK SHALL gracefully handle execution limits by returning clear error messages
     pub fn size_limit(message: impl Into<String>) -> Self {
         Self::SizeLimit {
             message: message.into(),
@@ -374,10 +357,6 @@ impl DurableError {
     /// * `message` - Description of the size limit violation
     /// * `actual_size` - The actual size that exceeded the limit
     /// * `max_size` - The maximum allowed size
-    ///
-    /// # Requirements
-    ///
-    /// - 25.6: THE SDK SHALL gracefully handle execution limits by returning clear error messages
     pub fn size_limit_with_details(
         message: impl Into<String>,
         actual_size: usize,
@@ -395,10 +374,6 @@ impl DurableError {
     /// # Arguments
     ///
     /// * `message` - Description of the throttling condition
-    ///
-    /// # Requirements
-    ///
-    /// - 18.5: THE AWS_Integration SHALL handle ThrottlingException with appropriate retry behavior
     pub fn throttling(message: impl Into<String>) -> Self {
         Self::Throttling {
             message: message.into(),
@@ -412,10 +387,6 @@ impl DurableError {
     ///
     /// * `message` - Description of the throttling condition
     /// * `retry_after_ms` - Suggested retry delay in milliseconds
-    ///
-    /// # Requirements
-    ///
-    /// - 18.5: THE AWS_Integration SHALL handle ThrottlingException with appropriate retry behavior
     pub fn throttling_with_retry_delay(message: impl Into<String>, retry_after_ms: u64) -> Self {
         Self::Throttling {
             message: message.into(),
@@ -428,10 +399,6 @@ impl DurableError {
     /// # Arguments
     ///
     /// * `message` - Description of what resource was not found
-    ///
-    /// # Requirements
-    ///
-    /// - 18.6: THE AWS_Integration SHALL handle ResourceNotFoundException appropriately
     pub fn resource_not_found(message: impl Into<String>) -> Self {
         Self::ResourceNotFound {
             message: message.into(),
@@ -445,10 +412,6 @@ impl DurableError {
     ///
     /// * `message` - Description of what resource was not found
     /// * `resource_id` - The identifier of the resource that was not found
-    ///
-    /// # Requirements
-    ///
-    /// - 18.6: THE AWS_Integration SHALL handle ResourceNotFoundException appropriately
     pub fn resource_not_found_with_id(
         message: impl Into<String>,
         resource_id: impl Into<String>,
@@ -483,10 +446,6 @@ impl DurableError {
     ///
     /// These errors are retriable because Lambda will provide a fresh token
     /// on the next invocation.
-    ///
-    /// # Requirements
-    ///
-    /// - 2.11: THE Checkpointing_System SHALL handle InvalidParameterValueException for invalid tokens by allowing propagation for retry
     pub fn is_invalid_checkpoint_token(&self) -> bool {
         match self {
             Self::Checkpoint {

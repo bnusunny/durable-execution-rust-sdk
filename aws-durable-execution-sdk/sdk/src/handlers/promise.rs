@@ -104,11 +104,6 @@ impl<T> PromiseOutcome<T> {
 /// # Returns
 ///
 /// `Ok(Vec<T>)` if all futures succeed, or `Err` with the first error.
-///
-/// # Requirements
-///
-/// - 20.1: Wait for all promises to complete successfully, return error on first failure
-/// - 20.5: Implement within a STEP operation for durability
 pub async fn all_handler<T, Fut>(
     futures: Vec<Fut>,
     state: &Arc<ExecutionState>,
@@ -209,11 +204,6 @@ where
 /// # Returns
 ///
 /// `BatchResult<T>` containing results for all futures.
-///
-/// # Requirements
-///
-/// - 20.2: Wait for all promises to settle (success or failure), return BatchResult with all outcomes
-/// - 20.5: Implement within a STEP operation for durability
 pub async fn all_settled_handler<T, Fut>(
     futures: Vec<Fut>,
     state: &Arc<ExecutionState>,
@@ -305,11 +295,6 @@ where
 /// # Returns
 ///
 /// The result of the first future to settle.
-///
-/// # Requirements
-///
-/// - 20.3: Return result of first promise to settle
-/// - 20.5: Implement within a STEP operation for durability
 pub async fn race_handler<T, Fut>(
     futures: Vec<Fut>,
     state: &Arc<ExecutionState>,
@@ -395,11 +380,6 @@ where
 /// # Returns
 ///
 /// The result of the first future to succeed, or an error if all fail.
-///
-/// # Requirements
-///
-/// - 20.4: Return result of first promise to succeed, return error only if all fail
-/// - 20.5: Implement within a STEP operation for durability
 pub async fn any_handler<T, Fut>(
     futures: Vec<Fut>,
     state: &Arc<ExecutionState>,

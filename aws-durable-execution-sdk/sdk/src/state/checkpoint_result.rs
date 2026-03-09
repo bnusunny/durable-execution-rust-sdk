@@ -137,10 +137,6 @@ impl CheckpointedResult {
     /// # Returns
     ///
     /// The payload string if available, None otherwise.
-    ///
-    /// # Requirements
-    ///
-    /// - 4.9: THE Step_Operation SHALL support RETRY action with Payload for wait-for-condition pattern
     pub fn retry_payload(&self) -> Option<&str> {
         self.operation
             .as_ref()
@@ -152,10 +148,6 @@ impl CheckpointedResult {
     /// # Returns
     ///
     /// The attempt number (0-indexed) if available, None otherwise.
-    ///
-    /// # Requirements
-    ///
-    /// - 4.8: THE Step_Operation SHALL track attempt numbers in StepDetails.Attempt
     pub fn attempt(&self) -> Option<u32> {
         self.operation.as_ref().and_then(|op| op.get_attempt())
     }

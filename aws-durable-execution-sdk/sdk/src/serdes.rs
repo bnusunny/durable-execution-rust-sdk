@@ -162,11 +162,6 @@ impl SerDesContext {
 /// let deserialized = serdes.deserialize(&serialized, &context).unwrap();
 /// assert_eq!(data, deserialized);
 /// ```
-///
-/// # Requirements
-///
-/// - 3.2: THE SDK SHALL implement the sealed trait pattern for the `SerDes` trait
-/// - 3.5: THE SDK SHALL document that these traits are sealed and cannot be implemented externally
 #[allow(private_bounds)]
 pub trait SerDes<T>: Sealed + Send + Sync {
     /// Serializes a value to a string representation.
@@ -300,10 +295,6 @@ unsafe impl<T> Sync for JsonSerDes<T> {}
 ///     },
 /// );
 /// ```
-///
-/// # Requirements
-///
-/// - 3.6: THE SDK SHALL provide factory functions or builders for users who need custom behavior
 pub struct CustomSerDes<T, S, D>
 where
     T: Send + Sync,
@@ -382,10 +373,6 @@ where
 /// let deserialized = serdes.deserialize("42", &context).unwrap();
 /// assert_eq!(deserialized, 42);
 /// ```
-///
-/// # Requirements
-///
-/// - 3.6: THE SDK SHALL provide factory functions or builders for users who need custom behavior
 pub fn custom_serdes<T, S, D>(serialize_fn: S, deserialize_fn: D) -> CustomSerDes<T, S, D>
 where
     T: Send + Sync,

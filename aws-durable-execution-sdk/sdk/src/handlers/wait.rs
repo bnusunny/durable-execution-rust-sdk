@@ -32,13 +32,6 @@ const MIN_WAIT_SECONDS: u64 = 1;
 /// # Returns
 ///
 /// Ok(()) when the wait has elapsed, or a Suspend error if still waiting.
-///
-/// # Requirements
-///
-/// - 5.1: Checkpoint the wait start time
-/// - 5.2: Suspend execution if duration has not elapsed
-/// - 5.3: Allow execution to continue when duration has elapsed
-/// - 5.4: Validate that duration is at least 1 second
 pub async fn wait_handler(
     duration: Duration,
     state: &Arc<ExecutionState>,
@@ -159,10 +152,6 @@ pub async fn wait_handler(
 /// - The operation doesn't exist
 /// - The operation is not a WAIT operation
 /// - The checkpoint fails
-///
-/// # Requirements
-///
-/// - 5.5: THE Wait_Operation SHALL support cancellation of active waits via CANCEL action
 pub async fn wait_cancel_handler(
     state: &Arc<ExecutionState>,
     operation_id: &str,

@@ -52,14 +52,6 @@ use crate::sealed::Sealed;
 /// let jittered = half.apply(10.0, 1);
 /// assert!(jittered >= 5.0 && jittered <= 10.0);
 /// ```
-///
-/// # Requirements
-///
-/// - 1.1: JitterStrategy enum with None, Full, Half variants
-/// - 1.2: None returns delay exactly
-/// - 1.3: Full returns delay in [0, d]
-/// - 1.4: Half returns delay in [d/2, d]
-/// - 1.5: Default returns None
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum JitterStrategy {
     /// No jitter — use exact calculated delay.
@@ -140,10 +132,6 @@ fn deterministic_random_factor(attempt: u32) -> f64 {
 /// let cont = WaitDecision::Continue { delay: Duration::from_seconds(5) };
 /// let done = WaitDecision::Done;
 /// ```
-///
-/// # Requirements
-///
-/// - 4.1: WaitDecision enum with Continue { delay: Duration } and Done variants
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WaitDecision {
     /// Continue polling after the specified delay.
@@ -181,14 +169,6 @@ pub enum WaitDecision {
 /// let strategy = create_wait_strategy(config);
 /// // strategy(&"COMPLETED".to_string(), 1) => WaitDecision::Done
 /// ```
-///
-/// # Requirements
-///
-/// - 4.2: should_continue_polling returning false → Done
-/// - 4.3: should_continue_polling returning true + attempts < max → Continue with delay >= 1s
-/// - 4.4: Panic when max_attempts exceeded
-/// - 4.5: Delay = min(initial_delay * backoff_rate^(N-1), max_delay)
-/// - 4.6: Jitter applied to base delay
 pub struct WaitStrategyConfig<T> {
     /// Maximum number of polling attempts. `None` defaults to 60.
     pub max_attempts: Option<usize>,
@@ -216,14 +196,6 @@ pub struct WaitStrategyConfig<T> {
 ///    panics with a message indicating max attempts exceeded.
 /// 3. Otherwise, computes delay as `min(initial_delay * backoff_rate^(attempts_made - 1), max_delay)`,
 ///    applies jitter, floors at 1 second, and returns `WaitDecision::Continue { delay }`.
-///
-/// # Requirements
-///
-/// - 4.2: should_continue_polling returning false → Done
-/// - 4.3: should_continue_polling returning true + attempts < max → Continue with delay >= 1s
-/// - 4.4: Panic when max_attempts exceeded
-/// - 4.5: Delay = min(initial_delay * backoff_rate^(N-1), max_delay)
-/// - 4.6: Jitter applied to base delay
 #[allow(clippy::type_complexity)]
 pub fn create_wait_strategy<T: Send + Sync + 'static>(
     config: WaitStrategyConfig<T>,
@@ -424,11 +396,6 @@ impl CheckpointingMode {
 /// This allows the SDK maintainers to evolve the retry interface without
 /// breaking external code. If you need custom retry behavior, use the
 /// provided factory functions.
-///
-/// # Requirements
-///
-/// - 3.3: THE SDK SHALL implement the sealed trait pattern for the `RetryStrategy` trait
-/// - 3.5: THE SDK SHALL document that these traits are sealed and cannot be implemented externally
 #[allow(private_bounds)]
 pub trait RetryStrategy: Sealed + Send + Sync {
     /// Returns the delay before the next retry attempt, or None if no more retries.
@@ -775,12 +742,6 @@ impl RetryStrategy for NoRetry {
 /// let contains = ErrorPattern::Contains("timeout".to_string());
 /// let regex = ErrorPattern::Regex(regex::Regex::new(r"(?i)connection.*refused").unwrap());
 /// ```
-///
-/// # Requirements
-///
-/// - 2.1: Contains matches substring
-/// - 2.2: Contains doesn't match when substring absent
-/// - 2.3: Regex matches regex pattern
 #[derive(Clone)]
 pub enum ErrorPattern {
     /// Match if error message contains this substring.
@@ -823,11 +784,6 @@ impl std::fmt::Debug for ErrorPattern {
 /// assert!(!filter.is_retryable("invalid input"));
 /// assert!(filter.is_retryable_with_type("invalid input", "TransientError"));
 /// ```
-///
-/// # Requirements
-///
-/// - 2.4: Empty filter retries all (backward-compatible)
-/// - 2.5: OR logic between patterns and error_types
 #[derive(Clone, Debug, Default)]
 pub struct RetryableErrorFilter {
     /// Error message patterns (string contains or regex).
@@ -1106,12 +1062,6 @@ pub struct ParallelConfig {
 ///
 /// This configuration controls how child contexts behave, including
 /// whether to replay children when loading state for large parallel operations.
-///
-/// # Requirements
-///
-/// - 10.5: THE Child_Context_Operation SHALL support ReplayChildren option for large parallel operations
-/// - 10.6: WHEN ReplayChildren is true, THE Child_Context_Operation SHALL include child operations in state loads for replay
-/// - 12.8: THE Configuration_System SHALL provide ContextConfig with replay_children option
 #[derive(Clone, Default)]
 #[allow(clippy::type_complexity)]
 pub struct ChildConfig {
@@ -1125,11 +1075,6 @@ pub struct ChildConfig {
     /// by replaying each branch.
     ///
     /// Default is `false` for better performance in most cases.
-    ///
-    /// # Requirements
-    ///
-    /// - 10.5: THE Child_Context_Operation SHALL support ReplayChildren option for large parallel operations
-    /// - 10.6: WHEN ReplayChildren is true, THE Child_Context_Operation SHALL include child operations in state loads for replay
     pub replay_children: bool,
     /// Optional function to map child context errors before propagation.
     ///
@@ -1137,12 +1082,6 @@ pub struct ChildConfig {
     /// before they are checkpointed and propagated. Suspend errors are never mapped.
     ///
     /// Default is `None`, which preserves current behavior (errors propagate unchanged).
-    ///
-    /// # Requirements
-    ///
-    /// - 6.1: error_mapper applied to errors before checkpointing and propagation
-    /// - 6.2: None preserves current behavior
-    /// - 6.3: Suspend errors skip the mapper
     pub error_mapper: Option<Arc<dyn Fn(DurableError) -> DurableError + Send + Sync>>,
     /// Optional function to generate a summary when the serialized child result exceeds 256KB.
     ///
@@ -1154,12 +1093,6 @@ pub struct ChildConfig {
     /// a summary generator is configured.
     ///
     /// Default is `None`, which preserves current behavior (full result stored regardless of size).
-    ///
-    /// # Requirements
-    ///
-    /// - 7.1: summary_generator invoked when result > 256KB
-    /// - 7.2: summary_generator NOT invoked when result <= 256KB
-    /// - 7.3: None preserves current behavior
     pub summary_generator: Option<Arc<dyn Fn(&str) -> String + Send + Sync>>,
 }
 
@@ -1223,10 +1156,6 @@ impl ChildConfig {
     ///
     /// The error mapper is applied to child context errors before they are
     /// checkpointed and propagated. Suspend errors are never mapped.
-    ///
-    /// # Requirements
-    ///
-    /// - 6.1: error_mapper applied to errors before checkpointing and propagation
     pub fn set_error_mapper(
         mut self,
         mapper: Arc<dyn Fn(DurableError) -> DurableError + Send + Sync>,
@@ -1240,10 +1169,6 @@ impl ChildConfig {
     /// The summary generator is invoked when the serialized child result exceeds
     /// 256KB (262144 bytes). It receives the serialized result string and should
     /// return a compact summary string to store instead.
-    ///
-    /// # Requirements
-    ///
-    /// - 7.1: summary_generator invoked when result > 256KB
     pub fn set_summary_generator(
         mut self,
         generator: Arc<dyn Fn(&str) -> String + Send + Sync>,
@@ -1257,10 +1182,6 @@ impl ChildConfig {
 ///
 /// The design document refers to this as `ContextConfig`, but internally
 /// we use `ChildConfig` to be more descriptive of its purpose.
-///
-/// # Requirements
-///
-/// - 12.8: THE Configuration_System SHALL provide ContextConfig with replay_children option
 pub type ContextConfig = ChildConfig;
 
 /// Configuration defining success/failure criteria for concurrent operations.
@@ -1386,14 +1307,6 @@ impl ItemBatcher {
     /// A vector of `(start_index, batch)` tuples where:
     /// - `start_index` is the index of the first item in the batch from the original slice
     /// - `batch` is a vector of cloned items in that batch
-    ///
-    /// # Requirements
-    ///
-    /// - 2.1: THE ItemBatcher SHALL support configuring maximum items per batch
-    /// - 2.2: THE ItemBatcher SHALL support configuring maximum bytes per batch
-    /// - 2.3: WHEN ItemBatcher is configured, THE map operation SHALL group items into batches before processing
-    /// - 2.6: WHEN batch size limits are exceeded, THE ItemBatcher SHALL split items into multiple batches
-    ///
     /// # Example
     ///
     /// ```

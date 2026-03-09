@@ -92,11 +92,6 @@ use crate::handlers::StepContext;
 /// };
 /// store_result(result);
 /// ```
-///
-/// # Requirements
-///
-/// - 2.1: THE SDK SHALL provide a `DurableValue` trait alias for `Serialize + DeserializeOwned + Send + Sync + 'static`
-/// - 2.4: THE SDK SHALL document trait aliases with examples showing equivalent expanded bounds
 pub trait DurableValue: Serialize + DeserializeOwned + Send {}
 
 /// Blanket implementation for all types meeting the bounds.
@@ -147,11 +142,6 @@ impl<T> DurableValue for T where T: Serialize + DeserializeOwned + Send {}
 /// execute(step_fn);
 /// execute(process_data);
 /// ```
-///
-/// # Requirements
-///
-/// - 2.2: THE SDK SHALL provide a `StepFn` trait alias for step function bounds
-/// - 2.4: THE SDK SHALL document trait aliases with examples showing equivalent expanded bounds
 pub trait StepFn<T>:
     FnOnce(StepContext) -> Result<T, Box<dyn std::error::Error + Send + Sync>> + Send
 {

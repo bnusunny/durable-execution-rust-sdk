@@ -251,11 +251,6 @@ pub fn generate_operation_id(base_id: &str, counter: u64) -> String {
 /// This allows the SDK maintainers to evolve the logging interface without
 /// breaking external code. If you need custom logging behavior, use the
 /// provided factory functions or wrap one of the existing implementations.
-///
-/// # Requirements
-///
-/// - 3.1: THE SDK SHALL implement the sealed trait pattern for the `Logger` trait
-/// - 3.5: THE SDK SHALL document that these traits are sealed and cannot be implemented externally
 #[allow(private_bounds)]
 pub trait Logger: Sealed + Send + Sync {
     /// Logs a debug message.
@@ -273,10 +268,6 @@ pub trait Logger: Sealed + Send + Sync {
 /// This struct provides context for log messages including execution ARN,
 /// operation IDs, and replay status. The `is_replay` flag indicates whether
 /// the current operation is being replayed from a checkpoint.
-///
-/// # Requirements
-///
-/// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
 #[derive(Debug, Clone, Default)]
 pub struct LogInfo {
     /// The durable execution ARN
@@ -290,10 +281,6 @@ pub struct LogInfo {
     /// When `true`, the operation is returning a previously checkpointed result
     /// without re-executing the operation's logic. Loggers can use this flag
     /// to suppress or annotate logs during replay.
-    ///
-    /// # Requirements
-    ///
-    /// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
     pub is_replay: bool,
     /// Additional key-value pairs
     pub extra: Vec<(String, String)>,
@@ -328,10 +315,6 @@ impl LogInfo {
     /// # Arguments
     ///
     /// * `is_replay` - Whether the operation is being replayed
-    ///
-    /// # Requirements
-    ///
-    /// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
     pub fn with_replay(mut self, is_replay: bool) -> Self {
         self.is_replay = is_replay;
         self
@@ -367,13 +350,6 @@ impl LogInfo {
 /// let _guard = span.enter();
 /// // ... operation execution ...
 /// ```
-///
-/// # Requirements
-///
-/// - 3.2: THE tracing span SHALL include the operation_id as a structured field
-/// - 3.3: THE tracing span SHALL include the operation_type as a structured field
-/// - 3.4: THE tracing span SHALL include the parent_id as a structured field when available
-/// - 3.5: THE tracing span SHALL include the durable_execution_arn as a structured field
 pub fn create_operation_span(
     operation_type: &str,
     op_id: &OperationIdentifier,
@@ -397,12 +373,6 @@ pub fn create_operation_span(
 ///
 /// Extra fields from `LogInfo` are included in the tracing output as a formatted
 /// string of key-value pairs, making them queryable in log aggregation systems.
-///
-/// # Requirements
-///
-/// - 5.1: WHEN LogInfo contains extra fields, THE TracingLogger SHALL include them in the tracing output
-/// - 5.2: THE extra fields SHALL be formatted as key-value pairs in the tracing event
-/// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
 #[derive(Debug, Clone, Default)]
 pub struct TracingLogger;
 
@@ -414,10 +384,6 @@ impl TracingLogger {
     ///
     /// Returns an empty string if there are no extra fields, otherwise returns
     /// a comma-separated list of "key=value" pairs.
-    ///
-    /// # Requirements
-    ///
-    /// - 5.2: THE extra fields SHALL be formatted as key-value pairs in the tracing event
     fn format_extra_fields(extra: &[(String, String)]) -> String {
         if extra.is_empty() {
             String::new()
@@ -490,11 +456,6 @@ impl Logger for TracingLogger {
 /// This configuration controls how the `ReplayAwareLogger` handles log messages
 /// during replay. Users can choose to suppress all logs during replay, allow
 /// only certain log levels, or log all messages regardless of replay status.
-///
-/// # Requirements
-///
-/// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
-/// - 16.7: THE Logging_System SHALL allow users to configure replay logging behavior
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ReplayLoggingConfig {
     /// Suppress all logs during replay (default).
@@ -547,11 +508,6 @@ pub enum ReplayLoggingConfig {
 ///     ReplayLoggingConfig::ErrorsOnly,
 /// );
 /// ```
-///
-/// # Requirements
-///
-/// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
-/// - 16.7: THE Logging_System SHALL allow users to configure replay logging behavior
 pub struct ReplayAwareLogger {
     /// The underlying logger to delegate to
     inner: Arc<dyn Logger>,
@@ -695,10 +651,6 @@ impl Logger for ReplayAwareLogger {
 ///     |msg, info| println!("[ERROR] {}: {:?}", msg, info),
 /// );
 /// ```
-///
-/// # Requirements
-///
-/// - 3.6: THE SDK SHALL provide factory functions or builders for users who need custom behavior
 pub struct CustomLogger<D, I, W, E>
 where
     D: Fn(&str, &LogInfo) + Send + Sync,
@@ -788,10 +740,6 @@ where
 /// // Use with Arc for sharing across contexts
 /// let shared_logger = Arc::new(logger);
 /// ```
-///
-/// # Requirements
-///
-/// - 3.6: THE SDK SHALL provide factory functions or builders for users who need custom behavior
 pub fn custom_logger<D, I, W, E>(
     debug_fn: D,
     info_fn: I,
@@ -836,10 +784,6 @@ where
 /// // Use with Arc for sharing across contexts
 /// let shared_logger = Arc::new(logger);
 /// ```
-///
-/// # Requirements
-///
-/// - 3.6: THE SDK SHALL provide factory functions or builders for users who need custom behavior
 pub fn simple_custom_logger<F>(log_fn: F) -> impl Logger
 where
     F: Fn(&str, &str, &LogInfo) + Send + Sync + Clone + 'static,
@@ -984,11 +928,6 @@ impl DurableContext {
     /// # Arguments
     ///
     /// * `logger` - The new logger implementation to use
-    ///
-    /// # Requirements
-    ///
-    /// - 13.1: configure_logger swaps the logger, subsequent calls use new logger
-    /// - 13.2: Original logger used when configure_logger not called
     pub fn configure_logger(&self, logger: Arc<dyn Logger>) {
         *self.logger.write().unwrap() = logger;
     }
@@ -1045,10 +984,6 @@ impl DurableContext {
     /// The returned `LogInfo` includes the current replay status from the
     /// execution state, allowing loggers to distinguish between fresh
     /// executions and replayed operations.
-    ///
-    /// # Requirements
-    ///
-    /// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
     pub fn create_log_info(&self) -> LogInfo {
         let mut info = LogInfo::new(self.durable_execution_arn());
         if let Some(ref parent_id) = self.parent_id {
@@ -1064,10 +999,6 @@ impl DurableContext {
     /// The returned `LogInfo` includes the current replay status from the
     /// execution state, allowing loggers to distinguish between fresh
     /// executions and replayed operations.
-    ///
-    /// # Requirements
-    ///
-    /// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
     pub fn create_log_info_with_operation(&self, operation_id: &str) -> LogInfo {
         self.create_log_info().with_operation_id(operation_id)
     }
@@ -1082,10 +1013,6 @@ impl DurableContext {
     ///
     /// * `operation_id` - The operation ID to include in the log info
     /// * `is_replay` - Whether this specific operation is being replayed
-    ///
-    /// # Requirements
-    ///
-    /// - 16.6: THE Logging_System SHALL support replay-aware logging that can suppress logs during replay
     pub fn create_log_info_with_replay(&self, operation_id: &str, is_replay: bool) -> LogInfo {
         let mut info = LogInfo::new(self.durable_execution_arn());
         if let Some(ref parent_id) = self.parent_id {
@@ -1112,11 +1039,6 @@ impl DurableContext {
     /// ```rust,ignore
     /// ctx.log_info("Processing order started");
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 4.1: THE DurableContext SHALL provide a log_info method that logs at INFO level with automatic context
-    /// - 4.5: THE logging methods SHALL automatically include durable_execution_arn, operation_id, and parent_id
     pub fn log_info(&self, message: &str) {
         self.log_with_level(LogLevel::Info, message, &[]);
     }
@@ -1136,11 +1058,6 @@ impl DurableContext {
     /// ```rust,ignore
     /// ctx.log_info_with("Processing order", &[("order_id", "123"), ("amount", "99.99")]);
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 4.1: THE DurableContext SHALL provide a log_info method that logs at INFO level with automatic context
-    /// - 4.6: THE logging methods SHALL support additional structured fields via a builder pattern or variadic arguments
     pub fn log_info_with(&self, message: &str, fields: &[(&str, &str)]) {
         self.log_with_level(LogLevel::Info, message, fields);
     }
@@ -1159,11 +1076,6 @@ impl DurableContext {
     /// ```rust,ignore
     /// ctx.log_debug("Entering validation step");
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 4.2: THE DurableContext SHALL provide a log_debug method that logs at DEBUG level with automatic context
-    /// - 4.5: THE logging methods SHALL automatically include durable_execution_arn, operation_id, and parent_id
     pub fn log_debug(&self, message: &str) {
         self.log_with_level(LogLevel::Debug, message, &[]);
     }
@@ -1183,11 +1095,6 @@ impl DurableContext {
     /// ```rust,ignore
     /// ctx.log_debug_with("Variable state", &[("x", "42"), ("y", "100")]);
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 4.2: THE DurableContext SHALL provide a log_debug method that logs at DEBUG level with automatic context
-    /// - 4.6: THE logging methods SHALL support additional structured fields via a builder pattern or variadic arguments
     pub fn log_debug_with(&self, message: &str, fields: &[(&str, &str)]) {
         self.log_with_level(LogLevel::Debug, message, fields);
     }
@@ -1206,11 +1113,6 @@ impl DurableContext {
     /// ```rust,ignore
     /// ctx.log_warn("Retry attempt 3 of 5");
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 4.3: THE DurableContext SHALL provide a log_warn method that logs at WARN level with automatic context
-    /// - 4.5: THE logging methods SHALL automatically include durable_execution_arn, operation_id, and parent_id
     pub fn log_warn(&self, message: &str) {
         self.log_with_level(LogLevel::Warn, message, &[]);
     }
@@ -1230,11 +1132,6 @@ impl DurableContext {
     /// ```rust,ignore
     /// ctx.log_warn_with("Rate limit approaching", &[("current", "95"), ("limit", "100")]);
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 4.3: THE DurableContext SHALL provide a log_warn method that logs at WARN level with automatic context
-    /// - 4.6: THE logging methods SHALL support additional structured fields via a builder pattern or variadic arguments
     pub fn log_warn_with(&self, message: &str, fields: &[(&str, &str)]) {
         self.log_with_level(LogLevel::Warn, message, fields);
     }
@@ -1253,11 +1150,6 @@ impl DurableContext {
     /// ```rust,ignore
     /// ctx.log_error("Failed to process payment");
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 4.4: THE DurableContext SHALL provide a log_error method that logs at ERROR level with automatic context
-    /// - 4.5: THE logging methods SHALL automatically include durable_execution_arn, operation_id, and parent_id
     pub fn log_error(&self, message: &str) {
         self.log_with_level(LogLevel::Error, message, &[]);
     }
@@ -1277,11 +1169,6 @@ impl DurableContext {
     /// ```rust,ignore
     /// ctx.log_error_with("Payment failed", &[("error_code", "INSUFFICIENT_FUNDS"), ("amount", "150.00")]);
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 4.4: THE DurableContext SHALL provide a log_error method that logs at ERROR level with automatic context
-    /// - 4.6: THE logging methods SHALL support additional structured fields via a builder pattern or variadic arguments
     pub fn log_error_with(&self, message: &str, fields: &[(&str, &str)]) {
         self.log_with_level(LogLevel::Error, message, fields);
     }
@@ -1344,12 +1231,6 @@ impl DurableContext {
     ///     Ok(())
     /// }
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 1.11: THE DurableContext SHALL provide access to the original user input from the EXECUTION operation
-    /// - 19.2: THE EXECUTION_Operation SHALL provide access to original user input from ExecutionDetails.InputPayload
-    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub fn get_original_input<T>(&self) -> DurableResult<T>
     where
         T: serde::de::DeserializeOwned,
@@ -1375,10 +1256,6 @@ impl DurableContext {
     /// # Returns
     ///
     /// `Some(&str)` if the input exists, `None` otherwise.
-    ///
-    /// # Requirements
-    ///
-    /// - 19.2: THE EXECUTION_Operation SHALL provide access to original user input from ExecutionDetails.InputPayload
     pub fn get_original_input_raw(&self) -> Option<&str> {
         self.state.get_original_input_raw()
     }
@@ -1417,12 +1294,6 @@ impl DurableContext {
     ///     Ok(())
     /// }
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 19.3: THE EXECUTION_Operation SHALL support completing execution via SUCCEED action with result
-    /// - 19.5: WHEN execution result exceeds response size limits, THE EXECUTION_Operation SHALL checkpoint the result and return empty Result field
-    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn complete_execution_success<T>(&self, result: &T) -> DurableResult<()>
     where
         T: serde::Serialize,
@@ -1464,11 +1335,6 @@ impl DurableContext {
     ///     Ok(())
     /// }
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 19.4: THE EXECUTION_Operation SHALL support completing execution via FAIL action with error
-    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn complete_execution_failure(
         &self,
         error: crate::error::ErrorObject,
@@ -1510,11 +1376,6 @@ impl DurableContext {
     ///     Ok(result)
     /// }
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 19.5: WHEN execution result exceeds response size limits, THE EXECUTION_Operation SHALL checkpoint the result and return empty Result field
-    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn complete_execution_if_large<T>(&self, result: &T) -> DurableResult<bool>
     where
         T: serde::Serialize,
@@ -1553,12 +1414,6 @@ impl DurableContext {
     ///     Ok(42)
     /// }, None).await?;
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 1.1: THE DurableContext SHALL provide a `step` method that executes a closure and checkpoints the result
-    /// - 2.3: WHEN defining public APIs, THE SDK SHALL use trait aliases instead of repeated bound combinations
-    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn step<T, F>(
         &self,
         func: F,
@@ -1600,11 +1455,6 @@ impl DurableContext {
     ///     Ok(42)
     /// }, None).await?;
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 2.3: WHEN defining public APIs, THE SDK SHALL use trait aliases instead of repeated bound combinations
-    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn step_named<T, F>(
         &self,
         name: &str,
@@ -1654,11 +1504,6 @@ impl DurableContext {
     /// // Wait with a name
     /// ctx.wait(Duration::from_minutes(1), Some("wait_for_processing")).await?;
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 1.2: THE DurableContext SHALL provide a `wait` method that pauses execution for a specified Duration
-    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn wait(
         &self,
         duration: crate::duration::Duration,
@@ -1703,11 +1548,6 @@ impl DurableContext {
     /// // Later, cancel the wait from another branch
     /// ctx.cancel_wait(&wait_op_id).await?;
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 5.5: THE Wait_Operation SHALL support cancellation of active waits via CANCEL action
-    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn cancel_wait(&self, operation_id: &str) -> DurableResult<()> {
         let logger = self.logger.read().unwrap().clone();
         crate::handlers::wait_cancel_handler(&self.state, operation_id, &logger).await
@@ -1738,11 +1578,6 @@ impl DurableContext {
     /// // Wait for the callback result
     /// let approval = callback.result().await?;
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 1.3: THE DurableContext SHALL provide a `create_callback` method that returns a Callback with a unique callback_id
-    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn create_callback<T>(
         &self,
         config: Option<crate::config::CallbackConfig>,
@@ -1767,10 +1602,6 @@ impl DurableContext {
     /// Creates a named callback and returns a handle to wait for the result.
     ///
     /// Same as `create_callback`, but allows specifying a human-readable name.
-    ///
-    /// # Requirements
-    ///
-    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn create_callback_named<T>(
         &self,
         name: &str,
@@ -1818,11 +1649,6 @@ impl DurableContext {
     ///     None,
     /// ).await?;
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 1.4: THE DurableContext SHALL provide an `invoke` method that calls other durable functions
-    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn invoke<P, R>(
         &self,
         function_name: &str,
@@ -1884,11 +1710,6 @@ impl DurableContext {
     ///     }),
     /// ).await?;
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 1.5: THE DurableContext SHALL provide a `map` method that processes a collection in parallel with configurable concurrency
-    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn map<T, U, F, Fut>(
         &self,
         items: Vec<T>,
@@ -1943,11 +1764,6 @@ impl DurableContext {
     ///     None,
     /// ).await?;
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 1.6: THE DurableContext SHALL provide a `parallel` method that executes multiple closures concurrently
-    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn parallel<T, F, Fut>(
         &self,
         branches: Vec<F>,
@@ -2003,11 +1819,6 @@ impl DurableContext {
     ///     Ok(step1 + step2)
     /// }, None).await?;
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 1.7: THE DurableContext SHALL provide a `run_in_child_context` method that creates isolated nested workflows
-    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn run_in_child_context<T, F, Fut>(
         &self,
         func: F,
@@ -2036,10 +1847,6 @@ impl DurableContext {
     /// Executes a named function in a child context.
     ///
     /// Same as `run_in_child_context`, but allows specifying a human-readable name.
-    ///
-    /// # Requirements
-    ///
-    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn run_in_child_context_named<T, F, Fut>(
         &self,
         name: &str,
@@ -2108,12 +1915,6 @@ impl DurableContext {
     ///     ),
     /// ).await?;
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 1.8: THE DurableContext SHALL provide a `wait_for_condition` method that polls until a condition is met
-    /// - 4.9: THE Step_Operation SHALL support RETRY action with Payload for wait-for-condition pattern
-    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn wait_for_condition<T, S, F>(
         &self,
         check: F,
@@ -2178,15 +1979,6 @@ impl DurableContext {
     ///     }),
     /// ).await?;
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 1.1: WHEN wait_for_callback is called, THE SDK SHALL create a callback and execute the submitter function within a durable step
-    /// - 1.2: THE wait_for_callback method SHALL checkpoint the submitter execution to ensure replay safety
-    /// - 1.3: IF the submitter function fails, THEN THE SDK SHALL propagate the error with appropriate context
-    /// - 1.4: THE wait_for_callback method SHALL support configurable callback timeout and heartbeat timeout
-    /// - 1.9: THE DurableContext SHALL provide a `wait_for_callback` method that combines callback creation with a submitter function
-    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn wait_for_callback<T, F, Fut>(
         &self,
         submitter: F,
@@ -2285,12 +2077,6 @@ impl DurableContext {
     /// ]).await?;
     /// assert_eq!(results, vec![1, 2, 3]);
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 20.1: Wait for all promises to complete successfully, return error on first failure
-    /// - 20.5: Implement within a STEP operation for durability
-    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn all<T, Fut>(&self, futures: Vec<Fut>) -> DurableResult<Vec<T>>
     where
         T: serde::Serialize + serde::de::DeserializeOwned + Send + Clone + 'static,
@@ -2333,12 +2119,6 @@ impl DurableContext {
     /// assert_eq!(results.success_count(), 2);
     /// assert_eq!(results.failure_count(), 1);
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 20.2: Wait for all promises to settle, return BatchResult with all outcomes
-    /// - 20.5: Implement within a STEP operation for durability
-    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn all_settled<T, Fut>(
         &self,
         futures: Vec<Fut>,
@@ -2383,12 +2163,6 @@ impl DurableContext {
     /// ]).await?;
     /// // result is either 1 or 2, whichever completed first
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 20.3: Return result of first promise to settle
-    /// - 20.5: Implement within a STEP operation for durability
-    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn race<T, Fut>(&self, futures: Vec<Fut>) -> DurableResult<T>
     where
         T: serde::Serialize + serde::de::DeserializeOwned + Send + Clone + 'static,
@@ -2431,12 +2205,6 @@ impl DurableContext {
     /// ]).await?;
     /// // result is either 2 or 3, whichever succeeded first
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 20.4: Return result of first promise to succeed, return error only if all fail
-    /// - 20.5: Implement within a STEP operation for durability
-    /// - 5.1: THE SDK SHALL provide a `DurableResult<T>` type alias for `Result<T, DurableError>`
     pub async fn any<T, Fut>(&self, futures: Vec<Fut>) -> DurableResult<T>
     where
         T: serde::Serialize + serde::de::DeserializeOwned + Send + Clone + 'static,
@@ -2457,11 +2225,6 @@ impl DurableContext {
 }
 
 /// Configuration for wait_for_condition operations.
-///
-/// # Requirements
-///
-/// - 4.7: wait_for_condition uses wait_strategy to determine polling delay
-/// - 4.8: Backward-compatible constructor converts interval + max_attempts to a WaitStrategy
 #[allow(clippy::type_complexity)]
 pub struct WaitForConditionConfig<S> {
     /// Initial state to pass to the check function.
@@ -2514,10 +2277,6 @@ impl<S> WaitForConditionConfig<S> {
     ///     Some(10),
     /// );
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 4.8: Backward-compatible constructor converts interval + max_attempts to a WaitStrategy
     pub fn from_interval(
         initial_state: S,
         interval: crate::duration::Duration,

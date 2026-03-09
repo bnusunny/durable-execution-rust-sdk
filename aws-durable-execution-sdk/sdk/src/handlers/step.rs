@@ -145,10 +145,6 @@ impl StepContext {
     /// let state: Option<RetryState> = ctx_no_payload.get_retry_payload().unwrap();
     /// assert!(state.is_none());
     /// ```
-    ///
-    /// # Requirements
-    ///
-    /// - 4.9: THE Step_Operation SHALL support RETRY action with Payload for wait-for-condition pattern
     pub fn get_retry_payload<T>(
         &self,
     ) -> Result<Option<T>, Box<dyn std::error::Error + Send + Sync>>
@@ -182,18 +178,6 @@ impl StepContext {
 /// # Returns
 ///
 /// The result of the step function, or an error if execution fails.
-///
-/// # Requirements
-///
-/// - 2.3: WHEN defining public APIs, THE SDK SHALL use trait aliases instead of repeated bound combinations
-/// - 3.7: READY status resume without re-checkpointing START
-/// - 4.1: AT_MOST_ONCE_PER_RETRY semantics checkpoint before execution
-/// - 4.2: AT_LEAST_ONCE_PER_RETRY semantics checkpoint after execution
-/// - 4.3: Retry failed steps according to retry strategy
-/// - 4.4: Support custom SerDes for result serialization
-/// - 4.5: Checkpoint serialized result on success
-/// - 4.6: Checkpoint error after all retries exhausted
-/// - 5.2: THE SDK SHALL provide a `StepResult<T>` type alias for step operation results
 pub async fn step_handler<T, F>(
     func: F,
     state: &Arc<ExecutionState>,
@@ -653,11 +637,6 @@ fn create_fail_update(op_id: &OperationIdentifier, error: ErrorObject) -> Operat
 /// * `op_id` - The operation identifier
 /// * `payload` - Optional state payload to preserve across retries
 /// * `next_attempt_delay_seconds` - Optional delay before the next retry attempt
-///
-/// # Requirements
-///
-/// - 4.7: THE Step_Operation SHALL support RETRY action with NextAttemptDelaySeconds for backoff
-/// - 4.9: THE Step_Operation SHALL support RETRY action with Payload for wait-for-condition pattern
 #[allow(dead_code)]
 fn create_retry_update(
     op_id: &OperationIdentifier,
@@ -689,10 +668,6 @@ fn create_retry_update(
 /// * `op_id` - The operation identifier
 /// * `error` - The error that caused the retry
 /// * `next_attempt_delay_seconds` - Optional delay before the next retry attempt
-///
-/// # Requirements
-///
-/// - 4.7: THE Step_Operation SHALL support RETRY action with NextAttemptDelaySeconds for backoff
 #[allow(dead_code)]
 fn create_retry_with_error_update(
     op_id: &OperationIdentifier,

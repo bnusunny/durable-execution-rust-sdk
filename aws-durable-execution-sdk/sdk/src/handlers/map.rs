@@ -38,13 +38,6 @@ use crate::state::ExecutionState;
 /// # Returns
 ///
 /// A `BatchResult` containing results for all items.
-///
-/// # Requirements
-///
-/// - 8.1: Execute the function for each item
-/// - 8.2: Support configurable max_concurrency
-/// - 8.3: Support CompletionConfig for success/failure criteria
-/// - 8.4: Support ItemBatcher for batching
 pub async fn map_handler<T, U, F, Fut>(
     items: Vec<T>,
     func: F,
@@ -302,10 +295,6 @@ where
 ///
 /// This function delegates to `ItemBatcher::batch()` which respects both
 /// item count and byte size limits.
-///
-/// # Requirements
-///
-/// - 2.4: THE map operation SHALL process each batch as a single child context operation
 fn batch_items<T: Serialize + Clone>(items: &[T], batcher: &ItemBatcher) -> Vec<(usize, Vec<T>)> {
     batcher.batch(items)
 }

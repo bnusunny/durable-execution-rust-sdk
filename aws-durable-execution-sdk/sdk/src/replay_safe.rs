@@ -90,10 +90,6 @@ use crate::state::ExecutionState;
 /// let uuid_bytes_3 = uuid_from_operation(operation_id, 1);
 /// assert_ne!(uuid_bytes, uuid_bytes_3);
 /// ```
-///
-/// # Requirements
-///
-/// - 22.1: THE Replay_Safe_Helpers MAY provide a deterministic UUID generator seeded by operation ID
 pub fn uuid_from_operation(operation_id: &str, seed: u64) -> [u8; 16] {
     let mut hasher = Blake2b512::new();
     hasher.update(operation_id.as_bytes());
@@ -170,10 +166,6 @@ pub fn uuid_to_string(uuid_bytes: &[u8; 16]) -> String {
 /// let uuid = uuid_string_from_operation("my-operation", 0);
 /// println!("Generated UUID: {}", uuid);
 /// ```
-///
-/// # Requirements
-///
-/// - 22.1: THE Replay_Safe_Helpers MAY provide a deterministic UUID generator seeded by operation ID
 pub fn uuid_string_from_operation(operation_id: &str, seed: u64) -> String {
     uuid_to_string(&uuid_from_operation(operation_id, seed))
 }
@@ -218,11 +210,6 @@ pub fn uuid_string_from_operation(operation_id: &str, seed: u64) -> String {
 ///
 /// By using `timestamp_from_execution`, you always get the same timestamp
 /// (the execution start time) regardless of when the replay occurs.
-///
-/// # Requirements
-///
-/// - 22.2: THE Replay_Safe_Helpers MAY provide replay-safe timestamps derived from execution state
-/// - 22.3: THE Replay_Safe_Helpers SHALL document how to use these helpers correctly
 pub fn timestamp_from_execution(state: &ExecutionState) -> Option<i64> {
     state
         .execution_operation()
@@ -255,10 +242,6 @@ pub fn timestamp_from_execution(state: &ExecutionState) -> Option<i64> {
 ///     Ok(())
 /// }
 /// ```
-///
-/// # Requirements
-///
-/// - 22.2: THE Replay_Safe_Helpers MAY provide replay-safe timestamps derived from execution state
 pub fn timestamp_seconds_from_execution(state: &ExecutionState) -> Option<i64> {
     timestamp_from_execution(state).map(|ms| ms / 1000)
 }

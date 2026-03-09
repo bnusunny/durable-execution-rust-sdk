@@ -472,13 +472,6 @@ impl OperationHandle {
     ///
     /// - `Ok(Vec<DurableOperation>)` - Child operations if the handle is populated
     /// - `Err(TestError::OperationNotFound)` - If the handle is not yet populated
-    ///
-    /// # Requirements
-    ///
-    /// - 3.1: Returns all operations whose parent_id matches this operation's id
-    /// - 3.2: Returns empty Vec when no children exist
-    /// - 3.3: Returned children support get_child_operations() for nested hierarchies
-    /// - 3.4: Preserves execution order of child operations
     pub async fn get_child_operations(&self) -> Result<Vec<DurableOperation>, TestError> {
         let inner = self.inner.read().await;
         let op = inner

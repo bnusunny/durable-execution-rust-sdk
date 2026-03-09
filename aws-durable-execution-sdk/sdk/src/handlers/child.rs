@@ -35,15 +35,6 @@ use crate::state::ExecutionState;
 /// # Returns
 ///
 /// The result of the child function, or an error if execution fails.
-///
-/// # Requirements
-///
-/// - 10.1: Create a new context with the parent's operation_id
-/// - 10.2: Checkpoint the child context result when complete
-/// - 10.3: Support custom SerDes for result serialization
-/// - 10.4: Propagate errors to the parent
-/// - 10.5: Support ReplayChildren option for large parallel operations
-/// - 10.6: When ReplayChildren is true, include child operations in state loads for replay
 pub async fn child_handler<T, F, Fut>(
     func: F,
     state: &Arc<ExecutionState>,

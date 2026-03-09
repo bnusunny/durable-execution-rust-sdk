@@ -317,10 +317,6 @@ impl DurableOperation {
     /// # Returns
     ///
     /// The unique identifier for this operation.
-    ///
-    /// # Requirements
-    ///
-    /// - 4.4: WHEN a developer calls get_operation_by_id(id) on Test_Runner, THE Test_Runner SHALL return the operation with that unique identifier
     pub fn get_id(&self) -> &str {
         &self.operation.operation_id
     }
@@ -339,10 +335,6 @@ impl DurableOperation {
     /// # Returns
     ///
     /// The human-readable name if set, None otherwise.
-    ///
-    /// # Requirements
-    ///
-    /// - 4.1: WHEN a developer calls get_operation(name) on Test_Runner, THE Test_Runner SHALL return the first operation with that name
     pub fn get_name(&self) -> Option<&str> {
         self.operation.name.as_deref()
     }
@@ -454,12 +446,6 @@ impl DurableOperation {
     /// A vector of `DurableOperation` instances representing child operations.
     /// Returns an empty vector if no children exist or if the operations list
     /// is not available.
-    ///
-    /// # Requirements
-    ///
-    /// - 8.1: Returns all operations whose parent_id matches this operation's id
-    /// - 8.2: Returns empty Vec when no children exist
-    /// - 8.3: Returned operations ordered by their position in the operations list
     pub fn get_child_operations(&self) -> Vec<DurableOperation> {
         let Some(all_ops) = &self.all_operations else {
             return Vec::new();
@@ -490,11 +476,6 @@ impl DurableOperation {
     ///
     /// - `Ok(StepDetails<T>)` - The step details if this is a Step operation
     /// - `Err(TestError)` - Error if this is not a Step operation
-    ///
-    /// # Requirements
-    ///
-    /// - 5.1: WHEN a developer calls get_step_details() on a Step operation, THE Durable_Operation SHALL return attempt count, result, and error information
-    /// - 5.6: IF a developer calls a type-specific method on the wrong operation type, THEN THE Durable_Operation SHALL return an error
     pub fn get_step_details<T: DeserializeOwned>(&self) -> Result<StepDetails<T>, TestError> {
         if self.operation.operation_type != OperationType::Step {
             return Err(TestError::type_mismatch(
@@ -537,11 +518,6 @@ impl DurableOperation {
     ///
     /// - `Ok(WaitDetails)` - The wait details if this is a Wait operation
     /// - `Err(TestError)` - Error if this is not a Wait operation
-    ///
-    /// # Requirements
-    ///
-    /// - 5.2: WHEN a developer calls get_wait_details() on a Wait operation, THE Durable_Operation SHALL return the wait duration and scheduled end timestamp
-    /// - 5.6: IF a developer calls a type-specific method on the wrong operation type, THEN THE Durable_Operation SHALL return an error
     pub fn get_wait_details(&self) -> Result<WaitDetails, TestError> {
         if self.operation.operation_type != OperationType::Wait {
             return Err(TestError::type_mismatch(
@@ -581,11 +557,6 @@ impl DurableOperation {
     ///
     /// - `Ok(CallbackDetails<T>)` - The callback details if this is a Callback operation
     /// - `Err(TestError)` - Error if this is not a Callback operation
-    ///
-    /// # Requirements
-    ///
-    /// - 5.3: WHEN a developer calls get_callback_details() on a Callback operation, THE Durable_Operation SHALL return the callback ID, result, and error
-    /// - 5.6: IF a developer calls a type-specific method on the wrong operation type, THEN THE Durable_Operation SHALL return an error
     pub fn get_callback_details<T: DeserializeOwned>(
         &self,
     ) -> Result<CallbackDetails<T>, TestError> {
@@ -629,11 +600,6 @@ impl DurableOperation {
     ///
     /// - `Ok(InvokeDetails<T>)` - The invoke details if this is an Invoke operation
     /// - `Err(TestError)` - Error if this is not an Invoke operation
-    ///
-    /// # Requirements
-    ///
-    /// - 5.4: WHEN a developer calls get_invoke_details() on an Invoke operation, THE Durable_Operation SHALL return the invocation result and error
-    /// - 5.6: IF a developer calls a type-specific method on the wrong operation type, THEN THE Durable_Operation SHALL return an error
     pub fn get_invoke_details<T: DeserializeOwned>(&self) -> Result<InvokeDetails<T>, TestError> {
         if self.operation.operation_type != OperationType::Invoke {
             return Err(TestError::type_mismatch(
@@ -671,11 +637,6 @@ impl DurableOperation {
     ///
     /// - `Ok(ContextDetails<T>)` - The context details if this is a Context operation
     /// - `Err(TestError)` - Error if this is not a Context operation
-    ///
-    /// # Requirements
-    ///
-    /// - 5.5: WHEN a developer calls get_context_details() on a Context operation, THE Durable_Operation SHALL return the context result and error
-    /// - 5.6: IF a developer calls a type-specific method on the wrong operation type, THEN THE Durable_Operation SHALL return an error
     pub fn get_context_details<T: DeserializeOwned>(&self) -> Result<ContextDetails<T>, TestError> {
         if self.operation.operation_type != OperationType::Context {
             return Err(TestError::type_mismatch(
@@ -719,11 +680,6 @@ impl DurableOperation {
     ///
     /// - `Ok(())` - If the callback response was sent successfully
     /// - `Err(TestError)` - If this is not a callback operation or sending failed
-    ///
-    /// # Requirements
-    ///
-    /// - 6.1: WHEN a developer calls send_callback_success(result) on a callback operation, THE Durable_Operation SHALL send a success response to the checkpoint service
-    /// - 6.4: IF a developer calls callback methods on a non-callback operation, THEN THE Durable_Operation SHALL return an error
     pub async fn send_callback_success(&self, result: &str) -> Result<(), TestError> {
         if !self.is_callback() {
             return Err(TestError::NotCallbackOperation);
@@ -749,11 +705,6 @@ impl DurableOperation {
     ///
     /// - `Ok(())` - If the callback response was sent successfully
     /// - `Err(TestError)` - If this is not a callback operation or sending failed
-    ///
-    /// # Requirements
-    ///
-    /// - 6.2: WHEN a developer calls send_callback_failure(error) on a callback operation, THE Durable_Operation SHALL send a failure response to the checkpoint service
-    /// - 6.4: IF a developer calls callback methods on a non-callback operation, THEN THE Durable_Operation SHALL return an error
     pub async fn send_callback_failure(&self, error: &TestResultError) -> Result<(), TestError> {
         if !self.is_callback() {
             return Err(TestError::NotCallbackOperation);
@@ -775,11 +726,6 @@ impl DurableOperation {
     ///
     /// - `Ok(())` - If the heartbeat was sent successfully
     /// - `Err(TestError)` - If this is not a callback operation or sending failed
-    ///
-    /// # Requirements
-    ///
-    /// - 6.3: WHEN a developer calls send_callback_heartbeat() on a callback operation, THE Durable_Operation SHALL send a heartbeat to keep the callback active
-    /// - 6.4: IF a developer calls callback methods on a non-callback operation, THEN THE Durable_Operation SHALL return an error
     pub async fn send_callback_heartbeat(&self) -> Result<(), TestError> {
         if !self.is_callback() {
             return Err(TestError::NotCallbackOperation);
@@ -822,13 +768,6 @@ impl DurableOperation {
     ///
     /// - `Ok(&Self)` - Reference to self when the target status is reached
     /// - `Err(TestError)` - If the execution completes before reaching the target status
-    ///
-    /// # Requirements
-    ///
-    /// - 10.1: WHEN a developer calls wait_for_data() on a Durable_Operation, THE Durable_Operation SHALL return a future that resolves when the operation has started
-    /// - 10.2: WHEN a developer calls wait_for_data(WaitingStatus::Completed) on a Durable_Operation, THE Durable_Operation SHALL return a future that resolves when the operation has completed
-    /// - 10.3: WHEN a developer calls wait_for_data(WaitingStatus::Submitted) on a callback operation, THE Durable_Operation SHALL return a future that resolves when the callback is ready to receive responses
-    /// - 10.4: IF the execution completes before the operation reaches the requested state, THEN THE Durable_Operation SHALL return an error
     pub async fn wait_for_data(
         &self,
         target_status: WaitingOperationStatus,

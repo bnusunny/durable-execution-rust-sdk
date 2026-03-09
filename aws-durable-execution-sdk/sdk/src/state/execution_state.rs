@@ -59,13 +59,6 @@ pub struct ExecutionState {
     execution_operation: Option<Operation>,
 
     /// The checkpointing mode that controls the trade-off between durability and performance.
-    ///
-    /// # Requirements
-    ///
-    /// - 24.1: THE Performance_Configuration SHALL support eager checkpointing mode
-    /// - 24.2: THE Performance_Configuration SHALL support batched checkpointing mode
-    /// - 24.3: THE Performance_Configuration SHALL support optimistic execution mode
-    /// - 24.4: THE Performance_Configuration SHALL document the default behavior and trade-offs
     checkpointing_mode: crate::config::CheckpointingMode,
 }
 
@@ -78,11 +71,6 @@ impl ExecutionState {
     /// * `checkpoint_token` - The initial checkpoint token
     /// * `initial_state` - The initial execution state with operations
     /// * `service_client` - The service client for Lambda communication
-    ///
-    /// # Requirements
-    ///
-    /// - 19.1: THE EXECUTION_Operation SHALL be recognized as the first operation in state
-    /// - 19.2: THE EXECUTION_Operation SHALL provide access to original user input from ExecutionDetails.InputPayload
     pub fn new(
         durable_execution_arn: impl Into<String>,
         checkpoint_token: impl Into<String>,
@@ -99,14 +87,6 @@ impl ExecutionState {
     }
 
     /// Creates a new ExecutionState with a specific checkpointing mode.
-    ///
-    /// # Requirements
-    ///
-    /// - 19.1: THE EXECUTION_Operation SHALL be recognized as the first operation in state
-    /// - 19.2: THE EXECUTION_Operation SHALL provide access to original user input from ExecutionDetails.InputPayload
-    /// - 24.1: THE Performance_Configuration SHALL support eager checkpointing mode
-    /// - 24.2: THE Performance_Configuration SHALL support batched checkpointing mode
-    /// - 24.3: THE Performance_Configuration SHALL support optimistic execution mode
     pub fn with_checkpointing_mode(
         durable_execution_arn: impl Into<String>,
         checkpoint_token: impl Into<String>,
@@ -155,11 +135,6 @@ impl ExecutionState {
     /// This method sets up the checkpoint queue and batcher for efficient
     /// batched checkpointing. Returns the ExecutionState and a handle to
     /// the batcher that should be run in a background task.
-    ///
-    /// # Requirements
-    ///
-    /// - 19.1: THE EXECUTION_Operation SHALL be recognized as the first operation in state
-    /// - 19.2: THE EXECUTION_Operation SHALL provide access to original user input from ExecutionDetails.InputPayload
     pub fn with_batcher(
         durable_execution_arn: impl Into<String>,
         checkpoint_token: impl Into<String>,
@@ -180,14 +155,6 @@ impl ExecutionState {
     }
 
     /// Creates a new ExecutionState with a checkpoint batcher and specific checkpointing mode.
-    ///
-    /// # Requirements
-    ///
-    /// - 19.1: THE EXECUTION_Operation SHALL be recognized as the first operation in state
-    /// - 19.2: THE EXECUTION_Operation SHALL provide access to original user input from ExecutionDetails.InputPayload
-    /// - 24.1: THE Performance_Configuration SHALL support eager checkpointing mode
-    /// - 24.2: THE Performance_Configuration SHALL support batched checkpointing mode
-    /// - 24.3: THE Performance_Configuration SHALL support optimistic execution mode
     pub fn with_batcher_and_mode(
         durable_execution_arn: impl Into<String>,
         checkpoint_token: impl Into<String>,
@@ -320,19 +287,11 @@ impl ExecutionState {
     }
 
     /// Returns a reference to the EXECUTION operation if it exists.
-    ///
-    /// # Requirements
-    ///
-    /// - 19.1: THE EXECUTION_Operation SHALL be recognized as the first operation in state
     pub fn execution_operation(&self) -> Option<&Operation> {
         self.execution_operation.as_ref()
     }
 
     /// Returns the original user input from the EXECUTION operation.
-    ///
-    /// # Requirements
-    ///
-    /// - 19.2: THE EXECUTION_Operation SHALL provide access to original user input from ExecutionDetails.InputPayload
     pub fn get_original_input_raw(&self) -> Option<&str> {
         self.execution_operation
             .as_ref()
@@ -348,11 +307,6 @@ impl ExecutionState {
     }
 
     /// Completes the execution with a successful result via checkpointing.
-    ///
-    /// # Requirements
-    ///
-    /// - 19.3: THE EXECUTION_Operation SHALL support completing execution via SUCCEED action with result
-    /// - 19.5: WHEN execution result exceeds response size limits, THE EXECUTION_Operation SHALL checkpoint the result and return empty Result field
     pub async fn complete_execution_success(
         &self,
         result: Option<String>,
@@ -369,10 +323,6 @@ impl ExecutionState {
     }
 
     /// Completes the execution with a failure via checkpointing.
-    ///
-    /// # Requirements
-    ///
-    /// - 19.4: THE EXECUTION_Operation SHALL support completing execution via FAIL action with error
     pub async fn complete_execution_failure(&self, error: ErrorObject) -> Result<(), DurableError> {
         let execution_id =
             self.execution_operation_id()
@@ -420,10 +370,6 @@ impl ExecutionState {
     }
 
     /// Loads additional operations from the service for pagination.
-    ///
-    /// # Requirements
-    ///
-    /// - 18.5: THE AWS_Integration SHALL handle ThrottlingException with appropriate retry behavior
     pub async fn load_more_operations(&self) -> Result<bool, DurableError> {
         let marker = {
             let guard = self.next_marker.read().await;
@@ -565,12 +511,6 @@ impl ExecutionState {
     }
 
     /// Creates a checkpoint for an operation.
-    ///
-    /// # Requirements
-    ///
-    /// - 24.1: THE Performance_Configuration SHALL support eager checkpointing mode
-    /// - 24.2: THE Performance_Configuration SHALL support batched checkpointing mode
-    /// - 24.3: THE Performance_Configuration SHALL support optimistic execution mode
     pub async fn create_checkpoint(
         &self,
         operation: OperationUpdate,
@@ -844,11 +784,6 @@ impl ExecutionState {
     }
 
     /// Loads child operations for a specific parent operation.
-    ///
-    /// # Requirements
-    ///
-    /// - 10.5: THE Child_Context_Operation SHALL support ReplayChildren option for large parallel operations
-    /// - 10.6: WHEN ReplayChildren is true, THE Child_Context_Operation SHALL include child operations in state loads for replay
     pub async fn load_child_operations(
         &self,
         parent_id: &str,
@@ -874,10 +809,6 @@ impl ExecutionState {
     }
 
     /// Checks if a CONTEXT operation has ReplayChildren enabled.
-    ///
-    /// # Requirements
-    ///
-    /// - 10.5: THE Child_Context_Operation SHALL support ReplayChildren option for large parallel operations
     pub async fn has_replay_children(&self, operation_id: &str) -> bool {
         let operations = self.operations.read().await;
         operations

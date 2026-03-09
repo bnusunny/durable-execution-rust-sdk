@@ -45,11 +45,6 @@ use crate::error::{DurableError, ErrorObject};
 /// and `Ordering::Acquire` for loads (need to see latest writes from other threads).
 /// Note that reading multiple counters is not atomic - there may be slight
 /// inconsistencies between reads, which is acceptable for progress tracking.
-///
-/// # Requirements
-///
-/// - 14.4: Use ExecutionCounters to track success/failure counts
-/// - 4.1, 4.6: Use appropriate memory orderings for atomic operations
 #[derive(Debug)]
 pub struct ExecutionCounters {
     /// Total number of tasks to execute
@@ -488,11 +483,6 @@ impl<T> BatchItem<T> {
 /// assert!(!result.all_succeeded());
 /// assert!(result.has_failures());
 /// ```
-///
-/// # Requirements
-///
-/// - 8.5: Return a BatchResult containing results for all items
-/// - 9.4: Return a BatchResult containing results for all branches
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BatchResult<T> {
     /// Results for each item in the batch
@@ -606,12 +596,6 @@ impl<T> Default for BatchResult<T> {
 ///
 /// The executor manages parallel execution of tasks while respecting
 /// concurrency limits and completion criteria.
-///
-/// # Requirements
-///
-/// - 14.2: Use Tokio for async execution of concurrent operations
-/// - 14.3: Track execution state for each concurrent branch
-/// - 14.5: Signal completion to waiting branches when criteria are met
 pub struct ConcurrentExecutor {
     /// Maximum number of concurrent tasks (None = unlimited)
     max_concurrency: Option<usize>,

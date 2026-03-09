@@ -32,11 +32,6 @@
 ///
 /// Each array element is considered a failure if it is an object containing
 /// an `"error"` field. All other elements are counted as successes.
-///
-/// # Requirements
-///
-/// - 12.1: parallel_summary returns JSON with type, totalCount, successCount,
-///   failureCount, and status fields
 pub fn parallel_summary() -> impl Fn(&str) -> String {
     build_summary("parallel")
 }
@@ -54,11 +49,6 @@ pub fn parallel_summary() -> impl Fn(&str) -> String {
 ///
 /// Each array element is considered a failure if it is an object containing
 /// an `"error"` field. All other elements are counted as successes.
-///
-/// # Requirements
-///
-/// - 12.2: map_summary returns JSON with type, totalCount, successCount,
-///   failureCount, and status fields
 pub fn map_summary() -> impl Fn(&str) -> String {
     build_summary("map")
 }

@@ -45,11 +45,6 @@ struct WaitForConditionState<S> {
 /// # Returns
 ///
 /// The result when the condition is met, or an error if timeout/max attempts exceeded.
-///
-/// # Requirements
-///
-/// - 1.8: THE DurableContext SHALL provide a `wait_for_condition` method that polls until a condition is met
-/// - 4.9: THE Step_Operation SHALL support RETRY action with Payload for wait-for-condition pattern
 pub async fn wait_for_condition_handler<T, S, F>(
     check: F,
     config: WaitForConditionConfig<S>,
@@ -372,11 +367,6 @@ fn create_fail_update(op_id: &OperationIdentifier, error: ErrorObject) -> Operat
 }
 
 /// Creates a Retry operation update with payload.
-///
-/// # Requirements
-///
-/// - 4.7: THE Step_Operation SHALL support RETRY action with NextAttemptDelaySeconds for backoff
-/// - 4.9: THE Step_Operation SHALL support RETRY action with Payload for wait-for-condition pattern
 fn create_retry_update(
     op_id: &OperationIdentifier,
     payload: Option<String>,

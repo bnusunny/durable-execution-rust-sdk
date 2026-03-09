@@ -36,12 +36,6 @@ use crate::state::ExecutionState;
 /// # Returns
 ///
 /// A `BatchResult` containing results for all branches.
-///
-/// # Requirements
-///
-/// - 9.1: Execute closures concurrently
-/// - 9.2: Support configurable max_concurrency
-/// - 9.5: Handle branch suspension appropriately
 pub async fn parallel_handler<T, F, Fut>(
     branches: Vec<F>,
     state: &Arc<ExecutionState>,

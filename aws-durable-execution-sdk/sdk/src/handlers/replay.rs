@@ -56,13 +56,6 @@ pub enum ReplayResult<T> {
 /// - `Err(DurableError::NonDeterministic)` - Operation type mismatch
 /// - `Err(DurableError::UserCode)` - Operation failed with stored error
 /// - `Err(DurableError::Execution)` - Operation was cancelled/timed out/stopped
-///
-/// # Requirements
-///
-/// - 3.2: Return stored result if operation completed successfully
-/// - 3.3: Return stored error if operation failed
-/// - 3.4: Execute normally if no checkpoint exists
-/// - 3.5: Detect non-deterministic execution when operation types don't match
 pub fn check_replay<T>(
     checkpoint_result: &CheckpointedResult,
     expected_type: OperationType,

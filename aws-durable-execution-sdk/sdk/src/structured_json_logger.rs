@@ -108,11 +108,6 @@ impl StructuredJsonLogger {
     /// Valid values (case-insensitive): `"DEBUG"`, `"INFO"`, `"WARN"`, `"ERROR"`.
     /// If the variable is not set or contains an invalid value, defaults to
     /// [`LogLevel::Debug`] (all messages emitted).
-    ///
-    /// # Requirements
-    ///
-    /// - 10.1: Valid env var → corresponding log level
-    /// - 10.2: Missing/invalid env var → defaults to DEBUG
     pub fn from_env() -> Self {
         let min_level = std::env::var("AWS_LAMBDA_LOG_LEVEL")
             .ok()

@@ -192,10 +192,6 @@ impl<T> TestResult<T> {
     /// # Returns
     ///
     /// The current execution status (Succeeded, Failed, Running, etc.)
-    ///
-    /// # Requirements
-    ///
-    /// - 3.1: WHEN a developer calls get_status() on Test_Result, THE Test_Result SHALL return the execution status
     pub fn get_status(&self) -> ExecutionStatus {
         self.status
     }
@@ -206,11 +202,6 @@ impl<T> TestResult<T> {
     ///
     /// - `Ok(&T)` - Reference to the result value if execution succeeded
     /// - `Err(TestError)` - Error if execution failed or result is not available
-    ///
-    /// # Requirements
-    ///
-    /// - 3.2: WHEN a developer calls get_result() on a successful execution, THE Test_Result SHALL return the deserialized result value
-    /// - 3.3: WHEN a developer calls get_result() on a failed execution, THE Test_Result SHALL return an error
     pub fn get_result(&self) -> Result<&T, TestError> {
         match self.status {
             ExecutionStatus::Succeeded => self.result.as_ref().ok_or_else(|| {
@@ -237,10 +228,6 @@ impl<T> TestResult<T> {
     ///
     /// - `Ok(&TestResultError)` - Reference to the error if execution failed
     /// - `Err(&str)` - Error message if execution succeeded or error is not available
-    ///
-    /// # Requirements
-    ///
-    /// - 3.4: WHEN a developer calls get_error() on a failed execution, THE Test_Result SHALL return the error details
     pub fn get_error(&self) -> Result<&TestResultError, &str> {
         match self.status {
             ExecutionStatus::Failed | ExecutionStatus::Cancelled | ExecutionStatus::TimedOut => {
@@ -258,10 +245,6 @@ impl<T> TestResult<T> {
     /// # Returns
     ///
     /// A slice of all operations captured during execution, in execution order.
-    ///
-    /// # Requirements
-    ///
-    /// - 3.5: WHEN a developer calls get_operations() on Test_Result, THE Test_Result SHALL return all operations from the execution
     pub fn get_operations(&self) -> &[Operation] {
         &self.operations
     }
@@ -275,10 +258,6 @@ impl<T> TestResult<T> {
     /// # Returns
     ///
     /// A vector of references to operations matching the given status.
-    ///
-    /// # Requirements
-    ///
-    /// - 3.6: WHEN a developer calls get_operations() with a status filter, THE Test_Result SHALL return only operations matching that status
     pub fn get_operations_by_status(&self, status: OperationStatus) -> Vec<&Operation> {
         self.operations
             .iter()
@@ -291,10 +270,6 @@ impl<T> TestResult<T> {
     /// # Returns
     ///
     /// A slice of invocation details for each time the handler was invoked.
-    ///
-    /// # Requirements
-    ///
-    /// - 3.7: WHEN a developer calls get_invocations() on Test_Result, THE Test_Result SHALL return details about each handler invocation
     pub fn get_invocations(&self) -> &[Invocation] {
         &self.invocations
     }
@@ -317,10 +292,6 @@ impl<T> TestResult<T> {
     /// # Returns
     ///
     /// A slice of Node.js-compatible history events that occurred during execution.
-    ///
-    /// # Requirements
-    ///
-    /// - 5.3: THE Event_History output SHALL contain History_Event objects in chronological order by EventId
     pub fn get_nodejs_history_events(&self) -> &[NodeJsHistoryEvent] {
         &self.nodejs_history_events
     }
@@ -482,11 +453,6 @@ impl<T> TestResult<T> {
     /// Prints a formatted table of all operations to stdout.
     ///
     /// Uses default column configuration showing name, type, status, and timing information.
-    ///
-    /// # Requirements
-    ///
-    /// - 11.1: WHEN a developer calls print() on Test_Result, THE Test_Result SHALL print a formatted table of all operations to stdout
-    /// - 11.3: THE printed table SHALL include operation name, type, status, and timing information by default
     pub fn print(&self) {
         self.print_with_config(PrintConfig::default());
     }
@@ -496,10 +462,6 @@ impl<T> TestResult<T> {
     /// # Arguments
     ///
     /// * `config` - Configuration specifying which columns to include
-    ///
-    /// # Requirements
-    ///
-    /// - 11.2: WHEN a developer calls print() with column configuration, THE Test_Result SHALL include only the specified columns
     pub fn print_with_config(&self, config: PrintConfig) {
         // Build header row
         let mut headers: Vec<&str> = Vec::new();

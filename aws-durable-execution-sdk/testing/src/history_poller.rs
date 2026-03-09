@@ -17,12 +17,6 @@ use durable_execution_sdk::Operation;
 /// Implementations of this trait provide the ability to retrieve paginated history
 /// for a durable execution identified by its ARN. The trait is object-safe and
 /// async, enabling both real API clients and mock implementations for testing.
-///
-/// # Requirements
-///
-/// - 1.1: The History_Poller SHALL begin polling the GetDurableExecutionHistory API
-/// - 1.5: The History_Poller SHALL stop polling when a terminal event is detected
-/// - 2.1: Pagination support via marker-based requests
 #[async_trait::async_trait]
 pub trait HistoryApiClient: Send + Sync {
     /// Retrieves a single page of execution history.
@@ -94,14 +88,6 @@ pub struct TerminalState {
 ///
 /// The `HistoryPoller` periodically calls the history API, handles pagination
 /// within each poll cycle, and retries transient errors with exponential backoff.
-///
-/// # Requirements
-///
-/// - 1.1: Begin polling after Lambda invocation returns an ARN
-/// - 1.5: Stop polling when a terminal event is detected
-/// - 4.1: Retry transient errors up to `max_retries` times
-/// - 4.2: Use exponential backoff between retry attempts
-/// - 4.3: Return error if all retries exhausted
 pub struct HistoryPoller<C: HistoryApiClient> {
     api_client: C,
     durable_execution_arn: String,
@@ -179,14 +165,6 @@ impl<C: HistoryApiClient> HistoryPoller<C> {
     ///
     /// A `PollResult` containing all operations and events aggregated across
     /// all pages, plus any terminal state detected during the cycle.
-    ///
-    /// # Requirements
-    ///
-    /// - 1.1, 1.2: Poll and detect terminal state
-    /// - 1.5: Stop on terminal
-    /// - 2.1, 2.2: Paginate within a cycle
-    /// - 2.3: Wait poll_interval between pages
-    /// - 2.4: Marker continuity across cycles
     pub async fn poll_once(&mut self) -> Result<PollResult, TestError> {
         let mut all_operations = Vec::new();
         let mut all_events = Vec::new();

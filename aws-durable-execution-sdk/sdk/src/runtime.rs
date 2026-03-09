@@ -191,15 +191,6 @@ async fn checkpoint_large_result(
 ///     }).await
 /// }
 /// ```
-///
-/// # Requirements
-///
-/// - 15.1: THE Lambda_Integration SHALL provide a `#[durable_execution]` attribute macro for handler functions
-/// - 15.3: THE Lambda_Integration SHALL create ExecutionState and DurableContext for the handler
-/// - 15.5: WHEN the handler returns successfully, THE Lambda_Integration SHALL return SUCCEEDED status
-/// - 15.6: WHEN the handler fails, THE Lambda_Integration SHALL return FAILED status with error
-/// - 15.7: WHEN execution suspends, THE Lambda_Integration SHALL return PENDING status
-/// - 15.8: THE Lambda_Integration SHALL handle large responses by checkpointing before returning
 pub async fn run_durable_handler<E, R, Fut, F>(
     lambda_event: lambda_runtime::LambdaEvent<DurableExecutionInvocationInput>,
     handler: F,

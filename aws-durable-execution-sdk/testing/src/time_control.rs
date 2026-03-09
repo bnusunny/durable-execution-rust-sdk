@@ -101,12 +101,6 @@ impl TimeControl {
     /// When time is paused, `tokio::time::sleep` and other time-based operations
     /// will not block. Instead, time advances only when explicitly advanced or
     /// when there are no other tasks to run.
-    ///
-    /// # Requirements
-    ///
-    /// - 2.1: WHEN time skipping is enabled via setup_test_environment(),
-    ///   THE Local_Test_Runner SHALL use Tokio's time manipulation to skip wait durations
-    ///
     /// # Errors
     ///
     /// Returns `Ok(())` on success. This operation is idempotent - calling it
@@ -222,12 +216,6 @@ impl TimeControl {
     /// Disables time skipping by resuming Tokio's internal clock.
     ///
     /// After calling this method, time-based operations will use real time again.
-    ///
-    /// # Requirements
-    ///
-    /// - 2.4: WHEN teardown_test_environment() is called, THE Local_Test_Runner
-    ///   SHALL restore normal time behavior
-    ///
     /// # Errors
     ///
     /// Returns `Ok(())` on success. This operation is idempotent - calling it
@@ -287,12 +275,6 @@ impl TimeControl {
     ///
     /// This method instantly advances Tokio's internal clock by the given duration,
     /// causing any pending timers that would expire within that duration to fire.
-    ///
-    /// # Requirements
-    ///
-    /// - 2.2: WHEN a wait operation is encountered with time skipping enabled,
-    ///   THE Local_Test_Runner SHALL advance time instantly without blocking
-    ///
     /// # Arguments
     ///
     /// * `duration` - The amount of time to advance the clock by

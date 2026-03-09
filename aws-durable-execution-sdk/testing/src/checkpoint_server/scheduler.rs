@@ -100,11 +100,6 @@ pub trait Scheduler: Send {
 /// Executes functions sequentially in FIFO order, ignoring timestamps.
 /// This is used when time skipping is enabled to process operations
 /// as quickly as possible without waiting for actual time to pass.
-///
-/// # Requirements
-///
-/// - 17.1: WHEN time skipping is enabled, THE Scheduler SHALL use a queue-based
-///   approach that processes operations in FIFO order
 pub struct QueueScheduler {
     /// Queue of scheduled functions
     function_queue: VecDeque<ScheduledFunction>,
@@ -196,11 +191,6 @@ impl Scheduler for QueueScheduler {
 /// Respects actual timestamps using tokio timers. Functions are scheduled
 /// to execute at their specified timestamps, with earlier timestamps
 /// executing first.
-///
-/// # Requirements
-///
-/// - 17.2: WHEN time skipping is disabled, THE Scheduler SHALL use timer-based
-///   scheduling that respects actual timestamps
 pub struct TimerScheduler {
     /// Handles to spawned timer tasks
     scheduled_tasks: Vec<JoinHandle<()>>,

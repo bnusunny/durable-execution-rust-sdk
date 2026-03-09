@@ -53,21 +53,13 @@ use syn::{parse_macro_input, spanned::Spanned, FnArg, ItemFn, Pat, ReturnType};
 ///
 /// # Generated Code
 ///
-/// The macro generates a Lambda handler function that:
-/// 1. Receives `DurableExecutionInvocationInput` from Lambda
-/// 2. Extracts the user's event payload from the input
-/// 3. Creates an `ExecutionState` with the checkpoint token and initial operations
-/// 4. Creates a `DurableContext` for the user's handler
-/// 5. Calls the user's handler function
-/// 6. Converts the result to `DurableExecutionInvocationOutput`:
-///    - `Ok(result)` → `SUCCEEDED` status with serialized result
-///    - `Err(DurableError::Suspend { .. })` → `PENDING` status
-///    - `Err(other)` → `FAILED` status with error details
+/// The macro generates two functions:
+/// 1. An inner async function (`__<name>_inner`) containing the user's original logic
+/// 2. A Lambda handler wrapper that accepts `LambdaEvent<DurableExecutionInvocationInput>`
+///    and delegates to `run_durable_handler` with the inner function
 ///
-/// # Requirements
-///
-/// - 15.1: THE Lambda_Integration SHALL provide a `#[durable_execution]` attribute macro for handler functions
-/// - 15.3: THE Lambda_Integration SHALL create ExecutionState and DurableContext for the handler
+/// All runtime concerns (event deserialization, state management, context creation,
+/// result/error/suspend handling) are encapsulated in `run_durable_handler`.
 #[proc_macro_attribute]
 pub fn durable_execution(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as ItemFn);

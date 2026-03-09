@@ -86,13 +86,6 @@ where
     ///
     /// The callback result on success, or an error if the callback
     /// failed, timed out, or execution was suspended.
-    ///
-    /// # Requirements
-    ///
-    /// - 6.4: Suspend execution when result is not available
-    /// - 6.5: Return the result when callback receives success signal
-    /// - 6.6: Return CallbackError when callback receives failure signal
-    /// - 6.7: Return timeout error when callback times out
     pub async fn result(&self) -> Result<T, DurableError> {
         let log_info = LogInfo::new(self.state.durable_execution_arn())
             .with_operation_id(&self.operation_id)
@@ -189,12 +182,6 @@ where
 /// # Returns
 ///
 /// A Callback handle that can be used to wait for the result.
-///
-/// # Requirements
-///
-/// - 6.1: Generate unique callback_id via checkpoint
-/// - 6.2: Support configurable timeout duration
-/// - 6.3: Support configurable heartbeat timeout
 pub async fn callback_handler<T>(
     state: &Arc<ExecutionState>,
     op_id: &OperationIdentifier,

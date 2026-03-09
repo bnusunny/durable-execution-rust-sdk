@@ -307,14 +307,6 @@ where
     /// # Arguments
     ///
     /// * `config` - Configuration for the test environment
-    ///
-    /// # Requirements
-    ///
-    /// - 2.1: WHEN time skipping is enabled via setup_test_environment(),
-    ///   THE Local_Test_Runner SHALL use Tokio's time manipulation to skip wait durations
-    /// - 2.3: WHEN time skipping is disabled, THE Local_Test_Runner SHALL execute
-    ///   wait operations with real timing
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -385,12 +377,6 @@ where
     ///
     /// This method should be called after tests complete to restore normal
     /// time behavior and clean up test infrastructure.
-    ///
-    /// # Requirements
-    ///
-    /// - 2.4: WHEN teardown_test_environment() is called, THE Local_Test_Runner
-    ///   SHALL restore normal time behavior
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -438,14 +424,6 @@ where
     /// # Arguments
     ///
     /// * `handler` - An async function that takes input and DurableContext
-    ///
-    /// # Requirements
-    ///
-    /// - 1.1: WHEN a developer creates a Local_Test_Runner with a handler function,
-    ///   THE Local_Test_Runner SHALL accept any async function that takes a payload and DurableContext
-    /// - 9.1: WHEN a developer creates a Local_Test_Runner, THE Local_Test_Runner
-    ///   SHALL spawn a checkpoint server in a separate thread
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -534,11 +512,6 @@ where
     ///
     /// * `handler` - An async function that takes input and DurableContext
     /// * `params` - Configuration parameters for the checkpoint worker
-    ///
-    /// # Requirements
-    ///
-    /// - 9.2: WHEN the checkpoint server is running, THE Checkpoint_Worker_Manager
-    ///   SHALL manage the lifecycle of the server thread
     pub fn with_checkpoint_params<F, Fut>(handler: F, params: CheckpointWorkerParams) -> Self
     where
         F: Fn(I, DurableContext) -> Fut + Send + Sync + 'static,
@@ -594,26 +567,6 @@ where
     ///
     /// * `input` - A payload or `InvokeRequest<I>` to pass to the handler.
     ///   Raw payloads are automatically wrapped via `From<I> for InvokeRequest<I>`.
-    ///
-    /// # Requirements
-    ///
-    /// - 1.2: WHEN a developer calls run() with a payload, THE Local_Test_Runner
-    ///   SHALL execute the handler function and return a Test_Result
-    /// - 1.3: WHEN the handler function completes successfully, THE Test_Result
-    ///   SHALL contain the execution result and status SUCCEEDED
-    /// - 1.4: WHEN the handler function fails with an error, THE Test_Result
-    ///   SHALL contain the error details and status FAILED
-    /// - 1.5: WHEN the handler function performs durable operations, THE Local_Test_Runner
-    ///   SHALL capture all operations in the Test_Result
-    /// - 2.1: WHEN a developer calls run(), THE Local_Test_Runner SHALL return a future
-    ///   that resolves to a Test_Result when the handler completes
-    /// - 9.1: THE Local_Test_Runner SHALL accept an InvokeRequest struct with an optional
-    ///   payload field for the run() method
-    /// - 9.2: WHEN run() is called with an InvokeRequest containing a payload,
-    ///   THE Local_Test_Runner SHALL pass the payload to the handler function
-    /// - 9.3: WHEN run() is called with an InvokeRequest containing no payload,
-    ///   THE Local_Test_Runner SHALL use a default empty payload
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -932,22 +885,6 @@ where
     /// # Arguments
     ///
     /// * `payload` - The input payload to pass to the handler
-    ///
-    /// # Requirements
-    ///
-    /// - 16.1: WHEN a wait operation is encountered, THE Test_Execution_Orchestrator
-    ///   SHALL track the wait's scheduled end timestamp
-    /// - 16.2: WHEN time skipping is enabled and a wait's scheduled end time is reached,
-    ///   THE Test_Execution_Orchestrator SHALL mark the wait as SUCCEEDED and schedule
-    ///   handler re-invocation
-    /// - 16.3: WHEN time skipping is enabled, THE Test_Execution_Orchestrator SHALL use
-    ///   tokio::time::advance() to skip wait durations instantly
-    /// - 16.4: WHEN a handler invocation returns PENDING status, THE Test_Execution_Orchestrator
-    ///   SHALL continue polling for operation updates and re-invoke the handler when
-    ///   operations complete
-    /// - 16.5: WHEN a handler invocation returns SUCCEEDED or FAILED status,
-    ///   THE Test_Execution_Orchestrator SHALL resolve the execution and stop polling
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -1066,13 +1003,6 @@ where
     /// # Arguments
     ///
     /// * `name` - The operation name to match against
-    ///
-    /// # Requirements
-    ///
-    /// - 1.1: WHEN a developer calls `get_operation_handle(name)` on the Local_Test_Runner
-    ///   before calling `run()`, THE Local_Test_Runner SHALL return an Operation_Handle
-    ///   that is initially unpopulated
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -1094,13 +1024,6 @@ where
     /// # Arguments
     ///
     /// * `index` - The zero-based execution order index
-    ///
-    /// # Requirements
-    ///
-    /// - 1.7: WHEN `get_operation_handle_by_index(index)` is called before `run()`,
-    ///   THE Local_Test_Runner SHALL return an Operation_Handle that populates with
-    ///   the operation at that execution order index
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -1122,13 +1045,6 @@ where
     /// # Arguments
     ///
     /// * `id` - The unique operation ID to match against
-    ///
-    /// # Requirements
-    ///
-    /// - 1.8: WHEN `get_operation_handle_by_id(id)` is called before `run()`,
-    ///   THE Local_Test_Runner SHALL return an Operation_Handle that populates with
-    ///   the operation matching that unique ID
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -1148,12 +1064,6 @@ where
     ///
     /// This method clears all captured operations and resets the checkpoint server
     /// state, allowing the runner to be reused for multiple test scenarios.
-    ///
-    /// # Requirements
-    ///
-    /// - 1.6: WHEN reset() is called, THE Local_Test_Runner SHALL clear all
-    ///   captured operations and reset checkpoint server state
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -1199,14 +1109,6 @@ where
     /// # Returns
     ///
     /// The operation if found, or `None` if no operation with that ID exists.
-    ///
-    /// # Requirements
-    ///
-    /// - 4.1: WHEN get_operation(name) is called, THE Test_Result SHALL return
-    ///   the first operation with that name
-    /// - 4.4: WHEN get_operation_by_id(id) is called, THE Test_Result SHALL return
-    ///   the operation with that unique ID
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -1232,12 +1134,6 @@ where
     /// # Returns
     ///
     /// The first operation with that name, or `None` if no operation with that name exists.
-    ///
-    /// # Requirements
-    ///
-    /// - 4.1: WHEN get_operation(name) is called, THE Test_Result SHALL return
-    ///   the first operation with that name
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -1267,12 +1163,6 @@ where
     /// # Returns
     ///
     /// The operation at that index, or `None` if the index is out of bounds.
-    ///
-    /// # Requirements
-    ///
-    /// - 4.2: WHEN get_operation_by_index(index) is called, THE Test_Result SHALL return
-    ///   the operation at that execution order index
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -1307,12 +1197,6 @@ where
     /// # Returns
     ///
     /// The operation at that name/index combination, or `None` if not found.
-    ///
-    /// # Requirements
-    ///
-    /// - 4.3: WHEN get_operation_by_name_and_index(name, index) is called,
-    ///   THE Test_Result SHALL return the Nth operation with that name
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -1343,12 +1227,6 @@ where
     /// # Returns
     ///
     /// A vector of all operations in execution order.
-    ///
-    /// # Requirements
-    ///
-    /// - 4.5: WHEN get_all_operations() is called, THE Test_Result SHALL return
-    ///   all operations in execution order
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -1374,14 +1252,6 @@ where
     ///
     /// * `name` - The name to register the function under
     /// * `func` - The durable function to register
-    ///
-    /// # Requirements
-    ///
-    /// - 7.1: WHEN register_durable_function(name, func) is called, THE Local_Test_Runner
-    ///   SHALL store the function for invoke handling
-    /// - 7.2: WHEN a registered durable function is invoked, THE Local_Test_Runner
-    ///   SHALL execute it with a DurableContext
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -1420,14 +1290,6 @@ where
     ///
     /// * `name` - The name to register the function under
     /// * `func` - The regular function to register
-    ///
-    /// # Requirements
-    ///
-    /// - 7.3: WHEN register_function(name, func) is called, THE Local_Test_Runner
-    ///   SHALL store the function for invoke handling
-    /// - 7.4: WHEN a registered regular function is invoked, THE Local_Test_Runner
-    ///   SHALL execute it without a DurableContext
-    ///
     /// # Examples
     ///
     /// ```ignore

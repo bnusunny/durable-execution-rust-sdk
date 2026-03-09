@@ -26,11 +26,6 @@ use crate::duration::Duration;
 /// - max_delay: 60 seconds
 /// - multiplier: 2.0
 /// - jitter: Full
-///
-/// # Requirements
-///
-/// - 3.1: default_retry() returns ExponentialBackoff with max_attempts=6,
-///   base_delay=5s, max_delay=60s, multiplier=2.0, jitter=Full
 pub fn default_retry() -> ExponentialBackoff {
     ExponentialBackoff::builder()
         .max_attempts(6)
@@ -45,10 +40,6 @@ pub fn default_retry() -> ExponentialBackoff {
 ///
 /// This strategy returns `None` for any attempt, meaning no retries
 /// will be performed.
-///
-/// # Requirements
-///
-/// - 3.2: no_retry() returns a NoRetry strategy that returns None for any attempt
 pub fn no_retry() -> NoRetry {
     NoRetry
 }

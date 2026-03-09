@@ -440,10 +440,6 @@ impl Operation {
     /// # Returns
     ///
     /// The payload string if this is a STEP operation with a payload, None otherwise.
-    ///
-    /// # Requirements
-    ///
-    /// - 4.9: THE Step_Operation SHALL support RETRY action with Payload for wait-for-condition pattern
     pub fn get_retry_payload(&self) -> Option<&str> {
         if self.operation_type == OperationType::Step {
             if let Some(ref details) = self.step_details {
@@ -458,10 +454,6 @@ impl Operation {
     /// # Returns
     ///
     /// The attempt number (0-indexed) if this is a STEP operation with attempt tracking, None otherwise.
-    ///
-    /// # Requirements
-    ///
-    /// - 4.8: THE Step_Operation SHALL track attempt numbers in StepDetails.Attempt
     pub fn get_attempt(&self) -> Option<u32> {
         if self.operation_type == OperationType::Step {
             if let Some(ref details) = self.step_details {
@@ -885,10 +877,6 @@ impl OperationUpdate {
     ///
     /// * `operation_id` - The ID of the operation to cancel
     /// * `operation_type` - The type of operation being cancelled
-    ///
-    /// # Requirements
-    ///
-    /// - 5.5: THE Wait_Operation SHALL support cancellation of active waits via CANCEL action
     pub fn cancel(operation_id: impl Into<String>, operation_type: OperationType) -> Self {
         Self {
             operation_id: operation_id.into(),
@@ -919,12 +907,6 @@ impl OperationUpdate {
     /// * `operation_type` - The type of operation being retried
     /// * `payload` - Optional state payload to preserve across retries
     /// * `next_attempt_delay_seconds` - Optional delay before the next retry attempt
-    ///
-    /// # Requirements
-    ///
-    /// - 4.7: THE Step_Operation SHALL support RETRY action with NextAttemptDelaySeconds for backoff
-    /// - 4.8: THE Step_Operation SHALL track attempt numbers in StepDetails.Attempt
-    /// - 4.9: THE Step_Operation SHALL support RETRY action with Payload (not just Error) for wait-for-condition pattern
     pub fn retry(
         operation_id: impl Into<String>,
         operation_type: OperationType,
@@ -961,10 +943,6 @@ impl OperationUpdate {
     /// * `operation_type` - The type of operation being retried
     /// * `error` - The error that caused the retry
     /// * `next_attempt_delay_seconds` - Optional delay before the next retry attempt
-    ///
-    /// # Requirements
-    ///
-    /// - 4.7: THE Step_Operation SHALL support RETRY action with NextAttemptDelaySeconds for backoff
     pub fn retry_with_error(
         operation_id: impl Into<String>,
         operation_type: OperationType,

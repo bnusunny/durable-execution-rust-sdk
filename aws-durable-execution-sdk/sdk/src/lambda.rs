@@ -147,11 +147,6 @@ impl DurableExecutionInvocationOutput {
     /// A `DurableExecutionInvocationOutput` with:
     /// - `SUCCEEDED` status if serialization succeeds and size is within limits
     /// - `FAILED` status if serialization fails or response is too large
-    ///
-    /// # Requirements
-    ///
-    /// - 15.5: WHEN the handler returns successfully, THE Lambda_Integration SHALL return SUCCEEDED status with result
-    /// - 15.8: THE Lambda_Integration SHALL handle large responses by checkpointing before returning
     pub fn from_result<T: serde::Serialize>(result: &T) -> Self {
         match serde_json::to_string(result) {
             Ok(json) => {
@@ -188,11 +183,6 @@ impl DurableExecutionInvocationOutput {
     /// # Returns
     ///
     /// A `DurableExecutionInvocationOutput` with appropriate status
-    ///
-    /// # Requirements
-    ///
-    /// - 15.6: WHEN the handler fails, THE Lambda_Integration SHALL return FAILED status with error
-    /// - 15.7: WHEN execution suspends, THE Lambda_Integration SHALL return PENDING status
     pub fn from_error(error: &crate::error::DurableError) -> Self {
         use crate::error::DurableError;
 
@@ -235,10 +225,6 @@ impl DurableExecutionInvocationOutput {
     ///
     /// A `DurableExecutionInvocationOutput` with SUCCEEDED status and a reference
     /// to the checkpointed result.
-    ///
-    /// # Requirements
-    ///
-    /// - 15.8: THE Lambda_Integration SHALL handle large responses by checkpointing before returning
     pub fn checkpointed_result(checkpoint_id: &str, original_size: usize) -> Self {
         Self::succeeded(Some(format!(
             "{{\"__checkpointed_result__\":\"{}\",\"size\":{}}}",

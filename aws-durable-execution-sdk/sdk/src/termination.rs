@@ -33,10 +33,6 @@ impl TerminationManager {
     ///
     /// Calculates `remaining_time_ms` from `ctx.deadline() - now`.
     /// The safety margin defaults to 5000ms (5 seconds).
-    ///
-    /// # Requirements
-    ///
-    /// - 5.4: Default safety margin is 5 seconds
     pub fn from_lambda_context(ctx: &lambda_runtime::Context) -> Self {
         let deadline = ctx.deadline();
         let now = SystemTime::now();
@@ -56,11 +52,6 @@ impl TerminationManager {
     ///
     /// If the remaining time is already less than the safety margin,
     /// this resolves immediately.
-    ///
-    /// # Requirements
-    ///
-    /// - 5.1: wait_for_timeout resolves when deadline - safety_margin is reached
-    /// - 5.5: Immediate resolution when remaining < margin
     pub async fn wait_for_timeout(&self) {
         let effective_ms = self.remaining_ms();
         if effective_ms == 0 {

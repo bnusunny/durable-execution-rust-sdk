@@ -186,11 +186,6 @@ impl OperationStorage {
 ///
 /// Wraps a `LambdaClient` and creates an internal service client to make
 /// signed HTTP calls to the `GetDurableExecutionHistory` API endpoint.
-///
-/// # Requirements
-///
-/// - 1.1: Polls the GetDurableExecutionHistory API using the Durable_Execution_ARN
-/// - 1.3: Uses the ARN from the Lambda invocation response
 pub struct LambdaHistoryApiClient {
     service_client: LambdaDurableServiceClient,
 }
@@ -286,14 +281,6 @@ impl HistoryApiClient for LambdaHistoryApiClient {
 /// This bridges the [`CallbackSender`] trait (used by [`OperationHandle`]) with
 /// the Lambda durable execution callback APIs, enabling handles to send callback
 /// responses during cloud test execution.
-///
-/// # Requirements
-///
-/// - 6.1: Allows sending a callback success signal via the Callback_Sender
-/// - 6.2: Allows sending a callback failure signal via the Callback_Sender
-/// - 6.3: Allows sending a callback heartbeat signal via the Callback_Sender
-/// - 6.4: THE Cloud_Runner SHALL configure Operation_Handle instances with a
-///   Callback_Sender that communicates with the durable execution service
 pub(crate) struct CloudCallbackSender {
     /// The AWS Lambda client used to send callback API calls
     client: LambdaClient,
@@ -476,12 +463,6 @@ where
     /// # Returns
     ///
     /// A new `CloudDurableTestRunner` configured with default settings.
-    ///
-    /// # Requirements
-    ///
-    /// - 8.1: WHEN a developer creates a Cloud_Test_Runner with a function name,
-    ///   THE Cloud_Test_Runner SHALL configure the Lambda client for that function
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -520,12 +501,6 @@ where
     /// # Returns
     ///
     /// A new `CloudDurableTestRunner` using the provided client.
-    ///
-    /// # Requirements
-    ///
-    /// - 8.4: WHEN a developer provides a custom Lambda client,
-    ///   THE Cloud_Test_Runner SHALL use that client for invocations
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -562,12 +537,6 @@ where
     /// # Returns
     ///
     /// The runner with updated configuration.
-    ///
-    /// # Requirements
-    ///
-    /// - 8.5: WHEN a developer configures poll_interval,
-    ///   THE Cloud_Test_Runner SHALL use that interval when polling for execution status
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -623,28 +592,6 @@ where
     ///
     /// A `TestResult` reflecting the full execution outcome, including all
     /// operations and history events collected during polling.
-    ///
-    /// # Requirements
-    ///
-    /// - 1.1: Begin polling after Lambda invocation returns an ARN
-    /// - 1.2: Continue polling until terminal state
-    /// - 1.3: Use the Durable_Execution_ARN from invocation
-    /// - 1.4: Stop polling and return TimedOut on timeout
-    /// - 1.5: Stop polling on terminal event
-    /// - 3.1: Populate OperationStorage with polled operations
-    /// - 3.3: TestResult contains all operations from storage
-    /// - 3.4: Clear storage at start of each run
-    /// - 7.1: Use configured poll_interval
-    /// - 7.2: Use configured timeout
-    /// - 8.1: Invoke Lambda, start poller, await completion
-    /// - 8.2: Parse result from terminal event on success
-    /// - 8.3: Parse error from terminal event on failure
-    /// - 8.4: Return error without polling if invocation fails
-    /// - 8.5: Stop poller in all exit paths
-    /// - 9.1: Collect all history events into TestResult
-    /// - 9.2: Preserve chronological order of events
-    /// - 9.3: Include events from all poll cycles
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -739,10 +686,6 @@ where
     }
 
     /// Invokes the Lambda function and extracts the `DurableExecutionArn` from the response.
-    ///
-    /// # Requirements
-    ///
-    /// - 8.4: Return error without polling if invocation fails
     async fn invoke_lambda<I: Serialize>(&self, payload: &I) -> Result<String, TestError> {
         let payload_json = serde_json::to_vec(payload)?;
 
@@ -824,12 +767,6 @@ where
     /// # Arguments
     ///
     /// * `name` - The operation name to match against
-    ///
-    /// # Requirements
-    ///
-    /// - 5.1: THE Cloud_Runner SHALL provide a method to obtain an Operation_Handle
-    ///   by operation name before or during execution.
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -851,12 +788,6 @@ where
     /// # Arguments
     ///
     /// * `index` - The zero-based execution order index
-    ///
-    /// # Requirements
-    ///
-    /// - 5.2: THE Cloud_Runner SHALL provide a method to obtain an Operation_Handle
-    ///   by operation index before or during execution.
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -879,12 +810,6 @@ where
     ///
     /// * `name` - The operation name to match against
     /// * `index` - The zero-based index among operations with that name
-    ///
-    /// # Requirements
-    ///
-    /// - 5.3: THE Cloud_Runner SHALL provide a method to obtain an Operation_Handle
-    ///   by operation name and index before or during execution.
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -910,12 +835,6 @@ where
     /// # Arguments
     ///
     /// * `id` - The unique operation ID to match against
-    ///
-    /// # Requirements
-    ///
-    /// - 5.4: THE Cloud_Runner SHALL provide a method to obtain an Operation_Handle
-    ///   by operation id before or during execution.
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -937,12 +856,6 @@ where
     /// For each handle, the matcher is used to look up the corresponding operation
     /// in storage. If found, the handle's inner data is populated and a status
     /// notification is sent via the watch channel so that `wait_for_data` resolves.
-    ///
-    /// # Requirements
-    ///
-    /// - 5.5: WHEN the History_Poller populates new operation data,
-    ///   THE Cloud_Runner SHALL notify waiting Operation_Handle instances
-    ///   so that their `wait_for_data` calls resolve.
     pub(crate) async fn notify_handles(&self) {
         for handle in &self.handles {
             let matched_op = match &handle.matcher {
@@ -988,12 +901,6 @@ where
     ///
     /// A `DurableOperation` wrapping the first operation with that name,
     /// or `None` if no operation with that name exists.
-    ///
-    /// # Requirements
-    ///
-    /// - 4.1: WHEN a developer calls get_operation(name) on Test_Runner,
-    ///   THE Test_Runner SHALL return the first operation with that name
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -1025,12 +932,6 @@ where
     /// # Returns
     ///
     /// A `DurableOperation` at that index, or `None` if the index is out of bounds.
-    ///
-    /// # Requirements
-    ///
-    /// - 4.2: WHEN a developer calls get_operation_by_index(index) on Test_Runner,
-    ///   THE Test_Runner SHALL return the operation at that execution order index
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -1067,12 +968,6 @@ where
     /// # Returns
     ///
     /// A `DurableOperation` at that name/index combination, or `None` if not found.
-    ///
-    /// # Requirements
-    ///
-    /// - 4.3: WHEN a developer calls get_operation_by_name_and_index(name, index) on Test_Runner,
-    ///   THE Test_Runner SHALL return the nth operation with that name
-    ///
     /// # Examples
     ///
     /// ```ignore
@@ -1109,12 +1004,6 @@ where
     /// # Returns
     ///
     /// A `DurableOperation` with that ID, or `None` if no operation with that ID exists.
-    ///
-    /// # Requirements
-    ///
-    /// - 4.4: WHEN a developer calls get_operation_by_id(id) on Test_Runner,
-    ///   THE Test_Runner SHALL return the operation with that unique identifier
-    ///
     /// # Examples
     ///
     /// ```ignore

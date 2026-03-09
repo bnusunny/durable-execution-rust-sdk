@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "AWS Durable Execution SDK for Lambda Rust Runtime"
+readme = "README.md"
 keywords = ["aws", "lambda", "durable", "workflow", "serverless"]
 categories = ["asynchronous", "web-programming"]
 

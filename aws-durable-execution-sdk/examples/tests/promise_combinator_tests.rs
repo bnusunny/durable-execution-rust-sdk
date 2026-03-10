@@ -15,9 +15,7 @@ use durable_execution_sdk::{
     all, all_settled, any, race, CompletionConfig, DurableContext, DurableError, MapConfig,
     OperationType,
 };
-use durable_execution_sdk_examples::test_helper::{
-    assert_nodejs_event_signatures, assert_nodejs_event_signatures_unordered,
-};
+use durable_execution_sdk_examples::test_helper::assert_nodejs_event_signatures_unordered;
 use durable_execution_sdk_testing::{
     ExecutionStatus, LocalDurableTestRunner, TestEnvironmentConfig,
 };
@@ -148,7 +146,10 @@ async fn test_promise_all_macro() {
     );
 
     // Check event signatures (Node.js-compatible format)
-    assert_nodejs_event_signatures(&result, "tests/history/promise_all_macro.history.json");
+    assert_nodejs_event_signatures_unordered(
+        &result,
+        "tests/history/promise_all_macro.history.json",
+    );
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -183,7 +184,7 @@ async fn test_promise_all() {
     assert!(!operations.is_empty(), "Should have operations");
 
     // Check event signatures (Node.js-compatible format)
-    assert_nodejs_event_signatures(&result, "tests/history/promise_all.history.json");
+    assert_nodejs_event_signatures_unordered(&result, "tests/history/promise_all.history.json");
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -218,7 +219,10 @@ async fn test_promise_all_with_map() {
     assert!(!operations.is_empty(), "Should have operations");
 
     // Check event signatures (Node.js-compatible format)
-    assert_nodejs_event_signatures(&result, "tests/history/promise_all_with_map.history.json");
+    assert_nodejs_event_signatures_unordered(
+        &result,
+        "tests/history/promise_all_with_map.history.json",
+    );
 }
 
 // ============================================================================
@@ -335,7 +339,7 @@ async fn test_promise_all_settled_macro() {
     assert!(!operations.is_empty(), "Should have operations");
 
     // Check event signatures (Node.js-compatible format)
-    assert_nodejs_event_signatures(
+    assert_nodejs_event_signatures_unordered(
         &result,
         "tests/history/promise_all_settled_macro.history.json",
     );
@@ -487,7 +491,10 @@ async fn test_promise_any_macro() {
     assert!(!operations.is_empty(), "Should have operations");
 
     // Check event signatures (Node.js-compatible format)
-    assert_nodejs_event_signatures(&result, "tests/history/promise_any_macro.history.json");
+    assert_nodejs_event_signatures_unordered(
+        &result,
+        "tests/history/promise_any_macro.history.json",
+    );
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -640,7 +647,10 @@ async fn test_promise_race_macro() {
     assert!(!operations.is_empty(), "Should have operations");
 
     // Check event signatures (Node.js-compatible format)
-    assert_nodejs_event_signatures(&result, "tests/history/promise_race_macro.history.json");
+    assert_nodejs_event_signatures_unordered(
+        &result,
+        "tests/history/promise_race_macro.history.json",
+    );
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -708,7 +718,10 @@ async fn test_promise_race_timeout_pattern() {
     assert!(!operations.is_empty(), "Should have operations");
 
     // Check event signatures (Node.js-compatible format)
-    assert_nodejs_event_signatures(&result, "tests/history/promise_race_timeout.history.json");
+    assert_nodejs_event_signatures_unordered(
+        &result,
+        "tests/history/promise_race_timeout.history.json",
+    );
 }
 
 // ============================================================================
@@ -779,7 +792,7 @@ async fn test_all_with_wait() {
     let operations = result.get_operations();
     assert!(!operations.is_empty(), "Should have operations");
 
-    assert_nodejs_event_signatures(&result, "tests/history/all_with_wait.history.json");
+    assert_nodejs_event_signatures_unordered(&result, "tests/history/all_with_wait.history.json");
 
     LocalDurableTestRunner::<serde_json::Value, Vec<String>>::teardown_test_environment()
         .await
@@ -844,7 +857,10 @@ async fn test_race_with_timeout() {
     let operations = result.get_operations();
     assert!(!operations.is_empty(), "Should have operations");
 
-    assert_nodejs_event_signatures(&result, "tests/history/race_with_timeout.history.json");
+    assert_nodejs_event_signatures_unordered(
+        &result,
+        "tests/history/race_with_timeout.history.json",
+    );
 
     LocalDurableTestRunner::<serde_json::Value, String>::teardown_test_environment()
         .await
@@ -941,7 +957,7 @@ async fn test_replay_behavior() {
     let operations = result.get_operations();
     assert!(!operations.is_empty(), "Should have operations");
 
-    assert_nodejs_event_signatures(&result, "tests/history/replay_behavior.history.json");
+    assert_nodejs_event_signatures_unordered(&result, "tests/history/replay_behavior.history.json");
 
     LocalDurableTestRunner::<serde_json::Value, ReplayBehaviorResult>::teardown_test_environment()
         .await

@@ -603,24 +603,23 @@ where
 
                     // Advance time if needed (for time skipping mode)
                     if let Some(advance_ms) = advance_time_ms {
-                        if advance_ms > 0 {
+                        if advance_ms > 0 && self.skip_time_config.enabled {
                             tokio::time::advance(tokio::time::Duration::from_millis(advance_ms))
                                 .await;
                         }
                     }
 
-                    // Mark all pending wait operations as SUCCEEDED after time advancement
-                    // This is critical for the handler to see the waits as completed
-                    // In time-skip mode, we complete waits immediately since we've already
-                    // "advanced" time conceptually
-                    if self.skip_time_config.enabled {
+                    // Mark all pending wait operations as SUCCEEDED when we have
+                    // a scheduled time. In the test runner, waits are resolved by
+                    // the orchestrator (not a real service), so we must complete
+                    // them here before re-invoking the handler.
+                    if advance_time_ms.is_some() {
                         for op in &operations {
                             if op.operation_type == OperationType::Wait
                                 && op.status == OperationStatus::Started
                             {
-                                // In time-skip mode, complete all pending waits immediately
-                                // We don't check the timestamp because tokio::time::advance
-                                // doesn't affect chrono::Utc::now()
+                                // Complete all pending waits so the handler sees
+                                // them as succeeded on re-invocation.
 
                                 // Update the wait operation to SUCCEEDED
                                 let mut updated_operation = op.clone();
@@ -818,17 +817,16 @@ where
             return ProcessOperationsResult::NoPendingOperations;
         }
 
-        // Calculate time to advance if time skipping is enabled
-        let advance_time_ms = if self.skip_time_config.enabled {
-            if let Some(end_ts) = earliest_scheduled_time {
-                let now_ms = chrono::Utc::now().timestamp_millis();
-                if end_ts > now_ms {
-                    Some((end_ts - now_ms) as u64)
-                } else {
-                    Some(0)
-                }
+        // Calculate time to advance based on earliest scheduled time.
+        // Always compute this from pending waits regardless of skip_time_config,
+        // so the orchestrator knows to reinvoke. The skip_time_config only controls
+        // whether tokio::time::advance is called, not the reinvocation decision.
+        let advance_time_ms = if let Some(end_ts) = earliest_scheduled_time {
+            let now_ms = chrono::Utc::now().timestamp_millis();
+            if end_ts > now_ms {
+                Some((end_ts - now_ms) as u64)
             } else {
-                None
+                Some(0)
             }
         } else {
             None

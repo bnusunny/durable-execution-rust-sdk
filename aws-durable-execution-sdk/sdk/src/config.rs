@@ -213,12 +213,10 @@ pub fn create_wait_strategy<T: Send + Sync + 'static>(
             return WaitDecision::Done;
         }
 
-        // Check max attempts
+        // Check max attempts — return Done so the handler can fail gracefully
+        // instead of panicking and crashing the async task.
         if attempts_made >= max_attempts {
-            panic!(
-                "waitForCondition exceeded maximum attempts ({})",
-                max_attempts
-            );
+            return WaitDecision::Done;
         }
 
         // Calculate delay with exponential backoff
@@ -2779,8 +2777,7 @@ mod retryable_error_filter_tests {
     }
 
     #[test]
-    #[should_panic(expected = "waitForCondition exceeded maximum attempts")]
-    fn test_wait_strategy_max_attempts_panic() {
+    fn test_wait_strategy_max_attempts_returns_done() {
         // **Validates: Requirement 4.4**
         let strategy = create_wait_strategy(WaitStrategyConfig {
             max_attempts: Some(3),
@@ -2791,8 +2788,9 @@ mod retryable_error_filter_tests {
             should_continue_polling: Box::new(|_: &i32| true),
         });
 
-        // Attempt 3 should panic (attempts_made >= max_attempts)
-        let _ = strategy(&0, 3);
+        // Attempt 3 should return Done (attempts_made >= max_attempts)
+        let decision = strategy(&0, 3);
+        assert_eq!(decision, WaitDecision::Done);
     }
 
     #[test]
@@ -2866,8 +2864,7 @@ mod retryable_error_filter_tests {
     }
 
     #[test]
-    #[should_panic(expected = "waitForCondition exceeded maximum attempts")]
-    fn test_wait_strategy_default_max_attempts_panic() {
+    fn test_wait_strategy_default_max_attempts_returns_done() {
         // **Validates: Requirement 4.4** — default max_attempts is 60
         let strategy = create_wait_strategy(WaitStrategyConfig {
             max_attempts: None, // defaults to 60
@@ -2878,8 +2875,9 @@ mod retryable_error_filter_tests {
             should_continue_polling: Box::new(|_: &i32| true),
         });
 
-        // Attempt 60 should panic (>= 60)
-        let _ = strategy(&0, 60);
+        // Attempt 60 should return Done (>= 60)
+        let decision = strategy(&0, 60);
+        assert_eq!(decision, WaitDecision::Done);
     }
 
     #[test]

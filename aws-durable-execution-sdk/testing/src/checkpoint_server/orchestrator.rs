@@ -555,7 +555,25 @@ where
                         // callback responses via OperationHandle. Poll the checkpoint
                         // server until the callback completes, then re-invoke.
                         if !self.registered_handles.is_empty() {
+                            // Safety limit: avoid infinite polling if callbacks never complete.
+                            // At 50ms per poll, 6000 iterations ≈ 5 minutes.
+                            const MAX_CALLBACK_POLLS: usize = 6000;
+                            let mut callback_poll_count = 0;
+
                             loop {
+                                callback_poll_count += 1;
+                                if callback_poll_count > MAX_CALLBACK_POLLS {
+                                    return Err(crate::error::TestError::CheckpointServerError(
+                                        format!(
+                                            "Callback polling timed out after {} iterations (~{}s). \
+                                             Pending operations: {:?}",
+                                            MAX_CALLBACK_POLLS,
+                                            MAX_CALLBACK_POLLS * 50 / 1000,
+                                            self.pending_operations
+                                        ),
+                                    ));
+                                }
+
                                 tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
                                 // Re-fetch operations to check for callback completion
@@ -565,7 +583,14 @@ where
                                     .await
                                 {
                                     Ok(response) => response.operations,
-                                    Err(_) => continue,
+                                    Err(e) => {
+                                        tracing::warn!(
+                                            attempt = callback_poll_count,
+                                            error = %e,
+                                            "Failed to fetch operations during callback polling"
+                                        );
+                                        continue;
+                                    }
                                 };
 
                                 // Populate handles with updated operations

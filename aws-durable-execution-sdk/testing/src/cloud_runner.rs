@@ -199,10 +199,12 @@ impl LambdaHistoryApiClient {
     /// # Arguments
     ///
     /// * `aws_config` - The AWS SDK configuration (same one used to create the `LambdaClient`)
-    pub fn from_aws_config(aws_config: &aws_config::SdkConfig) -> Self {
-        Self {
-            service_client: LambdaDurableServiceClient::from_aws_config(aws_config),
-        }
+    pub fn from_aws_config(aws_config: &aws_config::SdkConfig) -> Result<Self, TestError> {
+        Ok(Self {
+            service_client: LambdaDurableServiceClient::from_aws_config(aws_config).map_err(
+                |e| TestError::aws_error(format!("Failed to create service client: {}", e)),
+            )?,
+        })
     }
 
     /// Creates a new `LambdaHistoryApiClient` from an existing `LambdaDurableServiceClient`.
@@ -615,7 +617,7 @@ where
         let arn = self.invoke_lambda(&payload).await?;
 
         // Requirement 1.1: Create HistoryPoller with the ARN
-        let history_client = self.create_history_client();
+        let history_client = self.create_history_client()?;
         let mut poller = HistoryPoller::new(history_client, arn.clone(), self.config.poll_interval);
 
         // Requirement 6.4: Create CloudCallbackSender and configure handles
@@ -737,17 +739,19 @@ where
     }
 
     /// Creates a `LambdaHistoryApiClient` from the stored AWS config.
-    fn create_history_client(&self) -> LambdaHistoryApiClient {
+    fn create_history_client(&self) -> Result<LambdaHistoryApiClient, TestError> {
         match &self.aws_config {
             Some(cfg) => LambdaHistoryApiClient::from_aws_config(cfg),
             None => {
                 // Fallback: create a service client from a default config.
                 // This path is used when with_client() was called without an SdkConfig.
-                LambdaHistoryApiClient::from_service_client(
-                    LambdaDurableServiceClient::from_aws_config(
-                        &aws_config::SdkConfig::builder().build(),
-                    ),
+                let service_client = LambdaDurableServiceClient::from_aws_config(
+                    &aws_config::SdkConfig::builder().build(),
                 )
+                .map_err(|e| {
+                    TestError::aws_error(format!("Failed to create service client: {}", e))
+                })?;
+                Ok(LambdaHistoryApiClient::from_service_client(service_client))
             }
         }
     }
@@ -853,22 +857,38 @@ where
     /// Notifies all registered operation handles with matching operation data
     /// from the operation storage, and updates the shared `all_operations` list.
     ///
-    /// For each handle, the matcher is used to look up the corresponding operation
-    /// in storage. If found, the handle's inner data is populated and a status
-    /// notification is sent via the watch channel so that `wait_for_data` resolves.
+    /// All matched operations are collected first, then the shared `all_operations`
+    /// list and individual handles are updated together to ensure consistency.
     pub(crate) async fn notify_handles(&self) {
-        for handle in &self.handles {
-            let matched_op = match &handle.matcher {
-                OperationMatcher::ByName(name) => self.operation_storage.get_by_name(name).cloned(),
-                OperationMatcher::ByIndex(idx) => {
-                    self.operation_storage.get_by_index(*idx).cloned()
-                }
-                OperationMatcher::ById(id) => self.operation_storage.get_by_id(id).cloned(),
-                OperationMatcher::ByNameAndIndex(name, idx) => self
-                    .operation_storage
-                    .get_by_name_and_index(name, *idx)
-                    .cloned(),
-            };
+        // Phase 1: Collect all matched operations (no async locks held)
+        let matched: Vec<_> = self
+            .handles
+            .iter()
+            .map(|handle| {
+                let matched_op = match &handle.matcher {
+                    OperationMatcher::ByName(name) => {
+                        self.operation_storage.get_by_name(name).cloned()
+                    }
+                    OperationMatcher::ByIndex(idx) => {
+                        self.operation_storage.get_by_index(*idx).cloned()
+                    }
+                    OperationMatcher::ById(id) => self.operation_storage.get_by_id(id).cloned(),
+                    OperationMatcher::ByNameAndIndex(name, idx) => self
+                        .operation_storage
+                        .get_by_name_and_index(name, *idx)
+                        .cloned(),
+                };
+                (handle, matched_op)
+            })
+            .collect();
+
+        // Phase 2: Update shared all_operations first, then handles atomically
+        let mut all_ops = self.all_operations.write().await;
+        *all_ops = self.operation_storage.get_all().to_vec();
+        drop(all_ops);
+
+        // Phase 3: Update handles and send notifications
+        for (handle, matched_op) in matched {
             if let Some(op) = matched_op {
                 let status = op.status;
                 let mut inner = handle.inner.write().await;
@@ -877,9 +897,6 @@ where
                 let _ = handle.status_tx.send(Some(status));
             }
         }
-        // Update shared all_operations for child enumeration
-        let mut all_ops = self.all_operations.write().await;
-        *all_ops = self.operation_storage.get_all().to_vec();
     }
 }
 
@@ -916,7 +933,7 @@ where
     /// }
     /// ```
     pub fn get_operation(&self, name: &str) -> Option<DurableOperation> {
-        let all_ops = Arc::new(self.operation_storage.get_all().to_vec());
+        let all_ops = self.cached_all_operations();
         self.operation_storage
             .get_by_name(name)
             .cloned()
@@ -948,7 +965,7 @@ where
     /// }
     /// ```
     pub fn get_operation_by_index(&self, index: usize) -> Option<DurableOperation> {
-        let all_ops = Arc::new(self.operation_storage.get_all().to_vec());
+        let all_ops = self.cached_all_operations();
         self.operation_storage
             .get_by_index(index)
             .cloned()
@@ -988,7 +1005,7 @@ where
         name: &str,
         index: usize,
     ) -> Option<DurableOperation> {
-        let all_ops = Arc::new(self.operation_storage.get_all().to_vec());
+        let all_ops = self.cached_all_operations();
         self.operation_storage
             .get_by_name_and_index(name, index)
             .cloned()
@@ -1019,7 +1036,7 @@ where
     /// }
     /// ```
     pub fn get_operation_by_id(&self, id: &str) -> Option<DurableOperation> {
-        let all_ops = Arc::new(self.operation_storage.get_all().to_vec());
+        let all_ops = self.cached_all_operations();
         self.operation_storage
             .get_by_id(id)
             .cloned()
@@ -1046,13 +1063,19 @@ where
     /// println!("Total operations: {}", all_ops.len());
     /// ```
     pub fn get_all_operations(&self) -> Vec<DurableOperation> {
-        let all_ops = Arc::new(self.operation_storage.get_all().to_vec());
+        let all_ops = self.cached_all_operations();
         self.operation_storage
             .get_all()
             .iter()
             .cloned()
             .map(|op| DurableOperation::new(op).with_operations(Arc::clone(&all_ops)))
             .collect()
+    }
+
+    /// Creates a shared snapshot of all operations, avoiding repeated Vec clones
+    /// across multiple lookup calls.
+    fn cached_all_operations(&self) -> Arc<Vec<Operation>> {
+        Arc::new(self.operation_storage.get_all().to_vec())
     }
 
     /// Returns the number of captured operations.

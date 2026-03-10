@@ -237,13 +237,10 @@ where
 
 /// Creates a Start operation update for child context.
 fn create_start_update(op_id: &OperationIdentifier, config: &ChildConfig) -> OperationUpdate {
-    let mut update = OperationUpdate::start(&op_id.operation_id, OperationType::Context);
-    if let Some(ref parent_id) = op_id.parent_id {
-        update = update.with_parent_id(parent_id);
-    }
-    if let Some(ref name) = op_id.name {
-        update = update.with_name(name);
-    }
+    let mut update = op_id.apply_to(OperationUpdate::start(
+        &op_id.operation_id,
+        OperationType::Context,
+    ));
     // Pass ReplayChildren option to API when starting CONTEXT
     // Requirements: 10.5, 10.6, 12.8
     if config.replay_children {
@@ -254,26 +251,20 @@ fn create_start_update(op_id: &OperationIdentifier, config: &ChildConfig) -> Ope
 
 /// Creates a Succeed operation update for child context.
 fn create_succeed_update(op_id: &OperationIdentifier, result: Option<String>) -> OperationUpdate {
-    let mut update = OperationUpdate::succeed(&op_id.operation_id, OperationType::Context, result);
-    if let Some(ref parent_id) = op_id.parent_id {
-        update = update.with_parent_id(parent_id);
-    }
-    if let Some(ref name) = op_id.name {
-        update = update.with_name(name);
-    }
-    update
+    op_id.apply_to(OperationUpdate::succeed(
+        &op_id.operation_id,
+        OperationType::Context,
+        result,
+    ))
 }
 
 /// Creates a Fail operation update for child context.
 fn create_fail_update(op_id: &OperationIdentifier, error: ErrorObject) -> OperationUpdate {
-    let mut update = OperationUpdate::fail(&op_id.operation_id, OperationType::Context, error);
-    if let Some(ref parent_id) = op_id.parent_id {
-        update = update.with_parent_id(parent_id);
-    }
-    if let Some(ref name) = op_id.name {
-        update = update.with_name(name);
-    }
-    update
+    op_id.apply_to(OperationUpdate::fail(
+        &op_id.operation_id,
+        OperationType::Context,
+        error,
+    ))
 }
 
 #[cfg(test)]

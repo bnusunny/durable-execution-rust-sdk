@@ -185,13 +185,7 @@ fn create_invoke_start_update<P, R>(
     // Set ChainedInvokeOptions with function name and optional tenant_id (Requirement 7.6)
     update = update.with_chained_invoke_options(function_name, config.tenant_id.clone());
 
-    if let Some(ref parent_id) = op_id.parent_id {
-        update = update.with_parent_id(parent_id);
-    }
-    if let Some(ref name) = op_id.name {
-        update = update.with_name(name);
-    }
-    update
+    op_id.apply_to(update)
 }
 
 /// Creates a Succeed operation update for invoke.
@@ -200,27 +194,21 @@ fn create_invoke_succeed_update(
     op_id: &OperationIdentifier,
     result: Option<String>,
 ) -> OperationUpdate {
-    let mut update = OperationUpdate::succeed(&op_id.operation_id, OperationType::Invoke, result);
-    if let Some(ref parent_id) = op_id.parent_id {
-        update = update.with_parent_id(parent_id);
-    }
-    if let Some(ref name) = op_id.name {
-        update = update.with_name(name);
-    }
-    update
+    op_id.apply_to(OperationUpdate::succeed(
+        &op_id.operation_id,
+        OperationType::Invoke,
+        result,
+    ))
 }
 
 /// Creates a Fail operation update for invoke.
 #[allow(dead_code)]
 fn create_invoke_fail_update(op_id: &OperationIdentifier, error: ErrorObject) -> OperationUpdate {
-    let mut update = OperationUpdate::fail(&op_id.operation_id, OperationType::Invoke, error);
-    if let Some(ref parent_id) = op_id.parent_id {
-        update = update.with_parent_id(parent_id);
-    }
-    if let Some(ref name) = op_id.name {
-        update = update.with_name(name);
-    }
-    update
+    op_id.apply_to(OperationUpdate::fail(
+        &op_id.operation_id,
+        OperationType::Invoke,
+        error,
+    ))
 }
 
 #[cfg(test)]

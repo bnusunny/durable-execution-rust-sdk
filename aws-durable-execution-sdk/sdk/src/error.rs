@@ -272,6 +272,20 @@ pub enum DurableError {
         /// The resource identifier that was not found
         resource_id: Option<String>,
     },
+
+    /// Configuration error for missing or invalid SDK configuration.
+    ///
+    /// This error occurs when:
+    /// - No AWS credentials provider is configured
+    /// - HTTP client construction fails
+    /// - Required configuration values are missing
+    ///
+    /// This error is NOT retriable.
+    #[error("Configuration error: {message}")]
+    Configuration {
+        /// Error message describing the configuration issue
+        message: String,
+    },
 }
 
 impl DurableError {
@@ -676,6 +690,9 @@ impl From<&DurableError> for ErrorObject {
                 };
                 ErrorObject::new("ResourceNotFoundError", detailed_message)
             }
+            DurableError::Configuration { message } => {
+                ErrorObject::new("ConfigurationError", message)
+            }
         }
     }
 }
@@ -1044,6 +1061,7 @@ mod tests {
                 DurableError::SizeLimit { .. } => "SizeLimitExceededError",
                 DurableError::Throttling { .. } => "ThrottlingError",
                 DurableError::ResourceNotFound { .. } => "ResourceNotFoundError",
+                DurableError::Configuration { .. } => "ConfigurationError",
             };
 
             prop_assert_eq!(

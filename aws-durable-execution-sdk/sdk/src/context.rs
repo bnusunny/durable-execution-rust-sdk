@@ -80,6 +80,23 @@ impl OperationIdentifier {
             .as_ref()
             .map(|id| OperationId::from(id.clone()))
     }
+
+    /// Applies this identifier's parent_id and name to an `OperationUpdate`.
+    ///
+    /// This is a convenience method to avoid repeated boilerplate when building
+    /// operation updates across handlers.
+    pub fn apply_to(
+        &self,
+        mut update: crate::operation::OperationUpdate,
+    ) -> crate::operation::OperationUpdate {
+        if let Some(ref parent_id) = self.parent_id {
+            update = update.with_parent_id(parent_id);
+        }
+        if let Some(ref name) = self.name {
+            update = update.with_name(name);
+        }
+        update
+    }
 }
 
 impl std::fmt::Display for OperationIdentifier {

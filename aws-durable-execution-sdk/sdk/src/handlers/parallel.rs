@@ -264,39 +264,29 @@ where
 
 /// Creates a Start operation update for parallel operation.
 fn create_start_update(op_id: &OperationIdentifier) -> OperationUpdate {
-    let mut update = OperationUpdate::start(&op_id.operation_id, OperationType::Context);
-    if let Some(ref parent_id) = op_id.parent_id {
-        update = update.with_parent_id(parent_id);
-    }
-    if let Some(ref name) = op_id.name {
-        update = update.with_name(name);
-    }
-    update
+    op_id.apply_to(OperationUpdate::start(
+        &op_id.operation_id,
+        OperationType::Context,
+    ))
 }
 
 /// Creates a Succeed operation update for parallel operation.
 fn create_succeed_update(op_id: &OperationIdentifier, result: Option<String>) -> OperationUpdate {
-    let mut update = OperationUpdate::succeed(&op_id.operation_id, OperationType::Context, result);
-    if let Some(ref parent_id) = op_id.parent_id {
-        update = update.with_parent_id(parent_id);
-    }
-    if let Some(ref name) = op_id.name {
-        update = update.with_name(name);
-    }
-    update
+    op_id.apply_to(OperationUpdate::succeed(
+        &op_id.operation_id,
+        OperationType::Context,
+        result,
+    ))
 }
 
 /// Creates a Fail operation update for parallel operation.
 #[allow(dead_code)]
 fn create_fail_update(op_id: &OperationIdentifier, error: ErrorObject) -> OperationUpdate {
-    let mut update = OperationUpdate::fail(&op_id.operation_id, OperationType::Context, error);
-    if let Some(ref parent_id) = op_id.parent_id {
-        update = update.with_parent_id(parent_id);
-    }
-    if let Some(ref name) = op_id.name {
-        update = update.with_name(name);
-    }
-    update
+    op_id.apply_to(OperationUpdate::fail(
+        &op_id.operation_id,
+        OperationType::Context,
+        error,
+    ))
 }
 
 #[cfg(test)]

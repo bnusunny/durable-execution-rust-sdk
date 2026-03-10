@@ -38,6 +38,7 @@ jobs:
           key: ${{ runner.os }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-lint-
+            ${{ runner.os }}-cargo-
 
       - name: Check formatting
         working-directory: aws-durable-execution-sdk
@@ -68,6 +69,7 @@ jobs:
           key: ${{ runner.os }}-cargo-test-core-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-test-core-
+            ${{ runner.os }}-cargo-
 
       - name: Run core crate tests
         working-directory: aws-durable-execution-sdk
@@ -110,6 +112,7 @@ jobs:
           key: ${{ runner.os }}-cargo-test-examples-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-test-examples-
+            ${{ runner.os }}-cargo-
 
       - name: Run integration tests
         working-directory: aws-durable-execution-sdk
@@ -140,6 +143,7 @@ jobs:
           key: ${{ runner.os }}-cargo-doc-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-doc-
+            ${{ runner.os }}-cargo-
 
       - name: Check documentation
         working-directory: aws-durable-execution-sdk
@@ -167,6 +171,7 @@ jobs:
           key: ${{ runner.os }}-cargo-msrv-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-msrv-
+            ${{ runner.os }}-cargo-
 
       - name: Check MSRV
         working-directory: aws-durable-execution-sdk
@@ -223,6 +228,7 @@ jobs:
           key: ${{ runner.os }}-cargo-coverage-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-coverage-
+            ${{ runner.os }}-cargo-
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov

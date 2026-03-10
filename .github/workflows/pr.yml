@@ -13,21 +13,20 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0
 
 jobs:
-  check:
-    name: Check
+  # Fast lint gate — fails early before expensive jobs
+  lint:
+    name: Lint (fmt + clippy)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
-          df -h /
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -36,63 +35,62 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             aws-durable-execution-sdk/target
-          key: ${{ runner.os }}-cargo-check-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-check-
+            ${{ runner.os }}-cargo-lint-
+            ${{ runner.os }}-cargo-
 
-      - name: Run cargo check (workspace)
-        working-directory: aws-durable-execution-sdk
-        run: cargo check --workspace --all-features
-
-  fmt:
-    name: Format
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-
-      - name: Check formatting (workspace)
+      - name: Check formatting
         working-directory: aws-durable-execution-sdk
         run: cargo fmt --all -- --check
 
-  clippy:
-    name: Clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
-          df -h /
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-
-      - name: Cache cargo registry
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            aws-durable-execution-sdk/target
-          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-clippy-
-
-      - name: Run clippy (workspace)
+      - name: Run clippy
         working-directory: aws-durable-execution-sdk
         run: cargo clippy --workspace --all-features -- -D warnings
 
-  test:
-    name: Test
+  # Unit tests for core crates (sdk, testing, macros) — fast
+  test-core:
+    name: Test (core)
     runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            aws-durable-execution-sdk/target
+          key: ${{ runner.os }}-cargo-test-core-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-test-core-
+            ${{ runner.os }}-cargo-
+
+      - name: Run core crate tests
+        working-directory: aws-durable-execution-sdk
+        run: |
+          cargo test --package durable-execution-sdk --all-features
+          cargo test --package durable-execution-sdk-testing --all-features
+          cargo test --package durable-execution-sdk-macros --all-features
+
+  # Integration tests split across parallel runners
+  test-examples:
+    name: "Test (examples: ${{ matrix.group }})"
+    runs-on: ubuntu-latest
+    needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: "group1"
+            tests: "callback_tests parallel_map_tests promise_combinator_tests"
+          - group: "group2"
+            tests: "step_tests wait_tests advanced_tests child_context_tests concurrency_tests comprehensive_tests context_validation_tests error_handling_tests hello_world_tests invoke_tests serde_tests"
     steps:
       - uses: actions/checkout@v4
 
@@ -111,28 +109,26 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             aws-durable-execution-sdk/target
-          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-test-examples-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-test-
+            ${{ runner.os }}-cargo-test-examples-
+            ${{ runner.os }}-cargo-
 
-      - name: Run tests (workspace including examples)
+      - name: Run integration tests
         working-directory: aws-durable-execution-sdk
-        run: cargo test --workspace --all-features || cargo test --workspace --all-features
-
-      - name: Build all example binaries
-        working-directory: aws-durable-execution-sdk
-        run: cargo build --package durable-execution-sdk-examples --bins
+        run: |
+          for test_name in ${{ matrix.tests }}; do
+            echo "::group::Running $test_name"
+            cargo test --package durable-execution-sdk-examples --test "$test_name" --all-features
+            echo "::endgroup::"
+          done
 
   doc:
     name: Documentation
     runs-on: ubuntu-latest
+    needs: lint
     steps:
       - uses: actions/checkout@v4
-
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
-          df -h /
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -147,23 +143,20 @@ jobs:
           key: ${{ runner.os }}-cargo-doc-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-doc-
+            ${{ runner.os }}-cargo-
 
-      - name: Check documentation (workspace)
+      - name: Check documentation
         working-directory: aws-durable-execution-sdk
         run: cargo doc --workspace --no-deps --all-features
         env:
           RUSTDOCFLAGS: -D warnings
 
   msrv:
-    name: Minimum Supported Rust Version
+    name: MSRV
     runs-on: ubuntu-latest
+    needs: lint
     steps:
       - uses: actions/checkout@v4
-
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
-          df -h /
 
       - name: Install Rust toolchain (MSRV)
         uses: dtolnay/rust-toolchain@1.91.1
@@ -178,8 +171,9 @@ jobs:
           key: ${{ runner.os }}-cargo-msrv-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-msrv-
+            ${{ runner.os }}-cargo-
 
-      - name: Check MSRV (workspace)
+      - name: Check MSRV
         working-directory: aws-durable-execution-sdk
         run: cargo check --workspace --all-features
 
@@ -193,14 +187,14 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-audit
-        run: cargo install cargo-audit --locked
+        uses: taiki-e/install-action@cargo-audit
 
       - name: Run cargo audit
         working-directory: aws-durable-execution-sdk
         run: cargo audit
 
       - name: Install cargo-deny
-        run: cargo install cargo-deny --locked
+        uses: taiki-e/install-action@cargo-deny
 
       - name: Run cargo deny
         working-directory: aws-durable-execution-sdk
@@ -209,6 +203,7 @@ jobs:
   coverage:
     name: Code Coverage
     runs-on: ubuntu-latest
+    needs: [test-core, test-examples]
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -233,6 +228,7 @@ jobs:
           key: ${{ runner.os }}-cargo-coverage-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-coverage-
+            ${{ runner.os }}-cargo-
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
@@ -247,8 +243,3 @@ jobs:
           files: ./aws-durable-execution-sdk/codecov.json
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
-
-  # conformance:
-  #   name: Conformance Tests
-  #   runs-on: ubuntu-latest
-  #   NOTE: Disabled until conformance-tests directory is added to the repository

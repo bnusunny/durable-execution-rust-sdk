@@ -180,7 +180,11 @@ pub struct LambdaDurableServiceClient {
 
 impl LambdaDurableServiceClient {
     /// Creates a new LambdaDurableServiceClient from AWS config.
-    pub async fn from_env() -> Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns `DurableError::Configuration` if no credentials provider is configured.
+    pub async fn from_env() -> Result<Self, DurableError> {
         let aws_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
             .load()
             .await;
@@ -188,29 +192,41 @@ impl LambdaDurableServiceClient {
     }
 
     /// Creates a new LambdaDurableServiceClient from AWS SDK config.
-    pub fn from_aws_config(aws_config: &aws_config::SdkConfig) -> Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns `DurableError::Configuration` if no credentials provider is configured.
+    pub fn from_aws_config(aws_config: &aws_config::SdkConfig) -> Result<Self, DurableError> {
         let credentials_provider = aws_config
             .credentials_provider()
-            .expect("No credentials provider configured")
+            .ok_or_else(|| DurableError::Configuration {
+                message: "No credentials provider configured in AWS SDK config".to_string(),
+            })?
             .clone();
 
-        Self {
+        Ok(Self {
             http_client: reqwest::Client::new(),
             credentials_provider: Arc::from(credentials_provider),
             config: LambdaClientConfig::from_aws_config(aws_config),
-        }
+        })
     }
 
     /// Creates a new LambdaDurableServiceClient from AWS SDK config with a custom
     /// user-agent string appended to HTTP requests for SDK identification.
+    ///
+    /// # Errors
+    ///
+    /// Returns `DurableError::Configuration` if no credentials provider is configured.
     pub fn from_aws_config_with_user_agent(
         aws_config: &aws_config::SdkConfig,
         sdk_name: &str,
         sdk_version: &str,
-    ) -> Self {
+    ) -> Result<Self, DurableError> {
         let credentials_provider = aws_config
             .credentials_provider()
-            .expect("No credentials provider configured")
+            .ok_or_else(|| DurableError::Configuration {
+                message: "No credentials provider configured in AWS SDK config".to_string(),
+            })?
             .clone();
 
         let user_agent = format!("{}/{}", sdk_name, sdk_version);
@@ -222,13 +238,15 @@ impl LambdaDurableServiceClient {
         let http_client = reqwest::Client::builder()
             .default_headers(headers)
             .build()
-            .unwrap_or_else(|_| reqwest::Client::new());
+            .map_err(|e| DurableError::Configuration {
+                message: format!("Failed to build HTTP client: {}", e),
+            })?;
 
-        Self {
+        Ok(Self {
             http_client,
             credentials_provider: Arc::from(credentials_provider),
             config: LambdaClientConfig::from_aws_config(aws_config),
-        }
+        })
     }
 
     /// Creates a new LambdaDurableServiceClient with custom configuration.
@@ -989,7 +1007,8 @@ mod tests {
         // Verify from_aws_config_with_user_agent creates a client successfully (Req 14.1)
         let config = test_sdk_config();
         let client =
-            LambdaDurableServiceClient::from_aws_config_with_user_agent(&config, "my-sdk", "1.0.0");
+            LambdaDurableServiceClient::from_aws_config_with_user_agent(&config, "my-sdk", "1.0.0")
+                .unwrap();
         // Client should be constructed with the correct region config
         assert_eq!(client.config.region, "us-east-1");
     }
@@ -998,7 +1017,7 @@ mod tests {
     fn test_from_aws_config_unchanged() {
         // Verify existing from_aws_config still works without user-agent (Req 14.2)
         let config = test_sdk_config();
-        let client = LambdaDurableServiceClient::from_aws_config(&config);
+        let client = LambdaDurableServiceClient::from_aws_config(&config).unwrap();
         assert_eq!(client.config.region, "us-east-1");
     }
 
@@ -1036,7 +1055,8 @@ mod tests {
             &config,
             sdk_name,
             sdk_version,
-        );
+        )
+        .unwrap();
         client.config.endpoint_url = Some(format!("http://{}", addr));
 
         // Make a request (it will fail, but we just need to capture the headers)

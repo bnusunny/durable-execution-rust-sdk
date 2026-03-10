@@ -219,7 +219,7 @@ where
             &aws_config,
             SDK_NAME,
             SDK_VERSION,
-        ));
+        )?);
 
     // Create ExecutionState with batcher
     let batcher_config = CheckpointBatcherConfig::default();

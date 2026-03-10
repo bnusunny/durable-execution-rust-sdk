@@ -157,15 +157,19 @@ impl TimeControl {
                         .unwrap_or(false);
 
                 if is_runtime_error {
-                    // We're not in a current_thread runtime, so time control won't work
-                    // but we can still set the flag to indicate the intent
                     tracing::warn!(
                         "Time control requires current_thread Tokio runtime. \
                          Time skipping may not work correctly."
                     );
+                    return Err(TestError::invalid_configuration(
+                        "Time control requires current_thread Tokio runtime",
+                    ));
                 }
-                // For other panics, we'll just continue - the flag will be set
-                // and the user will see issues when they try to use time control
+
+                // For other unexpected panics, do not set the flag
+                return Err(TestError::invalid_configuration(
+                    "Failed to pause Tokio time: unexpected panic",
+                ));
             }
         }
         TIME_CONTROL_ACTIVE.store(true, Ordering::SeqCst);

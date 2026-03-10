@@ -210,12 +210,6 @@ where
             let op_id = op_id.clone();
 
             move |_task_idx: usize| {
-                let func = func.clone();
-                let map_ctx = map_ctx.clone();
-                let state = state.clone();
-                let logger = logger.clone();
-                let op_id = op_id.clone();
-
                 Box::pin(async move {
                     // For batched items, process each item in the batch
                     // For now, we process the first item (single item batches)
@@ -234,8 +228,7 @@ where
                     // Execute in child context
                     child_handler(
                         |ctx| {
-                            let item = item.clone();
-                            let func = func.clone();
+                            // item and func are moved into this FnOnce closure, no clone needed
                             async move { func(ctx, item, original_index).await }
                         },
                         &state,
@@ -301,39 +294,29 @@ fn batch_items<T: Serialize + Clone>(items: &[T], batcher: &ItemBatcher) -> Vec<
 
 /// Creates a Start operation update for map operation.
 fn create_start_update(op_id: &OperationIdentifier) -> OperationUpdate {
-    let mut update = OperationUpdate::start(&op_id.operation_id, OperationType::Context);
-    if let Some(ref parent_id) = op_id.parent_id {
-        update = update.with_parent_id(parent_id);
-    }
-    if let Some(ref name) = op_id.name {
-        update = update.with_name(name);
-    }
-    update
+    op_id.apply_to(OperationUpdate::start(
+        &op_id.operation_id,
+        OperationType::Context,
+    ))
 }
 
 /// Creates a Succeed operation update for map operation.
 fn create_succeed_update(op_id: &OperationIdentifier, result: Option<String>) -> OperationUpdate {
-    let mut update = OperationUpdate::succeed(&op_id.operation_id, OperationType::Context, result);
-    if let Some(ref parent_id) = op_id.parent_id {
-        update = update.with_parent_id(parent_id);
-    }
-    if let Some(ref name) = op_id.name {
-        update = update.with_name(name);
-    }
-    update
+    op_id.apply_to(OperationUpdate::succeed(
+        &op_id.operation_id,
+        OperationType::Context,
+        result,
+    ))
 }
 
 /// Creates a Fail operation update for map operation.
 #[allow(dead_code)]
 fn create_fail_update(op_id: &OperationIdentifier, error: ErrorObject) -> OperationUpdate {
-    let mut update = OperationUpdate::fail(&op_id.operation_id, OperationType::Context, error);
-    if let Some(ref parent_id) = op_id.parent_id {
-        update = update.with_parent_id(parent_id);
-    }
-    if let Some(ref name) = op_id.name {
-        update = update.with_name(name);
-    }
-    update
+    op_id.apply_to(OperationUpdate::fail(
+        &op_id.operation_id,
+        OperationType::Context,
+        error,
+    ))
 }
 
 #[cfg(test)]

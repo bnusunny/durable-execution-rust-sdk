@@ -220,14 +220,10 @@ pub async fn wait_cancel_handler(
 
 /// Creates a Start operation update for wait with the wait duration.
 fn create_start_update(op_id: &OperationIdentifier, wait_seconds: u64) -> OperationUpdate {
-    let mut update = OperationUpdate::start_wait(&op_id.operation_id, wait_seconds);
-    if let Some(ref parent_id) = op_id.parent_id {
-        update = update.with_parent_id(parent_id);
-    }
-    if let Some(ref name) = op_id.name {
-        update = update.with_name(name);
-    }
-    update
+    op_id.apply_to(OperationUpdate::start_wait(
+        &op_id.operation_id,
+        wait_seconds,
+    ))
 }
 
 #[cfg(test)]

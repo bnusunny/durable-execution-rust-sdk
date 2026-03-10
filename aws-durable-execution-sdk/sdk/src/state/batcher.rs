@@ -428,6 +428,10 @@ impl CheckpointBatcher {
     }
 
     /// Sends a checkpoint request with retry for throttling errors.
+    ///
+    /// Since the `checkpoint` trait method takes `Vec<OperationUpdate>` by value,
+    /// a clone is required for each retry attempt. The clone is only performed
+    /// when actually retrying, not on the final (successful or non-throttled) attempt.
     async fn checkpoint_with_retry(
         &self,
         token: &str,

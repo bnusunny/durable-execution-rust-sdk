@@ -299,13 +299,7 @@ fn create_callback_start_update(
         heartbeat_timeout_seconds: Some(config.heartbeat_timeout.to_seconds()),
     });
 
-    if let Some(ref parent_id) = op_id.parent_id {
-        update = update.with_parent_id(parent_id);
-    }
-    if let Some(ref name) = op_id.name {
-        update = update.with_name(name);
-    }
-    update
+    op_id.apply_to(update)
 }
 
 #[cfg(test)]

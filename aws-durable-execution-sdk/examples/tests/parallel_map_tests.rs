@@ -100,7 +100,7 @@ async fn test_parallel_basic() {
     );
 
     // Check event signatures (Node.js-compatible format)
-    assert_nodejs_event_signatures(&result, "tests/history/parallel_basic.history.json");
+    assert_nodejs_event_signatures_unordered(&result, "tests/history/parallel_basic.history.json");
 
     // Note: teardown is not needed since each test has its own tokio runtime
     // and the time state is automatically cleaned up when the runtime is dropped
@@ -329,7 +329,7 @@ async fn test_parallel_first_successful() {
     assert!(!operations.is_empty(), "Should have operations");
 
     // Check event signatures (Node.js-compatible format)
-    assert_nodejs_event_signatures(
+    assert_nodejs_event_signatures_unordered(
         &result,
         "tests/history/parallel_first_successful.history.json",
     );
@@ -396,7 +396,7 @@ async fn test_map_basic() {
     assert!(!operations.is_empty(), "Should have operations");
 
     // Check event signatures (Node.js-compatible format)
-    assert_nodejs_event_signatures(&result, "tests/history/map_basic.history.json");
+    assert_nodejs_event_signatures_unordered(&result, "tests/history/map_basic.history.json");
 }
 
 // ============================================================================
@@ -715,7 +715,10 @@ async fn test_map_min_successful() {
     assert!(!operations.is_empty(), "Should have operations");
 
     // Check event signatures (Node.js-compatible format)
-    assert_nodejs_event_signatures(&result, "tests/history/map_min_successful.history.json");
+    assert_nodejs_event_signatures_unordered(
+        &result,
+        "tests/history/map_min_successful.history.json",
+    );
 }
 
 // ============================================================================

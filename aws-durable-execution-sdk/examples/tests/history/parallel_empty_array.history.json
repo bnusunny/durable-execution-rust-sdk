@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "e53bdfe8-e1b2-4b79-ae7b-a4b9785e3eb1",
-    "EventTimestamp": "2026-02-26T22:00:47.509Z",
+    "Id": "10bb0c1b-9798-4149-8553-97f69e766676",
+    "EventTimestamp": "2026-03-12T05:35:19.510Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,9 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 2,
-    "Id": "8e7944af3d7466356d8b8cd62fa9f8ca",
-    "EventTimestamp": "2026-02-26T22:00:47.510Z",
+    "Id": "882e5182332c7e9c705779646a98fe05",
+    "EventTimestamp": "2026-03-12T05:35:19.564Z",
+    "SubType": "Context",
     "Name": "map",
     "ContextSucceededDetails": {
       "Result": {

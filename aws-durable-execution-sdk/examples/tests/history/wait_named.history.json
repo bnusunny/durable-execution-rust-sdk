@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "33c57771-6ed0-4b04-82cf-1a4152a0d343",
-    "EventTimestamp": "2026-01-20T23:17:39.523Z",
+    "Id": "f8f5bb63-7c29-4b54-a951-1fbcfd31c6a5",
+    "EventTimestamp": "2026-03-12T05:35:19.749Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,19 +13,21 @@
   {
     "EventType": "WaitStarted",
     "EventId": 2,
-    "Id": "8ad0c578bccd0e50210ec4540b84beab",
-    "EventTimestamp": "2026-01-20T23:17:39.533Z",
+    "Id": "5d37f96a10838a8c26c50773ce75e1f8",
+    "EventTimestamp": "2026-03-12T05:35:19.750Z",
+    "SubType": "Wait",
     "Name": "initial_delay",
     "WaitStartedDetails": {
       "Duration": "PT1S",
-      "ScheduledEndTimestamp": "2026-01-20T23:17:40.533Z"
+      "ScheduledEndTimestamp": "2026-03-12T05:35:20.750Z"
     }
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 3,
-    "Id": "352dbc0e089149ceff15360f2f441cd4",
-    "EventTimestamp": "2026-01-20T23:17:39.612Z",
+    "Id": "b8fa338f656754f3df437f52a12e9a2f",
+    "EventTimestamp": "2026-03-12T05:35:19.751Z",
+    "SubType": "Step",
     "Name": "process",
     "StepSucceededDetails": {
       "Result": {
@@ -37,12 +39,13 @@
   {
     "EventType": "WaitStarted",
     "EventId": 4,
-    "Id": "6cff47756c256cacb84051641e87e234",
-    "EventTimestamp": "2026-01-20T23:17:39.612Z",
+    "Id": "c0da6a1d86243c9f6327e750ad3039a4",
+    "EventTimestamp": "2026-03-12T05:35:19.752Z",
+    "SubType": "Wait",
     "Name": "cooldown_period",
     "WaitStartedDetails": {
       "Duration": "PT2S",
-      "ScheduledEndTimestamp": "2026-01-20T23:17:41.612Z"
+      "ScheduledEndTimestamp": "2026-03-12T05:35:21.752Z"
     }
   }
 ]

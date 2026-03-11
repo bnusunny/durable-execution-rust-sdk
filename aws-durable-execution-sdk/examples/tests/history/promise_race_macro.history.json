@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "8a379a9e-459b-49bc-924e-bbb033aa8b99",
-    "EventTimestamp": "2026-01-20T23:17:39.256Z",
+    "Id": "e2551d6b-3438-4380-bbe2-44817779f074",
+    "EventTimestamp": "2026-03-12T05:35:19.692Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,17 +13,18 @@
   {
     "EventType": "StepStarted",
     "EventId": 2,
-    "Id": "e3d7b3b714bd4bbe3863ecd7a301fde2",
-    "EventTimestamp": "2026-01-20T23:17:39.259Z",
-    "SubType": "PromiseCombinator",
+    "Id": "95cb4c92f5199d11715cb4d9a35e2df0",
+    "EventTimestamp": "2026-03-12T05:35:19.694Z",
+    "SubType": "Step",
     "Name": "race",
     "StepStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 3,
-    "Id": "ee2431ca093791d2c0de21ded5f5c997",
-    "EventTimestamp": "2026-01-20T23:17:39.259Z",
+    "Id": "1bdc8454a0a62757879fb76fa7245178",
+    "EventTimestamp": "2026-03-12T05:35:19.697Z",
+    "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"fast result\""
@@ -34,8 +35,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 4,
-    "Id": "5d5bc8e198681e34de47a3da502f5d98",
-    "EventTimestamp": "2026-01-20T23:17:39.259Z",
+    "Id": "9125741a0a1f4ef03fcff39be6e44e7f",
+    "EventTimestamp": "2026-03-12T05:35:19.697Z",
+    "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"slow result\""
@@ -46,9 +48,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 5,
-    "Id": "e3d7b3b714bd4bbe3863ecd7a301fde2",
-    "EventTimestamp": "2026-01-20T23:17:39.262Z",
-    "SubType": "PromiseCombinator",
+    "Id": "95cb4c92f5199d11715cb4d9a35e2df0",
+    "EventTimestamp": "2026-03-12T05:35:19.698Z",
+    "SubType": "Step",
     "Name": "race",
     "StepSucceededDetails": {
       "Result": {

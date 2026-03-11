@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "34ef4098-dce2-434e-b85e-9667b0946d0d",
-    "EventTimestamp": "2026-01-20T23:17:39.166Z",
+    "Id": "bc8d7311-4059-4b1f-9e85-e28d8aa37572",
+    "EventTimestamp": "2026-03-12T05:35:19.252Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,11 +13,12 @@
   {
     "EventType": "CallbackStarted",
     "EventId": 2,
-    "Id": "217fee04ab4aef669225383f1a27a6f9",
-    "EventTimestamp": "2026-01-20T23:17:39.167Z",
+    "Id": "d77fa2ad83be5373bb3d7b053eba9140",
+    "EventTimestamp": "2026-03-12T05:35:19.253Z",
+    "SubType": "Callback",
     "Name": "approval_callback",
     "CallbackStartedDetails": {
-      "CallbackId": "d3dc8e99-b4f0-4385-ae92-b5e053276c46",
+      "CallbackId": "2bea70e4-71f8-45da-9ece-0ede4bbafb71",
       "Timeout": 86400,
       "HeartbeatTimeout": 3600
     }

@@ -10,6 +10,28 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  FUNCTION_PREFIX: durable-rust-integ-${{ github.run_id }}
+  BINARIES: >-
+    hello_world step_basic step_named step_with_config
+    step_retry_exponential_backoff step_retry_with_filter step_error_determinism
+    wait_basic wait_named wait_extended multiple_waits wait_for_condition_basic
+    map_basic map_empty_array map_error_preservation map_failure_tolerance
+    map_high_concurrency map_large_scale map_min_successful
+    parallel_basic parallel_empty_array parallel_error_preservation
+    parallel_failure_threshold_exceeded parallel_first_successful
+    parallel_heterogeneous parallel_min_successful
+    parallel_tolerated_failure_count parallel_tolerated_failure_pct
+    parallel_with_wait
+    promise_all promise_all_settled promise_any promise_race
+    race_with_timeout all_with_wait replay_behavior
+    child_context_basic child_context_nested child_context_large_data
+    child_context_checkpoint_size_limit child_context_with_failing_step
+    concurrent_operations concurrent_wait
+    checkpointing_batched checkpointing_eager checkpointing_optimistic
+    large_payload custom_serialization
+    handler_error retry_exhaustion
+    context_validation_parent_in_child context_validation_parent_in_step
+    context_validation_parent_in_wait_condition
 
 jobs:
   integration-test:
@@ -23,6 +45,11 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+
+      - name: Install musl tools
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -31,9 +58,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             aws-durable-execution-sdk/target
-          key: ${{ runner.os }}-cargo-integ-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-integ-musl-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-integ-
+            ${{ runner.os }}-cargo-integ-musl-
 
       - name: Configure AWS credentials
         if: github.actor != 'nektos/act'
@@ -43,75 +70,74 @@ jobs:
           role-session-name: rust-sdk-integration-test
           aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
 
-      - name: Build test Lambda functions
+      - name: Build example binaries
         working-directory: aws-durable-execution-sdk
-        run: cargo build --release --package durable-execution-sdk-examples
+        run: cargo build --release --target x86_64-unknown-linux-musl --package durable-execution-sdk-examples
 
-      - name: Deploy test functions
-        id: deploy
+      - name: Package binaries
+        run: |
+          mkdir -p /tmp/lambda-packages
+          for binary in ${BINARIES}; do
+            BIN="aws-durable-execution-sdk/target/x86_64-unknown-linux-musl/release/${binary}"
+            DIR=$(mktemp -d)
+            cp ${BIN} ${DIR}/bootstrap && chmod +x ${DIR}/bootstrap
+            (cd ${DIR} && zip -j /tmp/lambda-packages/${binary}.zip bootstrap) &
+          done
+          wait
+
+      - name: Deploy test functions (parallel)
         env:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
-          FUNCTION_PREFIX: durable-rust-integ-${{ github.run_id }}
         run: |
           ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/DurableFunctionsIntegrationTestRole"
-
-          for binary in simple_workflow parallel_processing callback_workflow; do
-            FUNC_NAME="${FUNCTION_PREFIX}-${binary}"
-            BIN_PATH="aws-durable-execution-sdk/target/release/${binary}"
-
-            # Package the binary
-            WORK_DIR=$(mktemp -d)
-            cp ${BIN_PATH} ${WORK_DIR}/bootstrap
-            chmod +x ${WORK_DIR}/bootstrap
-            (cd ${WORK_DIR} && zip -j /tmp/${binary}.zip bootstrap)
-
-            echo "Deploying ${FUNC_NAME}..."
-            aws lambda create-function \
-              --function-name "${FUNC_NAME}" \
-              --runtime python3.13 \
-              --handler bootstrap \
-              --role "${ROLE_ARN}" \
-              --zip-file "fileb:///tmp/${binary}.zip" \
-              --timeout 300 \
-              --memory-size 256 \
-              --environment "Variables={AWS_LAMBDA_EXEC_WRAPPER=/var/task/bootstrap}" \
-              --durable-config '{"ExecutionTimeout":900,"RetentionPeriodInDays":7}' \
-              --region "${AWS_REGION}" \
-              --no-cli-pager
-
-            echo "Waiting for ${FUNC_NAME} to become active..."
-            aws lambda wait function-active-v2 \
-              --function-name "${FUNC_NAME}" \
-              --region "${AWS_REGION}"
-
-            echo "Deployed ${FUNC_NAME}"
+          PIDS=()
+          for binary in ${BINARIES}; do
+            (
+              FUNC_NAME="${FUNCTION_PREFIX}-${binary}"
+              aws lambda create-function \
+                --function-name "${FUNC_NAME}" \
+                --runtime python3.13 --handler bootstrap \
+                --role "${ROLE_ARN}" \
+                --zip-file "fileb:///tmp/lambda-packages/${binary}.zip" \
+                --timeout 300 --memory-size 256 \
+                --environment "Variables={AWS_LAMBDA_EXEC_WRAPPER=/var/task/bootstrap}" \
+                --durable-config '{"ExecutionTimeout":900,"RetentionPeriodInDays":7}' \
+                --region "${AWS_REGION}" --no-cli-pager > /dev/null
+              aws lambda wait function-active-v2 \
+                --function-name "${FUNC_NAME}" --region "${AWS_REGION}"
+              echo "Deployed ${FUNC_NAME}"
+            ) &
+            PIDS+=($!)
           done
+          FAILED=0
+          for pid in "${PIDS[@]}"; do
+            wait $pid || FAILED=1
+          done
+          if [ $FAILED -ne 0 ]; then
+            echo "Some deployments failed"
+            exit 1
+          fi
+          echo "All functions deployed"
 
-          # Export function names for test step
-          echo "SIMPLE_WORKFLOW_FUNCTION=${FUNCTION_PREFIX}-simple_workflow" >> $GITHUB_OUTPUT
-          echo "PARALLEL_PROCESSING_FUNCTION=${FUNCTION_PREFIX}-parallel_processing" >> $GITHUB_OUTPUT
-          echo "CALLBACK_WORKFLOW_FUNCTION=${FUNCTION_PREFIX}-callback_workflow" >> $GITHUB_OUTPUT
-
-      - name: Run integration tests
+      - name: Run cloud integration tests
         working-directory: aws-durable-execution-sdk
         env:
           AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
-          SIMPLE_WORKFLOW_FUNCTION: ${{ steps.deploy.outputs.SIMPLE_WORKFLOW_FUNCTION }}
-          PARALLEL_PROCESSING_FUNCTION: ${{ steps.deploy.outputs.PARALLEL_PROCESSING_FUNCTION }}
-          CALLBACK_WORKFLOW_FUNCTION: ${{ steps.deploy.outputs.CALLBACK_WORKFLOW_FUNCTION }}
-        run: cargo test --package durable-execution-sdk-testing --test integration -- --ignored
+          FUNCTION_PREFIX: ${{ env.FUNCTION_PREFIX }}
+        run: |
+          cargo test --package durable-execution-sdk-examples \
+            --test cloud_integration_tests -- --ignored
 
-      - name: Cleanup test functions
+      - name: Cleanup test functions (parallel)
         if: always()
         env:
           AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
-          FUNCTION_PREFIX: durable-rust-integ-${{ github.run_id }}
         run: |
-          for binary in simple_workflow parallel_processing callback_workflow; do
-            FUNC_NAME="${FUNCTION_PREFIX}-${binary}"
-            echo "Deleting ${FUNC_NAME}..."
+          for binary in ${BINARIES}; do
             aws lambda delete-function \
-              --function-name "${FUNC_NAME}" \
-              --region "${AWS_REGION}" 2>/dev/null || true
+              --function-name "${FUNCTION_PREFIX}-${binary}" \
+              --region "${AWS_REGION}" 2>/dev/null &
           done
+          wait
+          echo "Cleanup complete"

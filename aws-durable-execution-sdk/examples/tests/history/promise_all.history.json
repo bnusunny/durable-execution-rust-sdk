@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "19e8528c-4e06-471b-b8d4-4c36333676d1",
-    "EventTimestamp": "2026-01-20T23:17:39.255Z",
+    "Id": "ac989cb4-74e6-42e2-a0d0-315440c94dc6",
+    "EventTimestamp": "2026-03-12T05:35:19.677Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,17 +13,18 @@
   {
     "EventType": "StepStarted",
     "EventId": 2,
-    "Id": "72c288e8ef71839fa232684ba719e2f0",
-    "EventTimestamp": "2026-01-20T23:17:39.259Z",
-    "SubType": "PromiseCombinator",
+    "Id": "b6756752b1ce86e166083ab3caa51bc7",
+    "EventTimestamp": "2026-03-12T05:35:19.677Z",
+    "SubType": "Step",
     "Name": "all",
     "StepStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 3,
-    "Id": "ead5685319899cd23505d045c4f5e639",
-    "EventTimestamp": "2026-01-20T23:17:39.262Z",
+    "Id": "990c9638dab4153616f8a5772cf9f8a1",
+    "EventTimestamp": "2026-03-12T05:35:19.678Z",
+    "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "10"
@@ -34,8 +35,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 4,
-    "Id": "d280911571ade13502cd0e91294d563d",
-    "EventTimestamp": "2026-01-20T23:17:39.262Z",
+    "Id": "2eb29163450bc953347593fe68f437b3",
+    "EventTimestamp": "2026-03-12T05:35:19.679Z",
+    "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "20"
@@ -46,8 +48,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 5,
-    "Id": "564ccb297a9ee49cba335ca1018bcc6d",
-    "EventTimestamp": "2026-01-20T23:17:39.263Z",
+    "Id": "51dc586021425d023e74c694481b6780",
+    "EventTimestamp": "2026-03-12T05:35:19.679Z",
+    "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "30"
@@ -58,9 +61,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 6,
-    "Id": "72c288e8ef71839fa232684ba719e2f0",
-    "EventTimestamp": "2026-01-20T23:17:39.265Z",
-    "SubType": "PromiseCombinator",
+    "Id": "b6756752b1ce86e166083ab3caa51bc7",
+    "EventTimestamp": "2026-03-12T05:35:19.680Z",
+    "SubType": "Step",
     "Name": "all",
     "StepSucceededDetails": {
       "Result": {

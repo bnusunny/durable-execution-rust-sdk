@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "fdf72dd9-cc15-4530-b607-e84753af3323",
-    "EventTimestamp": "2026-02-26T22:59:22.394Z",
+    "Id": "3f6c6e2b-79c3-4e5a-9686-362c4868a436",
+    "EventTimestamp": "2026-03-12T05:35:19.694Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,17 +13,18 @@
   {
     "EventType": "StepStarted",
     "EventId": 2,
-    "Id": "1fef97c4917ca2b1ac9351a7fe34a829",
-    "EventTimestamp": "2026-02-26T22:59:22.394Z",
-    "SubType": "PromiseCombinator",
+    "Id": "5457e5eef8d6787194688eee212048a6",
+    "EventTimestamp": "2026-03-12T05:35:19.698Z",
+    "SubType": "Step",
     "Name": "all",
     "StepStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 3,
-    "Id": "ea87aba38f91df992eb8569a43c547da",
-    "EventTimestamp": "2026-02-26T22:59:22.394Z",
+    "Id": "0800a5d8276843983e92f9bb671a2525",
+    "EventTimestamp": "2026-03-12T05:35:19.699Z",
+    "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"result_a\""
@@ -34,8 +35,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 4,
-    "Id": "0ee515dad21a29d5dc5e42fa4984d2db",
-    "EventTimestamp": "2026-02-26T22:59:22.394Z",
+    "Id": "b04e6b544053219c9ac3be184497176c",
+    "EventTimestamp": "2026-03-12T05:35:19.699Z",
+    "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"result_b\""
@@ -46,8 +48,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 5,
-    "Id": "4553c77031845f9788d6d643a694cc8b",
-    "EventTimestamp": "2026-02-26T22:59:22.394Z",
+    "Id": "9d9b7b9c769dfa6cf2baca181fa5fd4a",
+    "EventTimestamp": "2026-03-12T05:35:19.699Z",
+    "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"result_c\""
@@ -58,9 +61,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 6,
-    "Id": "1fef97c4917ca2b1ac9351a7fe34a829",
-    "EventTimestamp": "2026-02-26T22:59:22.394Z",
-    "SubType": "PromiseCombinator",
+    "Id": "5457e5eef8d6787194688eee212048a6",
+    "EventTimestamp": "2026-03-12T05:35:19.700Z",
+    "SubType": "Step",
     "Name": "all",
     "StepSucceededDetails": {
       "Result": {
@@ -72,17 +75,18 @@
   {
     "EventType": "StepStarted",
     "EventId": 7,
-    "Id": "99fec45706a42a503d230168af97138a",
-    "EventTimestamp": "2026-02-26T22:59:22.395Z",
-    "SubType": "PromiseCombinator",
+    "Id": "9b12ca6754ec27d0fa93c6a5edbedb80",
+    "EventTimestamp": "2026-03-12T05:35:19.700Z",
+    "SubType": "Step",
     "Name": "race",
     "StepStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 8,
-    "Id": "f11186c2b140d0820a5ec2244ff40eec",
-    "EventTimestamp": "2026-02-26T22:59:22.395Z",
+    "Id": "87586e5246a67231ae38cfad793e4fd8",
+    "EventTimestamp": "2026-03-12T05:35:19.701Z",
+    "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"fast_path\""
@@ -93,8 +97,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 9,
-    "Id": "fa876f3aa3807dbcfd265f45d04f5e59",
-    "EventTimestamp": "2026-02-26T22:59:22.395Z",
+    "Id": "e099f1f0dd368c8c42c3db49c0ac3ab4",
+    "EventTimestamp": "2026-03-12T05:35:19.701Z",
+    "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"slow_path\""
@@ -105,9 +110,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 10,
-    "Id": "99fec45706a42a503d230168af97138a",
-    "EventTimestamp": "2026-02-26T22:59:22.395Z",
-    "SubType": "PromiseCombinator",
+    "Id": "9b12ca6754ec27d0fa93c6a5edbedb80",
+    "EventTimestamp": "2026-03-12T05:35:19.704Z",
+    "SubType": "Step",
     "Name": "race",
     "StepSucceededDetails": {
       "Result": {

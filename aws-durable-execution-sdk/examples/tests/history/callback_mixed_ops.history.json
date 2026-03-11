@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "1660b5be-9fa1-4946-bb31-782f1bec459b",
-    "EventTimestamp": "2026-02-26T21:56:39.806Z",
+    "Id": "cc69bf99-2a7d-47d4-82b6-d2061a1245c4",
+    "EventTimestamp": "2026-03-12T05:35:19.252Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 2,
-    "Id": "f4a51ac2eb93e7d25f01f368bfca893a",
-    "EventTimestamp": "2026-02-26T21:56:39.807Z",
+    "Id": "7220e0834b89b181ba5f8c5e030a21f8",
+    "EventTimestamp": "2026-03-12T05:35:19.253Z",
+    "SubType": "Step",
     "Name": "prepare",
     "StepSucceededDetails": {
       "Result": {
@@ -26,22 +27,24 @@
   {
     "EventType": "WaitStarted",
     "EventId": 3,
-    "Id": "914e5e1412f64e9c8b388be5a6cfa3a8",
-    "EventTimestamp": "2026-02-26T21:56:39.807Z",
+    "Id": "4ceb8d5b3cfb35360c7d7f80ecfa2b3d",
+    "EventTimestamp": "2026-03-12T05:35:19.254Z",
+    "SubType": "Wait",
     "Name": "pre_callback_delay",
     "WaitStartedDetails": {
       "Duration": "PT1S",
-      "ScheduledEndTimestamp": "2026-02-26T21:56:40.807Z"
+      "ScheduledEndTimestamp": "2026-03-12T05:35:20.254Z"
     }
   },
   {
     "EventType": "CallbackStarted",
     "EventId": 4,
-    "Id": "47132cb68216cd6a4f3c71a4f91dfe86",
-    "EventTimestamp": "2026-02-26T21:56:39.807Z",
+    "Id": "6b8303e3ba5fbe8f2869574f4408a387",
+    "EventTimestamp": "2026-03-12T05:35:19.256Z",
+    "SubType": "Callback",
     "Name": "mixed_callback",
     "CallbackStartedDetails": {
-      "CallbackId": "c9e8528e-5ed1-43f8-95e3-b0940143375d",
+      "CallbackId": "e7752ab0-6227-4726-be03-c3a1c086ada5",
       "Timeout": 0,
       "HeartbeatTimeout": 0
     }

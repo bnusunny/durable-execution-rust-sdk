@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "e9fd8e7d-028a-45da-b550-bfa45c22cc8b",
-    "EventTimestamp": "2026-01-20T23:17:39.173Z",
+    "Id": "3a751b08-311f-4ebd-b838-cbac3795b9d4",
+    "EventTimestamp": "2026-03-12T05:35:19.350Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,18 +13,20 @@
   {
     "EventType": "ContextStarted",
     "EventId": 2,
-    "Id": "da7815e7dc472cfe28b0075da06adc52",
-    "EventTimestamp": "2026-01-20T23:17:39.173Z",
+    "Id": "961d590f4ef77865e6c57e9dd6e8c8cc",
+    "EventTimestamp": "2026-03-12T05:35:19.350Z",
+    "SubType": "Context",
     "Name": "sub_workflow",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 3,
-    "Id": "c11a08b2fdb54306d85f44ff961e08c0",
-    "EventTimestamp": "2026-01-20T23:17:39.174Z",
+    "Id": "ff7988cda05f0642150753956e2c5a5b",
+    "EventTimestamp": "2026-03-12T05:35:19.350Z",
+    "SubType": "Step",
     "Name": "child_step_1",
-    "ParentId": "da7815e7dc472cfe28b0075da06adc52",
+    "ParentId": "961d590f4ef77865e6c57e9dd6e8c8cc",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"child step 1 done\""
@@ -35,10 +37,11 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 4,
-    "Id": "44e74c332d230d1f0203127011b706e7",
-    "EventTimestamp": "2026-01-20T23:17:39.174Z",
+    "Id": "70bf7f06ed558fc78a2f8d9b92733145",
+    "EventTimestamp": "2026-03-12T05:35:19.351Z",
+    "SubType": "Step",
     "Name": "child_step_2",
-    "ParentId": "da7815e7dc472cfe28b0075da06adc52",
+    "ParentId": "961d590f4ef77865e6c57e9dd6e8c8cc",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"child step 2 done\""
@@ -49,8 +52,9 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 5,
-    "Id": "da7815e7dc472cfe28b0075da06adc52",
-    "EventTimestamp": "2026-01-20T23:17:39.174Z",
+    "Id": "961d590f4ef77865e6c57e9dd6e8c8cc",
+    "EventTimestamp": "2026-03-12T05:35:19.351Z",
+    "SubType": "Context",
     "Name": "sub_workflow",
     "ContextSucceededDetails": {
       "Result": {

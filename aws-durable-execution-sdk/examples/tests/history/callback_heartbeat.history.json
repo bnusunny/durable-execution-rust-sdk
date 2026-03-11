@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "bbe5c854-65e2-499d-ad93-b54663c4e5eb",
-    "EventTimestamp": "2026-02-26T21:47:10.172Z",
+    "Id": "810f9c18-5b16-41bb-8e28-7bf3c55f0f53",
+    "EventTimestamp": "2026-03-12T05:35:19.252Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,11 +13,12 @@
   {
     "EventType": "CallbackStarted",
     "EventId": 2,
-    "Id": "3f1e747544973f3add33fe132829b701",
-    "EventTimestamp": "2026-02-26T21:47:10.172Z",
+    "Id": "65781d52228bfaa843fc352c0f6fb01e",
+    "EventTimestamp": "2026-03-12T05:35:19.253Z",
+    "SubType": "Callback",
     "Name": "heartbeat_callback",
     "CallbackStartedDetails": {
-      "CallbackId": "b5c09c30-0f9d-44d8-847d-e59866bfe598",
+      "CallbackId": "6b7500a9-e9b2-4463-8c59-902782ed3d36",
       "Timeout": 7200,
       "HeartbeatTimeout": 600
     }

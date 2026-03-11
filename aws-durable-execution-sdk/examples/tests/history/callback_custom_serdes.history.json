@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "1b3b65be-b3c3-4be1-b032-05e7a2ee2275",
-    "EventTimestamp": "2026-02-26T21:53:09.158Z",
+    "Id": "8ed1f196-3cdd-4598-b917-0638c04c20cd",
+    "EventTimestamp": "2026-03-12T05:35:19.252Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,11 +13,12 @@
   {
     "EventType": "CallbackStarted",
     "EventId": 2,
-    "Id": "029363d8ad08e548e6e0f9f43c8e6a5f",
-    "EventTimestamp": "2026-02-26T21:53:09.158Z",
+    "Id": "f4696f30a213a14dc407f354a73fcb59",
+    "EventTimestamp": "2026-03-12T05:35:19.253Z",
+    "SubType": "Callback",
     "Name": "custom_serdes_callback",
     "CallbackStartedDetails": {
-      "CallbackId": "aaee57ea-560e-44b6-8d30-ba8360c724bc",
+      "CallbackId": "496320ec-8747-446d-b07e-cf8e7da634c7",
       "Timeout": 0,
       "HeartbeatTimeout": 0
     }

@@ -452,6 +452,16 @@ impl LambdaHistoryApiClient {
             .iter()
             .filter_map(|event| {
                 let sdk_event_type = event.event_type()?;
+
+                // Skip InvocationCompleted events — the count of these can vary
+                // between runs due to timing, so they are filtered in test assertions.
+                if matches!(
+                    sdk_event_type,
+                    aws_sdk_lambda::types::EventType::InvocationCompleted
+                ) {
+                    return None;
+                }
+
                 let nodejs_event_type = Self::sdk_event_type_to_nodejs(sdk_event_type)?;
                 let sub_type = Self::sdk_event_type_to_sub_type(sdk_event_type);
                 let timestamp = event

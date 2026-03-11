@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "df095fc4-8ca4-4fab-a432-e19527a0bf14",
-    "EventTimestamp": "2026-01-20T23:17:39.173Z",
+    "Id": "ea16b8dc-761e-47d6-b761-293183cd3ff7",
+    "EventTimestamp": "2026-03-12T05:35:19.350Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,17 +13,19 @@
   {
     "EventType": "ContextStarted",
     "EventId": 2,
-    "Id": "b8c310493725745452bb3455fcd1ab8c",
-    "EventTimestamp": "2026-01-20T23:17:39.173Z",
+    "Id": "0c0e748e4202ed7c3445a8fca66e8172",
+    "EventTimestamp": "2026-03-12T05:35:19.350Z",
+    "SubType": "Context",
     "Name": "level_1",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 3,
-    "Id": "b7845eb5fdeda58fa32af8de63c33b05",
-    "EventTimestamp": "2026-01-20T23:17:39.174Z",
-    "ParentId": "b8c310493725745452bb3455fcd1ab8c",
+    "Id": "baf2812119c8ffd593952fe72a7f884a",
+    "EventTimestamp": "2026-03-12T05:35:19.350Z",
+    "SubType": "Step",
+    "ParentId": "0c0e748e4202ed7c3445a8fca66e8172",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "{\"level\":1,\"value\":\"level 1 complete\"}"
@@ -34,18 +36,20 @@
   {
     "EventType": "ContextStarted",
     "EventId": 4,
-    "Id": "05fec08c60f245f7b3f94ead0740c665",
-    "EventTimestamp": "2026-01-20T23:17:39.174Z",
+    "Id": "14c85f3814d7ebf68a89db5dde3b5537",
+    "EventTimestamp": "2026-03-12T05:35:19.351Z",
+    "SubType": "Context",
     "Name": "level_2",
-    "ParentId": "b8c310493725745452bb3455fcd1ab8c",
+    "ParentId": "0c0e748e4202ed7c3445a8fca66e8172",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 5,
-    "Id": "59182087d12087712cc9cee5753fbdf9",
-    "EventTimestamp": "2026-01-20T23:17:39.174Z",
-    "ParentId": "05fec08c60f245f7b3f94ead0740c665",
+    "Id": "56af63272f5e02706ce790f3043d190c",
+    "EventTimestamp": "2026-03-12T05:35:19.351Z",
+    "SubType": "Step",
+    "ParentId": "14c85f3814d7ebf68a89db5dde3b5537",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "{\"level\":2,\"value\":\"level 2 complete\"}"
@@ -56,10 +60,11 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 6,
-    "Id": "05fec08c60f245f7b3f94ead0740c665",
-    "EventTimestamp": "2026-01-20T23:17:39.174Z",
+    "Id": "14c85f3814d7ebf68a89db5dde3b5537",
+    "EventTimestamp": "2026-03-12T05:35:19.351Z",
+    "SubType": "Context",
     "Name": "level_2",
-    "ParentId": "b8c310493725745452bb3455fcd1ab8c",
+    "ParentId": "0c0e748e4202ed7c3445a8fca66e8172",
     "ContextSucceededDetails": {
       "Result": {
         "Payload": "{\"level\":2,\"value\":\"level 2 complete\"}"
@@ -69,8 +74,9 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 7,
-    "Id": "b8c310493725745452bb3455fcd1ab8c",
-    "EventTimestamp": "2026-01-20T23:17:39.174Z",
+    "Id": "0c0e748e4202ed7c3445a8fca66e8172",
+    "EventTimestamp": "2026-03-12T05:35:19.351Z",
+    "SubType": "Context",
     "Name": "level_1",
     "ContextSucceededDetails": {
       "Result": {

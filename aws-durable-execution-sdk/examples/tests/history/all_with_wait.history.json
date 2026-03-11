@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "52a84011-cc09-4591-80d9-c406df3ff624",
-    "EventTimestamp": "2026-02-26T22:59:08.555Z",
+    "Id": "8213b987-6fb5-4b7c-a5aa-44c40c651b2e",
+    "EventTimestamp": "2026-03-12T05:35:19.676Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,39 +13,42 @@
   {
     "EventType": "WaitStarted",
     "EventId": 2,
-    "Id": "3ef66b5dff42290ced68be2d2d407944",
-    "EventTimestamp": "2026-02-26T22:59:08.555Z",
+    "Id": "7e5b7c2e9987597471e6aaada0425f9e",
+    "EventTimestamp": "2026-03-12T05:35:19.677Z",
+    "SubType": "Wait",
     "Name": "wait_1",
     "WaitStartedDetails": {
       "Duration": "PT1S",
-      "ScheduledEndTimestamp": "2026-02-26T22:59:09.555Z"
+      "ScheduledEndTimestamp": "2026-03-12T05:35:20.677Z"
     }
   },
   {
     "EventType": "WaitStarted",
     "EventId": 3,
-    "Id": "5e35a1ee247f15f307e53b960b60fb34",
-    "EventTimestamp": "2026-02-26T22:59:08.556Z",
+    "Id": "d944c4db7869315ab290af862d129d9e",
+    "EventTimestamp": "2026-03-12T05:35:19.685Z",
+    "SubType": "Wait",
     "Name": "wait_2",
     "WaitStartedDetails": {
       "Duration": "PT2S",
-      "ScheduledEndTimestamp": "2026-02-26T22:59:10.556Z"
+      "ScheduledEndTimestamp": "2026-03-12T05:35:21.685Z"
     }
   },
   {
     "EventType": "StepStarted",
     "EventId": 4,
-    "Id": "63678f35232325784816c6c3807f8025",
-    "EventTimestamp": "2026-02-26T22:59:08.557Z",
-    "SubType": "PromiseCombinator",
+    "Id": "9ae413c152c1fb2c1de840835626de82",
+    "EventTimestamp": "2026-03-12T05:35:19.695Z",
+    "SubType": "Step",
     "Name": "all",
     "StepStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 5,
-    "Id": "806cdb511cebd2dedb1d550011947642",
-    "EventTimestamp": "2026-02-26T22:59:08.557Z",
+    "Id": "89445f640e40b0fa95ab8841486910fb",
+    "EventTimestamp": "2026-03-12T05:35:19.697Z",
+    "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"fast\""
@@ -56,8 +59,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 6,
-    "Id": "88ea6fcbe0e67bae647c1b3b28bea209",
-    "EventTimestamp": "2026-02-26T22:59:08.557Z",
+    "Id": "e0ebc639e5bb713e428909dd72735962",
+    "EventTimestamp": "2026-03-12T05:35:19.698Z",
+    "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"after_wait_1\""
@@ -68,8 +72,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 7,
-    "Id": "9ac9570cbbd4124d9435bc2b8149e415",
-    "EventTimestamp": "2026-02-26T22:59:08.557Z",
+    "Id": "9a441bd5856d91c5c762c060fb2c74d1",
+    "EventTimestamp": "2026-03-12T05:35:19.698Z",
+    "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"after_wait_2\""
@@ -80,9 +85,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 8,
-    "Id": "63678f35232325784816c6c3807f8025",
-    "EventTimestamp": "2026-02-26T22:59:08.557Z",
-    "SubType": "PromiseCombinator",
+    "Id": "9ae413c152c1fb2c1de840835626de82",
+    "EventTimestamp": "2026-03-12T05:35:19.699Z",
+    "SubType": "Step",
     "Name": "all",
     "StepSucceededDetails": {
       "Result": {

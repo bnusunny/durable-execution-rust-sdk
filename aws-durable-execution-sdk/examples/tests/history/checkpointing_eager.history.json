@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "57628f7e-012a-4d11-bcf0-b1c88936db0a",
-    "EventTimestamp": "2026-02-26T23:27:52.274Z",
+    "Id": "5f5d4108-e55a-469c-a690-778c4370d9fc",
+    "EventTimestamp": "2026-03-12T05:35:19.245Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 2,
-    "Id": "e5e90ad7b7a026975ee74346e16dbf0c",
-    "EventTimestamp": "2026-02-26T23:27:52.275Z",
+    "Id": "4da8a824d41231c80e2def5c8772de39",
+    "EventTimestamp": "2026-03-12T05:35:19.246Z",
+    "SubType": "Step",
     "Name": "critical_step_1",
     "StepSucceededDetails": {
       "Result": {
@@ -26,8 +27,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 3,
-    "Id": "194fc0b05fd846ed3743425d20123660",
-    "EventTimestamp": "2026-02-26T23:27:52.275Z",
+    "Id": "d972bced31c5526aeca466966b3abbb1",
+    "EventTimestamp": "2026-03-12T05:35:19.246Z",
+    "SubType": "Step",
     "Name": "critical_step_2",
     "StepSucceededDetails": {
       "Result": {

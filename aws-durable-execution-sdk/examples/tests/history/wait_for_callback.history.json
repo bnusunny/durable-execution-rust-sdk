@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "d084bdaf-b086-4f40-a8a1-e90d90f8e161",
-    "EventTimestamp": "2026-01-20T23:17:39.166Z",
+    "Id": "15628a1f-a9d1-4a24-818b-caa779c99fba",
+    "EventTimestamp": "2026-03-12T05:35:19.253Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{\"payment_id\":\"pay-12345\",\"amount\":100.0,\"currency\":\"USD\",\"customer_email\":\"test@example.com\"}"
@@ -13,8 +13,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 2,
-    "Id": "c1b8c1230c210ec81ca162845cb51bda",
-    "EventTimestamp": "2026-01-20T23:17:39.167Z",
+    "Id": "1df9b008797a47d856a8cae90e04456a",
+    "EventTimestamp": "2026-03-12T05:35:19.253Z",
+    "SubType": "Step",
     "Name": "validate",
     "StepSucceededDetails": {
       "Result": {
@@ -26,10 +27,11 @@
   {
     "EventType": "CallbackStarted",
     "EventId": 3,
-    "Id": "e18251c17849834ec1b2ad0dfbfee6ee",
-    "EventTimestamp": "2026-01-20T23:17:39.167Z",
+    "Id": "3686a8d4558d3a1c48c8e054618cf52e",
+    "EventTimestamp": "2026-03-12T05:35:19.254Z",
+    "SubType": "Callback",
     "CallbackStartedDetails": {
-      "CallbackId": "c6774060-bdbf-4801-a552-56ff2c97ba12",
+      "CallbackId": "68da41ef-f778-4de1-aec6-434c24137f40",
       "Timeout": 3600,
       "HeartbeatTimeout": 600
     }
@@ -37,18 +39,20 @@
   {
     "EventType": "ContextStarted",
     "EventId": 4,
-    "Id": "5b08d4c775c8d861f58bb7d73ac20478",
-    "EventTimestamp": "2026-01-20T23:17:39.167Z",
+    "Id": "2108bbb4bb22bfc992d62f53b20603fe",
+    "EventTimestamp": "2026-03-12T05:35:19.254Z",
+    "SubType": "Context",
     "Name": "wait_for_callback_submitter",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 5,
-    "Id": "b3614efb382db478039d833072af36dc",
-    "EventTimestamp": "2026-01-20T23:17:39.167Z",
+    "Id": "26c6a9e9abde9a7cc2c167531e2758fa",
+    "EventTimestamp": "2026-03-12T05:35:19.255Z",
+    "SubType": "Step",
     "Name": "execute_submitter",
-    "ParentId": "5b08d4c775c8d861f58bb7d73ac20478",
+    "ParentId": "2108bbb4bb22bfc992d62f53b20603fe",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "null"
@@ -59,8 +63,9 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 6,
-    "Id": "5b08d4c775c8d861f58bb7d73ac20478",
-    "EventTimestamp": "2026-01-20T23:17:39.167Z",
+    "Id": "2108bbb4bb22bfc992d62f53b20603fe",
+    "EventTimestamp": "2026-03-12T05:35:19.255Z",
+    "SubType": "Context",
     "Name": "wait_for_callback_submitter",
     "ContextSucceededDetails": {
       "Result": {

@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "a0886ce7-3d78-491a-955d-e58956b696fc",
-    "EventTimestamp": "2026-01-20T23:17:39.256Z",
+    "Id": "617e57ed-566f-4bbb-b68a-ea437230b2eb",
+    "EventTimestamp": "2026-03-12T05:35:19.676Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,44 +13,49 @@
   {
     "EventType": "ContextStarted",
     "EventId": 2,
-    "Id": "87765adf8f4c1488569935e290745b20",
-    "EventTimestamp": "2026-01-20T23:17:39.263Z",
+    "Id": "d6bca685158fe681b6b44431a1ac7687",
+    "EventTimestamp": "2026-03-12T05:35:19.677Z",
+    "SubType": "Context",
     "Name": "map",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "ContextStarted",
     "EventId": 3,
-    "Id": "847ebc00f595f87aa659c69cf30ae68a",
-    "EventTimestamp": "2026-01-20T23:17:39.264Z",
+    "Id": "5a5986db95809a04bdeacea96b7f41b1",
+    "EventTimestamp": "2026-03-12T05:35:19.678Z",
+    "SubType": "Context",
     "Name": "map-item-0",
-    "ParentId": "87765adf8f4c1488569935e290745b20",
+    "ParentId": "d6bca685158fe681b6b44431a1ac7687",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "ContextStarted",
     "EventId": 4,
-    "Id": "61de8bfef30efc8a5873b4b859be91d7",
-    "EventTimestamp": "2026-01-20T23:17:39.264Z",
+    "Id": "89dedaee4bcb70eb447da78b42c93fb2",
+    "EventTimestamp": "2026-03-12T05:35:19.678Z",
+    "SubType": "Context",
     "Name": "map-item-1",
-    "ParentId": "87765adf8f4c1488569935e290745b20",
+    "ParentId": "d6bca685158fe681b6b44431a1ac7687",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "ContextStarted",
     "EventId": 5,
-    "Id": "a7bdc9661cc05a953503ac396a3eccf6",
-    "EventTimestamp": "2026-01-20T23:17:39.264Z",
+    "Id": "dd79654f47961eb32e7c826ff10235ae",
+    "EventTimestamp": "2026-03-12T05:35:19.678Z",
+    "SubType": "Context",
     "Name": "map-item-2",
-    "ParentId": "87765adf8f4c1488569935e290745b20",
+    "ParentId": "d6bca685158fe681b6b44431a1ac7687",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 6,
-    "Id": "9a5dbaa3469895078ae241070bee08d5",
-    "EventTimestamp": "2026-01-20T23:17:39.264Z",
-    "ParentId": "847ebc00f595f87aa659c69cf30ae68a",
+    "Id": "c0f6032b7a2f7b13109c7e4448b19d88",
+    "EventTimestamp": "2026-03-12T05:35:19.679Z",
+    "SubType": "Step",
+    "ParentId": "5a5986db95809a04bdeacea96b7f41b1",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"op1 success\""
@@ -61,9 +66,10 @@
   {
     "EventType": "StepFailed",
     "EventId": 7,
-    "Id": "f6f0f97670a1ec43404ea98b5bd898c5",
-    "EventTimestamp": "2026-01-20T23:17:39.264Z",
-    "ParentId": "61de8bfef30efc8a5873b4b859be91d7",
+    "Id": "4d0d703a9efb085b55d118750df2fb2c",
+    "EventTimestamp": "2026-03-12T05:35:19.679Z",
+    "SubType": "Step",
+    "ParentId": "89dedaee4bcb70eb447da78b42c93fb2",
     "StepFailedDetails": {
       "Error": {
         "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"op2 failed\"}"
@@ -74,9 +80,10 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 8,
-    "Id": "9e727cfa727e180f38b16720135995d3",
-    "EventTimestamp": "2026-01-20T23:17:39.264Z",
-    "ParentId": "a7bdc9661cc05a953503ac396a3eccf6",
+    "Id": "d0157c091d4ee510a53abf99bff69f8f",
+    "EventTimestamp": "2026-03-12T05:35:19.679Z",
+    "SubType": "Step",
+    "ParentId": "dd79654f47961eb32e7c826ff10235ae",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"op3 success\""
@@ -87,10 +94,11 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 9,
-    "Id": "847ebc00f595f87aa659c69cf30ae68a",
-    "EventTimestamp": "2026-01-20T23:17:39.265Z",
+    "Id": "5a5986db95809a04bdeacea96b7f41b1",
+    "EventTimestamp": "2026-03-12T05:35:19.680Z",
+    "SubType": "Context",
     "Name": "map-item-0",
-    "ParentId": "87765adf8f4c1488569935e290745b20",
+    "ParentId": "d6bca685158fe681b6b44431a1ac7687",
     "ContextSucceededDetails": {
       "Result": {
         "Payload": "\"op1 success\""
@@ -100,10 +108,11 @@
   {
     "EventType": "ContextFailed",
     "EventId": 10,
-    "Id": "61de8bfef30efc8a5873b4b859be91d7",
-    "EventTimestamp": "2026-01-20T23:17:39.265Z",
+    "Id": "89dedaee4bcb70eb447da78b42c93fb2",
+    "EventTimestamp": "2026-03-12T05:35:19.680Z",
+    "SubType": "Context",
     "Name": "map-item-1",
-    "ParentId": "87765adf8f4c1488569935e290745b20",
+    "ParentId": "d6bca685158fe681b6b44431a1ac7687",
     "ContextFailedDetails": {
       "Error": {
         "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"op2 failed\"}"
@@ -113,10 +122,11 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 11,
-    "Id": "a7bdc9661cc05a953503ac396a3eccf6",
-    "EventTimestamp": "2026-01-20T23:17:39.265Z",
+    "Id": "dd79654f47961eb32e7c826ff10235ae",
+    "EventTimestamp": "2026-03-12T05:35:19.680Z",
+    "SubType": "Context",
     "Name": "map-item-2",
-    "ParentId": "87765adf8f4c1488569935e290745b20",
+    "ParentId": "d6bca685158fe681b6b44431a1ac7687",
     "ContextSucceededDetails": {
       "Result": {
         "Payload": "\"op3 success\""
@@ -126,8 +136,9 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 12,
-    "Id": "87765adf8f4c1488569935e290745b20",
-    "EventTimestamp": "2026-01-20T23:17:39.265Z",
+    "Id": "d6bca685158fe681b6b44431a1ac7687",
+    "EventTimestamp": "2026-03-12T05:35:19.681Z",
+    "SubType": "Context",
     "Name": "map",
     "ContextSucceededDetails": {
       "Result": {

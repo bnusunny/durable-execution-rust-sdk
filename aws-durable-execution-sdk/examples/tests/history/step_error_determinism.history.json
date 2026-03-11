@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "1b583ccc-274b-4b0a-a071-33276071d3f2",
-    "EventTimestamp": "2026-02-26T23:27:33.979Z",
+    "Id": "cf19fc4f-dde7-403d-b86c-9115c1db1b8c",
+    "EventTimestamp": "2026-03-12T05:35:19.741Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,9 @@
   {
     "EventType": "StepFailed",
     "EventId": 2,
-    "Id": "87fa404a1a009fe11feadacedc7ae40e",
-    "EventTimestamp": "2026-02-26T23:27:33.979Z",
+    "Id": "a9facece13eadfe8b3cd9b48f25729ea",
+    "EventTimestamp": "2026-03-12T05:35:19.742Z",
+    "SubType": "Step",
     "Name": "always_fails",
     "StepFailedDetails": {
       "Error": {

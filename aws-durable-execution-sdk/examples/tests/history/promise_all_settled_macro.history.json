@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "d36bb0c9-04e9-4107-ba7b-f18258ad725d",
-    "EventTimestamp": "2026-01-20T23:17:39.255Z",
+    "Id": "8b0ca9aa-7f84-40ad-aa05-a179c67d0f5d",
+    "EventTimestamp": "2026-03-12T05:35:19.677Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,17 +13,18 @@
   {
     "EventType": "StepStarted",
     "EventId": 2,
-    "Id": "8b9fda7b2379a4d3113f8bd19d030c96",
-    "EventTimestamp": "2026-01-20T23:17:39.256Z",
-    "SubType": "PromiseCombinator",
+    "Id": "dd32bd6c9d995625b947bb7eb42957c3",
+    "EventTimestamp": "2026-03-12T05:35:19.678Z",
+    "SubType": "Step",
     "Name": "all_settled",
     "StepStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 3,
-    "Id": "e6882c9deda7c4c83fbbc309f7a1cc03",
-    "EventTimestamp": "2026-01-20T23:17:39.257Z",
+    "Id": "4ad2e414445506a78c66fc42775f630f",
+    "EventTimestamp": "2026-03-12T05:35:19.679Z",
+    "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"op1 success\""
@@ -34,8 +35,9 @@
   {
     "EventType": "StepFailed",
     "EventId": 4,
-    "Id": "443c2f4f1eed624da39f4de17c5a8255",
-    "EventTimestamp": "2026-01-20T23:17:39.257Z",
+    "Id": "a0e5361b22bf5c03dcc32c4a1078aeee",
+    "EventTimestamp": "2026-03-12T05:35:19.679Z",
+    "SubType": "Step",
     "StepFailedDetails": {
       "Error": {
         "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"op2 failed\"}"
@@ -46,8 +48,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 5,
-    "Id": "e7e04083b53dfd69fd0faf59d5a05cc1",
-    "EventTimestamp": "2026-01-20T23:17:39.257Z",
+    "Id": "756adc41b5fe5c8dd7df1ab25903dade",
+    "EventTimestamp": "2026-03-12T05:35:19.679Z",
+    "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"op3 success\""
@@ -58,9 +61,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 6,
-    "Id": "8b9fda7b2379a4d3113f8bd19d030c96",
-    "EventTimestamp": "2026-01-20T23:17:39.258Z",
-    "SubType": "PromiseCombinator",
+    "Id": "dd32bd6c9d995625b947bb7eb42957c3",
+    "EventTimestamp": "2026-03-12T05:35:19.680Z",
+    "SubType": "Step",
     "Name": "all_settled",
     "StepSucceededDetails": {
       "Result": {

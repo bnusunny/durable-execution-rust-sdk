@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "03ce2bd3-eac6-450b-aa85-4d3c48cf3cf9",
-    "EventTimestamp": "2026-01-20T23:17:39.473Z",
+    "Id": "13c863be-a50f-4356-9d3c-93e5d9e04ecd",
+    "EventTimestamp": "2026-03-12T05:35:19.742Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 2,
-    "Id": "eabf43a602524612354350117428da5d",
-    "EventTimestamp": "2026-01-20T23:17:39.476Z",
+    "Id": "4e0502e9ca5d620e897d6d9797320f8b",
+    "EventTimestamp": "2026-03-12T05:35:19.742Z",
+    "SubType": "Step",
     "Name": "fetch_data",
     "StepSucceededDetails": {
       "Result": {
@@ -26,8 +27,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 3,
-    "Id": "4816f739fb55a74928b69512e1638499",
-    "EventTimestamp": "2026-01-20T23:17:39.476Z",
+    "Id": "bfcedc08d95281906bafe3237dc9aa78",
+    "EventTimestamp": "2026-03-12T05:35:19.743Z",
+    "SubType": "Step",
     "Name": "process_data",
     "StepSucceededDetails": {
       "Result": {
@@ -39,8 +41,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 4,
-    "Id": "185f2fd9e5cd517c1fcce9fd82546885",
-    "EventTimestamp": "2026-01-20T23:17:39.477Z",
+    "Id": "2144979efa4cb96ae5f10dd86468626b",
+    "EventTimestamp": "2026-03-12T05:35:19.743Z",
+    "SubType": "Step",
     "Name": "finalize",
     "StepSucceededDetails": {
       "Result": {

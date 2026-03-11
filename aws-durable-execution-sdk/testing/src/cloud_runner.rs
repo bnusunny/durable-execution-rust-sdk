@@ -430,6 +430,7 @@ impl HistoryApiClient for LambdaHistoryApiClient {
 
         Ok(HistoryPage {
             events: Vec::new(),
+            nodejs_events: Self::events_to_nodejs_events(events),
             operations,
             next_marker: response.next_marker().map(|s| s.to_string()),
             is_terminal,
@@ -437,6 +438,94 @@ impl HistoryApiClient for LambdaHistoryApiClient {
             terminal_result,
             terminal_error,
         })
+    }
+}
+
+impl LambdaHistoryApiClient {
+    /// Converts SDK events into `NodeJsHistoryEvent` objects for history comparison.
+    fn events_to_nodejs_events(
+        events: &[aws_sdk_lambda::types::Event],
+    ) -> Vec<crate::NodeJsHistoryEvent> {
+        use crate::checkpoint_server::nodejs_event_types::*;
+
+        events
+            .iter()
+            .filter_map(|event| {
+                let sdk_event_type = event.event_type()?;
+                let nodejs_event_type = Self::sdk_event_type_to_nodejs(sdk_event_type)?;
+                let sub_type = Self::sdk_event_type_to_sub_type(sdk_event_type);
+                let timestamp = event
+                    .event_timestamp()
+                    .map(|t| format!("{}", t))
+                    .unwrap_or_default();
+
+                Some(NodeJsHistoryEvent {
+                    event_type: nodejs_event_type,
+                    event_id: event.event_id() as u64,
+                    id: event.id().map(|s| s.to_string()),
+                    event_timestamp: timestamp,
+                    sub_type: sub_type.map(|s| s.to_string()),
+                    name: event.name().map(|s| s.to_string()),
+                    parent_id: event.parent_id().map(|s| s.to_string()),
+                    details: NodeJsEventDetails::Empty(EmptyDetails {}),
+                })
+            })
+            .collect()
+    }
+
+    /// Maps Lambda SDK EventType to NodeJsEventType.
+    fn sdk_event_type_to_nodejs(
+        et: &aws_sdk_lambda::types::EventType,
+    ) -> Option<crate::checkpoint_server::nodejs_event_types::NodeJsEventType> {
+        use crate::checkpoint_server::nodejs_event_types::NodeJsEventType;
+        use aws_sdk_lambda::types::EventType;
+        match et {
+            EventType::ExecutionStarted => Some(NodeJsEventType::ExecutionStarted),
+            EventType::ExecutionSucceeded => Some(NodeJsEventType::ExecutionSucceeded),
+            EventType::ExecutionFailed => Some(NodeJsEventType::ExecutionFailed),
+            EventType::StepStarted => Some(NodeJsEventType::StepStarted),
+            EventType::StepSucceeded => Some(NodeJsEventType::StepSucceeded),
+            EventType::StepFailed => Some(NodeJsEventType::StepFailed),
+            EventType::WaitStarted => Some(NodeJsEventType::WaitStarted),
+            EventType::WaitSucceeded => Some(NodeJsEventType::WaitSucceeded),
+            EventType::WaitCancelled => Some(NodeJsEventType::WaitCancelled),
+            EventType::CallbackStarted => Some(NodeJsEventType::CallbackStarted),
+            EventType::CallbackSucceeded => Some(NodeJsEventType::CallbackSucceeded),
+            EventType::CallbackFailed => Some(NodeJsEventType::CallbackFailed),
+            EventType::CallbackTimedOut => Some(NodeJsEventType::CallbackTimedOut),
+            EventType::ContextStarted => Some(NodeJsEventType::ContextStarted),
+            EventType::ContextSucceeded => Some(NodeJsEventType::ContextSucceeded),
+            EventType::ContextFailed => Some(NodeJsEventType::ContextFailed),
+            EventType::ChainedInvokeStarted => Some(NodeJsEventType::ChainedInvokeStarted),
+            EventType::ChainedInvokeSucceeded => Some(NodeJsEventType::ChainedInvokeSucceeded),
+            EventType::ChainedInvokeFailed => Some(NodeJsEventType::ChainedInvokeFailed),
+            EventType::InvocationCompleted => Some(NodeJsEventType::InvocationCompleted),
+            _ => None,
+        }
+    }
+
+    /// Maps Lambda SDK EventType to a sub-type string.
+    fn sdk_event_type_to_sub_type(et: &aws_sdk_lambda::types::EventType) -> Option<&'static str> {
+        use aws_sdk_lambda::types::EventType;
+        match et {
+            EventType::StepStarted | EventType::StepSucceeded | EventType::StepFailed => {
+                Some("Step")
+            }
+            EventType::WaitStarted | EventType::WaitSucceeded | EventType::WaitCancelled => {
+                Some("Wait")
+            }
+            EventType::CallbackStarted
+            | EventType::CallbackSucceeded
+            | EventType::CallbackFailed
+            | EventType::CallbackTimedOut => Some("Callback"),
+            EventType::ContextStarted | EventType::ContextSucceeded | EventType::ContextFailed => {
+                Some("Context")
+            }
+            EventType::ChainedInvokeStarted
+            | EventType::ChainedInvokeSucceeded
+            | EventType::ChainedInvokeFailed => Some("ChainedInvoke"),
+            _ => None,
+        }
     }
 }
 
@@ -817,6 +906,7 @@ where
         // Requirement 7.2: Use configured timeout
         let deadline = Instant::now() + self.config.timeout;
         let mut all_events = Vec::new();
+        let mut all_nodejs_events = Vec::new();
 
         loop {
             // Requirement 1.4: Check timeout
@@ -842,6 +932,7 @@ where
 
             // Requirement 9.1: Collect history events
             all_events.extend(poll_result.events);
+            all_nodejs_events.extend(poll_result.nodejs_events);
 
             // Requirement 1.2, 1.5: Check terminal state
             if let Some(terminal) = poll_result.terminal {
@@ -866,6 +957,7 @@ where
                 };
                 // Requirement 9.1, 9.2, 9.3: Include all history events
                 result.set_history_events(all_events);
+                result.set_nodejs_history_events(all_nodejs_events);
                 return Ok(result);
             }
         }

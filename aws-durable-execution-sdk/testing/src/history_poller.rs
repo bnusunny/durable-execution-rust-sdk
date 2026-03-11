@@ -42,6 +42,9 @@ pub trait HistoryApiClient: Send + Sync {
 pub struct HistoryPage {
     /// History events from this page.
     pub events: Vec<HistoryEvent>,
+    /// Node.js-compatible history events from this page (populated by cloud runner).
+    #[allow(dead_code)]
+    pub nodejs_events: Vec<crate::NodeJsHistoryEvent>,
     /// Operations discovered in this page.
     pub operations: Vec<Operation>,
     /// Pagination marker for the next page, if more results are available.
@@ -67,6 +70,8 @@ pub struct PollResult {
     pub operations: Vec<Operation>,
     /// All history events collected across all pages in this poll cycle.
     pub events: Vec<HistoryEvent>,
+    /// Node.js-compatible history events collected across all pages.
+    pub nodejs_events: Vec<crate::NodeJsHistoryEvent>,
     /// Terminal state information, if the execution completed during this cycle.
     pub terminal: Option<TerminalState>,
 }
@@ -168,6 +173,7 @@ impl<C: HistoryApiClient> HistoryPoller<C> {
     pub async fn poll_once(&mut self) -> Result<PollResult, TestError> {
         let mut all_operations = Vec::new();
         let mut all_events = Vec::new();
+        let mut all_nodejs_events = Vec::new();
         let mut terminal = None;
 
         // First page uses the marker carried over from the previous cycle
@@ -178,6 +184,7 @@ impl<C: HistoryApiClient> HistoryPoller<C> {
 
             all_operations.extend(page.operations);
             all_events.extend(page.events);
+            all_nodejs_events.extend(page.nodejs_events);
 
             // Capture terminal state from any page (first one wins)
             if page.is_terminal && terminal.is_none() {
@@ -205,6 +212,7 @@ impl<C: HistoryApiClient> HistoryPoller<C> {
         Ok(PollResult {
             operations: all_operations,
             events: all_events,
+            nodejs_events: all_nodejs_events,
             terminal,
         })
     }
@@ -263,6 +271,7 @@ pub(crate) mod tests {
     fn mock_returns_configured_responses() {
         let page = HistoryPage {
             events: vec![],
+            nodejs_events: Vec::new(),
             operations: vec![],
             next_marker: None,
             is_terminal: false,
@@ -306,6 +315,7 @@ pub(crate) mod tests {
         for _ in 0..3 {
             responses.push_back(Ok(HistoryPage {
                 events: vec![],
+                nodejs_events: Vec::new(),
                 operations: vec![],
                 next_marker: None,
                 is_terminal: false,
@@ -356,6 +366,7 @@ pub(crate) mod tests {
     fn empty_page() -> HistoryPage {
         HistoryPage {
             events: vec![],
+            nodejs_events: Vec::new(),
             operations: vec![],
             next_marker: None,
             is_terminal: false,
@@ -520,6 +531,7 @@ pub(crate) mod tests {
         let mut responses = VecDeque::new();
         responses.push_back(Ok(HistoryPage {
             events: vec![evt],
+            nodejs_events: Vec::new(),
             operations: vec![op],
             next_marker: None,
             is_terminal: false,
@@ -549,6 +561,7 @@ pub(crate) mod tests {
         // Page 1: has next_marker
         responses.push_back(Ok(HistoryPage {
             events: vec![make_event("E1")],
+            nodejs_events: Vec::new(),
             operations: vec![make_operation("op-1")],
             next_marker: Some("marker-A".to_string()),
             is_terminal: false,
@@ -559,6 +572,7 @@ pub(crate) mod tests {
         // Page 2: has next_marker
         responses.push_back(Ok(HistoryPage {
             events: vec![make_event("E2")],
+            nodejs_events: Vec::new(),
             operations: vec![make_operation("op-2")],
             next_marker: Some("marker-B".to_string()),
             is_terminal: false,
@@ -569,6 +583,7 @@ pub(crate) mod tests {
         // Page 3: no next_marker (end of pagination)
         responses.push_back(Ok(HistoryPage {
             events: vec![make_event("E3")],
+            nodejs_events: Vec::new(),
             operations: vec![make_operation("op-3")],
             next_marker: None,
             is_terminal: false,
@@ -605,6 +620,7 @@ pub(crate) mod tests {
         let mut responses = VecDeque::new();
         responses.push_back(Ok(HistoryPage {
             events: vec![make_event("ExecutionSucceeded")],
+            nodejs_events: Vec::new(),
             operations: vec![make_operation("op-1")],
             next_marker: None,
             is_terminal: true,
@@ -630,6 +646,7 @@ pub(crate) mod tests {
         let mut responses = VecDeque::new();
         responses.push_back(Ok(HistoryPage {
             events: vec![],
+            nodejs_events: Vec::new(),
             operations: vec![],
             next_marker: None,
             is_terminal: true,
@@ -660,6 +677,7 @@ pub(crate) mod tests {
         // Cycle 1: single page with next_marker
         responses.push_back(Ok(HistoryPage {
             events: vec![],
+            nodejs_events: Vec::new(),
             operations: vec![make_operation("op-1")],
             next_marker: Some("cycle1-marker".to_string()),
             is_terminal: false,
@@ -670,6 +688,7 @@ pub(crate) mod tests {
         // Cycle 1 page 2: no next_marker
         responses.push_back(Ok(HistoryPage {
             events: vec![],
+            nodejs_events: Vec::new(),
             operations: vec![],
             next_marker: None,
             is_terminal: false,
@@ -680,6 +699,7 @@ pub(crate) mod tests {
         // Cycle 2: should start with cycle1-marker
         responses.push_back(Ok(HistoryPage {
             events: vec![],
+            nodejs_events: Vec::new(),
             operations: vec![make_operation("op-2")],
             next_marker: None,
             is_terminal: true,
@@ -744,6 +764,7 @@ pub(crate) mod tests {
         let mut responses = VecDeque::new();
         responses.push_back(Ok(HistoryPage {
             events: vec![],
+            nodejs_events: Vec::new(),
             operations: vec![],
             next_marker: Some("m1".to_string()),
             is_terminal: false,

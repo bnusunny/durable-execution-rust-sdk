@@ -37,9 +37,7 @@ use crate::operation::{CallbackSender, DurableOperation};
 use crate::operation_handle::{OperationHandle, OperationMatcher};
 use crate::test_result::TestResult;
 use crate::types::{ExecutionStatus, TestResultError};
-use durable_execution_sdk::{
-    DurableServiceClient, LambdaDurableServiceClient, Operation, OperationStatus, OperationType,
-};
+use durable_execution_sdk::{Operation, OperationStatus, OperationType};
 
 /// Configuration for the cloud test runner.
 ///
@@ -181,94 +179,259 @@ impl OperationStorage {
     }
 }
 
-/// Real implementation of [`HistoryApiClient`] that calls the durable execution
-/// state API via a [`LambdaDurableServiceClient`].
-///
-/// Wraps a `LambdaClient` and creates an internal service client to make
-/// signed HTTP calls to the `GetDurableExecutionHistory` API endpoint.
+/// Real implementation of [`HistoryApiClient`] that calls the
+/// `GetDurableExecutionHistory` Lambda API via the AWS SDK.
 pub struct LambdaHistoryApiClient {
-    service_client: LambdaDurableServiceClient,
+    lambda_client: LambdaClient,
 }
 
 impl LambdaHistoryApiClient {
     /// Creates a new `LambdaHistoryApiClient` from an AWS SDK config.
-    ///
-    /// The config is used to construct a `LambdaDurableServiceClient` that
-    /// makes signed HTTP calls to the durable execution state API.
-    ///
-    /// # Arguments
-    ///
-    /// * `aws_config` - The AWS SDK configuration (same one used to create the `LambdaClient`)
     pub fn from_aws_config(aws_config: &aws_config::SdkConfig) -> Result<Self, TestError> {
         Ok(Self {
-            service_client: LambdaDurableServiceClient::from_aws_config(aws_config).map_err(
-                |e| TestError::aws_error(format!("Failed to create service client: {}", e)),
-            )?,
+            lambda_client: LambdaClient::new(aws_config),
         })
     }
 
-    /// Creates a new `LambdaHistoryApiClient` from an existing `LambdaDurableServiceClient`.
-    ///
-    /// Useful when a service client is already available.
-    pub fn from_service_client(service_client: LambdaDurableServiceClient) -> Self {
-        Self { service_client }
+    /// Creates a new `LambdaHistoryApiClient` from an existing Lambda client.
+    pub fn from_lambda_client(lambda_client: LambdaClient) -> Self {
+        Self { lambda_client }
     }
 
-    /// Maps an [`OperationStatus`] to an [`ExecutionStatus`] for terminal detection.
-    fn map_terminal_status(status: &OperationStatus) -> Option<ExecutionStatus> {
-        match status {
-            OperationStatus::Succeeded => Some(ExecutionStatus::Succeeded),
-            OperationStatus::Failed => Some(ExecutionStatus::Failed),
-            OperationStatus::Cancelled => Some(ExecutionStatus::Cancelled),
-            OperationStatus::TimedOut => Some(ExecutionStatus::TimedOut),
+    /// Converts an SDK `EventType` to an `OperationType`.
+    fn event_type_to_operation_type(
+        event_type: &aws_sdk_lambda::types::EventType,
+    ) -> Option<OperationType> {
+        use aws_sdk_lambda::types::EventType;
+        match event_type {
+            EventType::StepStarted | EventType::StepSucceeded | EventType::StepFailed => {
+                Some(OperationType::Step)
+            }
+            EventType::WaitStarted | EventType::WaitSucceeded | EventType::WaitCancelled => {
+                Some(OperationType::Wait)
+            }
+            EventType::CallbackStarted
+            | EventType::CallbackSucceeded
+            | EventType::CallbackFailed
+            | EventType::CallbackTimedOut => Some(OperationType::Callback),
+            EventType::ContextStarted | EventType::ContextSucceeded | EventType::ContextFailed => {
+                Some(OperationType::Context)
+            }
+            EventType::ChainedInvokeStarted
+            | EventType::ChainedInvokeSucceeded
+            | EventType::ChainedInvokeFailed
+            | EventType::ChainedInvokeStopped
+            | EventType::ChainedInvokeTimedOut => Some(OperationType::Invoke),
+            EventType::ExecutionStarted
+            | EventType::ExecutionSucceeded
+            | EventType::ExecutionFailed
+            | EventType::ExecutionTimedOut
+            | EventType::ExecutionStopped => Some(OperationType::Execution),
             _ => None,
         }
+    }
+
+    /// Determines the `OperationStatus` from an SDK `EventType`.
+    fn event_type_to_status(event_type: &aws_sdk_lambda::types::EventType) -> OperationStatus {
+        use aws_sdk_lambda::types::EventType;
+        match event_type {
+            EventType::StepStarted
+            | EventType::WaitStarted
+            | EventType::CallbackStarted
+            | EventType::ContextStarted
+            | EventType::ChainedInvokeStarted
+            | EventType::ExecutionStarted => OperationStatus::Started,
+
+            EventType::StepSucceeded
+            | EventType::WaitSucceeded
+            | EventType::CallbackSucceeded
+            | EventType::ContextSucceeded
+            | EventType::ChainedInvokeSucceeded
+            | EventType::ExecutionSucceeded => OperationStatus::Succeeded,
+
+            EventType::StepFailed
+            | EventType::CallbackFailed
+            | EventType::ContextFailed
+            | EventType::ChainedInvokeFailed
+            | EventType::ExecutionFailed => OperationStatus::Failed,
+
+            EventType::CallbackTimedOut
+            | EventType::ChainedInvokeTimedOut
+            | EventType::ExecutionTimedOut => OperationStatus::TimedOut,
+
+            EventType::WaitCancelled
+            | EventType::ChainedInvokeStopped
+            | EventType::ExecutionStopped => OperationStatus::Cancelled,
+
+            _ => OperationStatus::Started,
+        }
+    }
+
+    /// Extracts the result payload string from an event, if present.
+    fn extract_result(event: &aws_sdk_lambda::types::Event) -> Option<String> {
+        if let Some(d) = event.step_succeeded_details() {
+            return d.result().and_then(|r| r.payload()).map(|s| s.to_string());
+        }
+        if let Some(d) = event.execution_succeeded_details() {
+            return d.result().and_then(|r| r.payload()).map(|s| s.to_string());
+        }
+        if let Some(d) = event.context_succeeded_details() {
+            return d.result().and_then(|r| r.payload()).map(|s| s.to_string());
+        }
+        if let Some(d) = event.callback_succeeded_details() {
+            return d.result().and_then(|r| r.payload()).map(|s| s.to_string());
+        }
+        if let Some(d) = event.chained_invoke_succeeded_details() {
+            return d.result().and_then(|r| r.payload()).map(|s| s.to_string());
+        }
+        None
+    }
+
+    /// Extracts error info from an event, if present.
+    fn extract_error(
+        event: &aws_sdk_lambda::types::Event,
+    ) -> Option<durable_execution_sdk::ErrorObject> {
+        let extract_from = |err: &aws_sdk_lambda::types::EventError| -> Option<durable_execution_sdk::ErrorObject> {
+            err.payload().map(|p| durable_execution_sdk::ErrorObject {
+                error_type: p.error_type().unwrap_or_default().to_string(),
+                error_message: p.error_message().unwrap_or_default().to_string(),
+                stack_trace: None,
+            })
+        };
+
+        if let Some(d) = event.step_failed_details() {
+            return d.error().and_then(extract_from);
+        }
+        if let Some(d) = event.execution_failed_details() {
+            return d.error().and_then(extract_from);
+        }
+        if let Some(d) = event.context_failed_details() {
+            return d.error().and_then(extract_from);
+        }
+        if let Some(d) = event.callback_failed_details() {
+            return d.error().and_then(extract_from);
+        }
+        if let Some(d) = event.chained_invoke_failed_details() {
+            return d.error().and_then(extract_from);
+        }
+        None
+    }
+
+    /// Converts SDK events into `Operation` objects, merging Started+Completed events
+    /// for the same operation ID.
+    fn events_to_operations(events: &[aws_sdk_lambda::types::Event]) -> Vec<Operation> {
+        let mut ops_map: HashMap<String, Operation> = HashMap::new();
+        let mut order: Vec<String> = Vec::new();
+
+        for event in events {
+            let event_type = match event.event_type() {
+                Some(et) => et,
+                None => continue,
+            };
+
+            let op_type = match Self::event_type_to_operation_type(event_type) {
+                Some(t) => t,
+                None => continue,
+            };
+
+            let id = match event.id() {
+                Some(id) => id.to_string(),
+                None => continue,
+            };
+
+            let status = Self::event_type_to_status(event_type);
+
+            if let Some(existing) = ops_map.get_mut(&id) {
+                // Update existing operation with new status
+                existing.status = status;
+                if let Some(result) = Self::extract_result(event) {
+                    existing.result = Some(result);
+                }
+                if let Some(error) = Self::extract_error(event) {
+                    existing.error = Some(error);
+                }
+            } else {
+                let mut op = Operation::new(&id, op_type);
+                op.name = event.name().map(|s| s.to_string());
+                op.status = status;
+                op.parent_id = event.parent_id().map(|s| s.to_string());
+                op.result = Self::extract_result(event);
+                op.error = Self::extract_error(event);
+                order.push(id.clone());
+                ops_map.insert(id, op);
+            }
+        }
+
+        order
+            .into_iter()
+            .filter_map(|id| ops_map.remove(&id))
+            .collect()
     }
 }
 
 #[async_trait::async_trait]
 impl HistoryApiClient for LambdaHistoryApiClient {
-    /// Retrieves a single page of execution history by calling the durable execution state API.
-    ///
-    /// Detects terminal state by examining EXECUTION-type operations: when an execution
-    /// operation has a terminal status (Succeeded, Failed, Cancelled, TimedOut), the page
-    /// is marked as terminal with the corresponding status, result, and error.
+    /// Retrieves a single page of execution history using the Lambda SDK's
+    /// `GetDurableExecutionHistory` API.
     async fn get_history(&self, arn: &str, marker: Option<&str>) -> Result<HistoryPage, TestError> {
-        let marker_str = marker.unwrap_or("");
+        let mut builder = self
+            .lambda_client
+            .get_durable_execution_history()
+            .durable_execution_arn(arn)
+            .include_execution_data(true)
+            .max_items(1000);
 
-        let response = self
-            .service_client
-            .get_operations(arn, marker_str)
-            .await
-            .map_err(|e| {
-                TestError::aws_error(format!("GetDurableExecutionHistory failed: {}", e))
-            })?;
+        if let Some(m) = marker {
+            builder = builder.marker(m);
+        }
 
-        // Detect terminal state from EXECUTION-type operations
+        let response = builder.send().await.map_err(|e| {
+            TestError::aws_error(format!("GetDurableExecutionHistory failed: {:?}", e))
+        })?;
+
+        let events = response.events();
+        let operations = Self::events_to_operations(events);
+
+        // Detect terminal state from execution events
         let mut is_terminal = false;
         let mut terminal_status = None;
         let mut terminal_result = None;
         let mut terminal_error = None;
 
-        for op in &response.operations {
-            if op.operation_type == OperationType::Execution {
-                if let Some(exec_status) = Self::map_terminal_status(&op.status) {
-                    is_terminal = true;
-                    terminal_status = Some(exec_status);
-                    terminal_result = op.result.clone();
-                    if let Some(ref err) = op.error {
-                        terminal_error =
-                            Some(TestResultError::new(&err.error_type, &err.error_message));
+        for event in events {
+            if let Some(event_type) = event.event_type() {
+                use aws_sdk_lambda::types::EventType;
+                match event_type {
+                    EventType::ExecutionSucceeded => {
+                        is_terminal = true;
+                        terminal_status = Some(ExecutionStatus::Succeeded);
+                        terminal_result = Self::extract_result(event);
                     }
-                    break;
+                    EventType::ExecutionFailed => {
+                        is_terminal = true;
+                        terminal_status = Some(ExecutionStatus::Failed);
+                        if let Some(err) = Self::extract_error(event) {
+                            terminal_error =
+                                Some(TestResultError::new(&err.error_type, &err.error_message));
+                        }
+                    }
+                    EventType::ExecutionTimedOut => {
+                        is_terminal = true;
+                        terminal_status = Some(ExecutionStatus::TimedOut);
+                    }
+                    EventType::ExecutionStopped => {
+                        is_terminal = true;
+                        terminal_status = Some(ExecutionStatus::Cancelled);
+                    }
+                    _ => {}
                 }
             }
         }
 
         Ok(HistoryPage {
-            events: Vec::new(), // The state API returns operations, not raw history events
-            operations: response.operations,
-            next_marker: response.next_marker,
+            events: Vec::new(),
+            operations,
+            next_marker: response.next_marker().map(|s| s.to_string()),
             is_terminal,
             terminal_status,
             terminal_result,
@@ -478,8 +641,13 @@ where
         let aws_cfg = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
         let lambda_client = LambdaClient::new(&aws_cfg);
 
+        let name = function_name.into();
+        // Durable functions require a qualified function name (with version or alias).
+        // If the caller didn't provide one, default to $LATEST.
+        let qualified_name = Self::ensure_qualified(name);
+
         Ok(Self {
-            function_name: function_name.into(),
+            function_name: qualified_name,
             lambda_client,
             aws_config: Some(aws_cfg),
             config: CloudTestRunnerConfig::default(),
@@ -518,8 +686,9 @@ where
     /// );
     /// ```
     pub fn with_client(function_name: impl Into<String>, client: LambdaClient) -> Self {
+        let qualified_name = Self::ensure_qualified(function_name.into());
         Self {
-            function_name: function_name.into(),
+            function_name: qualified_name,
             lambda_client: client,
             aws_config: None,
             config: CloudTestRunnerConfig::default(),
@@ -571,6 +740,21 @@ where
     /// Returns a reference to the Lambda client.
     pub fn lambda_client(&self) -> &LambdaClient {
         &self.lambda_client
+    }
+
+    /// Ensures the function name is qualified with a version or alias.
+    ///
+    /// Durable functions require invocation with a qualified ARN. If the
+    /// provided name is unqualified (no `:` version/alias suffix), this
+    /// appends `:$LATEST`.
+    fn ensure_qualified(name: String) -> String {
+        if name.contains(':') {
+            // Already qualified (has version/alias like :$LATEST or :my-alias)
+            // or is a full ARN with version qualifier
+            name
+        } else {
+            format!("{}:$LATEST", name)
+        }
     }
 }
 
@@ -688,17 +872,41 @@ where
     }
 
     /// Invokes the Lambda function and extracts the `DurableExecutionArn` from the response.
+    ///
+    /// Uses synchronous (RequestResponse) invocation by default. The durable execution
+    /// ARN is returned as a response field by the Lambda service, not in the function payload.
     async fn invoke_lambda<I: Serialize>(&self, payload: &I) -> Result<String, TestError> {
         let payload_json = serde_json::to_vec(payload)?;
 
-        let invoke_result = self
+        // Split function name and qualifier if present (e.g., "my-func:$LATEST")
+        let (func_name, qualifier) = if let Some(idx) = self.function_name.rfind(':') {
+            let before_colon = &self.function_name[..idx];
+            if before_colon.contains(':') {
+                (self.function_name.as_str(), None)
+            } else {
+                (
+                    &self.function_name[..idx],
+                    Some(&self.function_name[idx + 1..]),
+                )
+            }
+        } else {
+            (self.function_name.as_str(), None)
+        };
+
+        let mut invoke_builder = self
             .lambda_client
             .invoke()
-            .function_name(&self.function_name)
-            .payload(aws_sdk_lambda::primitives::Blob::new(payload_json))
+            .function_name(func_name)
+            .payload(aws_sdk_lambda::primitives::Blob::new(payload_json));
+
+        if let Some(q) = qualifier {
+            invoke_builder = invoke_builder.qualifier(q);
+        }
+
+        let invoke_result = invoke_builder
             .send()
             .await
-            .map_err(|e| TestError::aws_error(format!("Lambda invoke failed: {}", e)))?;
+            .map_err(|e| TestError::aws_error(format!("Lambda invoke failed: {:?}", e)))?;
 
         // Check for function error
         if let Some(function_error) = invoke_result.function_error() {
@@ -713,46 +921,27 @@ where
             )));
         }
 
-        // Parse the response to extract DurableExecutionArn
-        let response_payload = invoke_result
-            .payload()
-            .ok_or_else(|| TestError::aws_error("No response payload from Lambda"))?;
-
-        let response_str = String::from_utf8_lossy(response_payload.as_ref());
-
-        // Try to parse as JSON and extract the ARN
-        let response_json: serde_json::Value = serde_json::from_str(&response_str)
-            .map_err(|e| TestError::aws_error(format!("Failed to parse Lambda response: {}", e)))?;
-
-        let arn = response_json
-            .get("DurableExecutionArn")
-            .or_else(|| response_json.get("durableExecutionArn"))
-            .and_then(|v| v.as_str())
+        // Extract DurableExecutionArn from the invoke response metadata
+        let arn = invoke_result
+            .durable_execution_arn()
             .ok_or_else(|| {
-                TestError::aws_error(format!(
-                    "Lambda response missing DurableExecutionArn: {}",
-                    response_str
-                ))
-            })?;
+                TestError::aws_error(
+                    "No DurableExecutionArn in invoke response. Is the function a durable function?"
+                        .to_string(),
+                )
+            })?
+            .to_string();
 
-        Ok(arn.to_string())
+        Ok(arn)
     }
 
-    /// Creates a `LambdaHistoryApiClient` from the stored AWS config.
+    /// Creates a `LambdaHistoryApiClient` from the stored AWS config or Lambda client.
     fn create_history_client(&self) -> Result<LambdaHistoryApiClient, TestError> {
         match &self.aws_config {
             Some(cfg) => LambdaHistoryApiClient::from_aws_config(cfg),
-            None => {
-                // Fallback: create a service client from a default config.
-                // This path is used when with_client() was called without an SdkConfig.
-                let service_client = LambdaDurableServiceClient::from_aws_config(
-                    &aws_config::SdkConfig::builder().build(),
-                )
-                .map_err(|e| {
-                    TestError::aws_error(format!("Failed to create service client: {}", e))
-                })?;
-                Ok(LambdaHistoryApiClient::from_service_client(service_client))
-            }
+            None => Ok(LambdaHistoryApiClient::from_lambda_client(
+                self.lambda_client.clone(),
+            )),
         }
     }
 }
@@ -1110,6 +1299,33 @@ mod tests {
 
         assert_eq!(config.poll_interval, Duration::from_millis(500));
         assert_eq!(config.timeout, Duration::from_secs(60));
+    }
+
+    #[test]
+    fn test_ensure_qualified_plain_name() {
+        let result = CloudDurableTestRunner::<String>::ensure_qualified("my-function".to_string());
+        assert_eq!(result, "my-function:$LATEST");
+    }
+
+    #[test]
+    fn test_ensure_qualified_already_qualified() {
+        let result =
+            CloudDurableTestRunner::<String>::ensure_qualified("my-function:$LATEST".to_string());
+        assert_eq!(result, "my-function:$LATEST");
+    }
+
+    #[test]
+    fn test_ensure_qualified_with_alias() {
+        let result =
+            CloudDurableTestRunner::<String>::ensure_qualified("my-function:prod".to_string());
+        assert_eq!(result, "my-function:prod");
+    }
+
+    #[test]
+    fn test_ensure_qualified_full_arn() {
+        let arn = "arn:aws:lambda:us-east-1:123456789012:function:my-function:$LATEST".to_string();
+        let result = CloudDurableTestRunner::<String>::ensure_qualified(arn.clone());
+        assert_eq!(result, arn);
     }
 
     #[test]

@@ -10,6 +10,7 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  STACK_NAME: durable-sdk-rust-integ-${{ github.run_id }}
 
 jobs:
   integration-test:
@@ -45,73 +46,63 @@ jobs:
 
       - name: Build test Lambda functions
         working-directory: aws-durable-execution-sdk
-        run: cargo build --release --package durable-execution-sdk-examples
-
-      - name: Deploy test functions
-        id: deploy
-        env:
-          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-          AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
-          FUNCTION_PREFIX: durable-rust-integ-${{ github.run_id }}
         run: |
-          ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/DurableFunctionsIntegrationTestRole"
-
+          cargo build --release --package durable-execution-sdk-examples
+          
+      - name: Package Lambda functions
+        run: |
+          mkdir -p lambda-packages
+          cd aws-durable-execution-sdk/target/release/examples
           for binary in simple_workflow parallel_processing callback_workflow; do
-            FUNC_NAME="${FUNCTION_PREFIX}-${binary}"
-            BIN_PATH="aws-durable-execution-sdk/target/release/${binary}"
-
-            # Package the binary
-            WORK_DIR=$(mktemp -d)
-            cp ${BIN_PATH} ${WORK_DIR}/bootstrap
-            chmod +x ${WORK_DIR}/bootstrap
-            (cd ${WORK_DIR} && zip -j /tmp/${binary}.zip bootstrap)
-
-            echo "Deploying ${FUNC_NAME}..."
-            aws lambda create-function \
-              --function-name "${FUNC_NAME}" \
-              --runtime python3.13 \
-              --handler bootstrap \
-              --role "${ROLE_ARN}" \
-              --zip-file "fileb:///tmp/${binary}.zip" \
-              --timeout 300 \
-              --memory-size 256 \
-              --environment "Variables={AWS_LAMBDA_EXEC_WRAPPER=/var/task/bootstrap}" \
-              --durable-config '{"ExecutionTimeout":900,"RetentionPeriodInDays":7}' \
-              --region "${AWS_REGION}" \
-              --no-cli-pager
-
-            echo "Waiting for ${FUNC_NAME} to become active..."
-            aws lambda wait function-active-v2 \
-              --function-name "${FUNC_NAME}" \
-              --region "${AWS_REGION}"
-
-            echo "Deployed ${FUNC_NAME}"
+            if [ -f "$binary" ]; then
+              cp $binary bootstrap
+              zip -j ../../../../lambda-packages/${binary}.zip bootstrap
+              rm bootstrap
+            fi
           done
 
-          # Export function names for test step
-          echo "SIMPLE_WORKFLOW_FUNCTION=${FUNCTION_PREFIX}-simple_workflow" >> $GITHUB_OUTPUT
-          echo "PARALLEL_PROCESSING_FUNCTION=${FUNCTION_PREFIX}-parallel_processing" >> $GITHUB_OUTPUT
-          echo "CALLBACK_WORKFLOW_FUNCTION=${FUNCTION_PREFIX}-callback_workflow" >> $GITHUB_OUTPUT
+      - name: Create S3 bucket and upload packages
+        run: |
+          BUCKET_NAME="${{ env.STACK_NAME }}-deployment"
+          aws s3 mb s3://${BUCKET_NAME} --region ${{ vars.AWS_REGION || 'us-east-1' }} || true
+          aws s3 cp lambda-packages/ s3://${BUCKET_NAME}/ --recursive
+          echo "DEPLOYMENT_BUCKET=${BUCKET_NAME}" >> $GITHUB_ENV
+
+      - name: Deploy test infrastructure
+        run: |
+          aws cloudformation deploy \
+            --template-file .github/workflows/integration-test-stack.yml.disabled \
+            --stack-name ${{ env.STACK_NAME }} \
+            --capabilities CAPABILITY_IAM \
+            --parameter-overrides \
+              DeploymentBucket=${{ env.DEPLOYMENT_BUCKET }} \
+              SimpleWorkflowKey=simple_workflow.zip \
+              ParallelProcessingKey=parallel_processing.zip \
+              CallbackWorkflowKey=callback_workflow.zip
+
+      - name: Get function names
+        id: functions
+        run: |
+          echo "simple=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query 'Stacks[0].Outputs[?OutputKey==`SimpleWorkflowFunction`].OutputValue' --output text)" >> $GITHUB_OUTPUT
+          echo "parallel=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query 'Stacks[0].Outputs[?OutputKey==`ParallelProcessingFunction`].OutputValue' --output text)" >> $GITHUB_OUTPUT
+          echo "callback=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query 'Stacks[0].Outputs[?OutputKey==`CallbackWorkflowFunction`].OutputValue' --output text)" >> $GITHUB_OUTPUT
 
       - name: Run integration tests
         working-directory: aws-durable-execution-sdk
         env:
-          AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
-          SIMPLE_WORKFLOW_FUNCTION: ${{ steps.deploy.outputs.SIMPLE_WORKFLOW_FUNCTION }}
-          PARALLEL_PROCESSING_FUNCTION: ${{ steps.deploy.outputs.PARALLEL_PROCESSING_FUNCTION }}
-          CALLBACK_WORKFLOW_FUNCTION: ${{ steps.deploy.outputs.CALLBACK_WORKFLOW_FUNCTION }}
+          SIMPLE_WORKFLOW_FUNCTION: ${{ steps.functions.outputs.simple }}
+          PARALLEL_PROCESSING_FUNCTION: ${{ steps.functions.outputs.parallel }}
+          CALLBACK_WORKFLOW_FUNCTION: ${{ steps.functions.outputs.callback }}
         run: cargo test --package durable-execution-sdk-testing --test integration -- --ignored
 
-      - name: Cleanup test functions
+      - name: Cleanup test infrastructure
         if: always()
-        env:
-          AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
-          FUNCTION_PREFIX: durable-rust-integ-${{ github.run_id }}
         run: |
-          for binary in simple_workflow parallel_processing callback_workflow; do
-            FUNC_NAME="${FUNCTION_PREFIX}-${binary}"
-            echo "Deleting ${FUNC_NAME}..."
-            aws lambda delete-function \
-              --function-name "${FUNC_NAME}" \
-              --region "${AWS_REGION}" 2>/dev/null || true
-          done
+          # Delete S3 bucket contents first
+          if [ -n "${{ env.DEPLOYMENT_BUCKET }}" ]; then
+            aws s3 rm s3://${{ env.DEPLOYMENT_BUCKET }} --recursive || true
+            aws s3 rb s3://${{ env.DEPLOYMENT_BUCKET }} || true
+          fi
+          # Delete CloudFormation stack
+          aws cloudformation delete-stack --stack-name ${{ env.STACK_NAME }} || true
+          aws cloudformation wait stack-delete-complete --stack-name ${{ env.STACK_NAME }} || true

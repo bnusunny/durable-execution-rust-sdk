@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "daaca7e8-b164-4570-8743-2d32bfd4da27",
-    "EventTimestamp": "2026-03-12T05:35:19.252Z",
+    "Id": "0dca90d7-aee9-4879-a16c-ff59b3d357e7",
+    "EventTimestamp": "2026-03-12T06:21:04.821Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,14 +13,25 @@
   {
     "EventType": "CallbackStarted",
     "EventId": 2,
-    "Id": "a8cdaf3fec63c3786681ee95b9c562bf",
-    "EventTimestamp": "2026-03-12T05:35:19.253Z",
+    "Id": "f070bfa5170cfa7b3a8f5a96c4baf309",
+    "EventTimestamp": "2026-03-12T06:21:04.835Z",
     "SubType": "Callback",
     "Name": "failure_callback",
     "CallbackStartedDetails": {
-      "CallbackId": "132d071a-a095-4a3c-afee-628625e6279a",
+      "CallbackId": "cdb57ef6-d043-425a-9f36-c1ab5d7f868e",
       "Timeout": 0,
       "HeartbeatTimeout": 0
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 3,
+    "EventTimestamp": "2026-03-12T06:21:04.841Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:04.821Z",
+      "EndTimestamp": "2026-03-12T06:21:04.841Z",
+      "RequestId": "b0cb58c3-5a8f-4ebe-bead-cfa265028cf8",
+      "Error": {}
     }
   }
 ]

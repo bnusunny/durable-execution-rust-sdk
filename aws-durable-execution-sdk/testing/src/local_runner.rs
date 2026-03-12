@@ -824,6 +824,22 @@ where
         let end_time = chrono::Utc::now();
         invocation = invocation.with_end(end_time);
 
+        // Notify checkpoint server that this invocation is complete
+        let complete_request = crate::checkpoint_server::types::CompleteInvocationRequest {
+            execution_id: execution_arn.clone(),
+            invocation_id: invocation_id.clone(),
+            error: match &handler_result {
+                Ok(_) => None,
+                Err(e) if e.is_suspend() => None,
+                Err(e) => Some(durable_execution_sdk::ErrorObject::from(e)),
+            },
+        };
+        let complete_payload = serde_json::to_string(&complete_request)?;
+        let _ = self
+            .checkpoint_worker
+            .send_api_request(ApiType::CompleteInvocation, complete_payload)
+            .await;
+
         // Retrieve operations from the checkpoint server
         let operations = match self
             .checkpoint_worker
@@ -846,8 +862,30 @@ where
         // Build the test result based on handler outcome
         match handler_result {
             Ok(result) => {
+                // Notify checkpoint server of execution completion
+                let result_json = serde_json::to_string(&result).ok();
+                let complete_exec = crate::checkpoint_server::types::CompleteExecutionRequest {
+                    execution_id: execution_arn.clone(),
+                    result: result_json,
+                    error: None,
+                };
+                if let Ok(p) = serde_json::to_string(&complete_exec) {
+                    let _ = self
+                        .checkpoint_worker
+                        .send_api_request(ApiType::CompleteExecution, p)
+                        .await;
+                }
+
                 let mut test_result = TestResult::success(result, operations);
                 test_result.add_invocation(invocation);
+                // Retrieve Node.js-compatible history events
+                if let Ok(nodejs_events) = self
+                    .checkpoint_worker
+                    .get_nodejs_history_events(&execution_arn)
+                    .await
+                {
+                    test_result.set_nodejs_history_events(nodejs_events);
+                }
                 Ok(test_result)
             }
             Err(error) => {
@@ -856,14 +894,42 @@ where
                     let mut test_result =
                         TestResult::with_status(ExecutionStatus::Running, operations);
                     test_result.add_invocation(invocation);
+                    if let Ok(nodejs_events) = self
+                        .checkpoint_worker
+                        .get_nodejs_history_events(&execution_arn)
+                        .await
+                    {
+                        test_result.set_nodejs_history_events(nodejs_events);
+                    }
                     Ok(test_result)
                 } else {
                     // Convert DurableError to ErrorObject to get the error type
                     let error_obj = durable_execution_sdk::ErrorObject::from(&error);
+
+                    // Notify checkpoint server of execution failure
+                    let complete_exec = crate::checkpoint_server::types::CompleteExecutionRequest {
+                        execution_id: execution_arn.clone(),
+                        result: None,
+                        error: Some(error_obj.clone()),
+                    };
+                    if let Ok(p) = serde_json::to_string(&complete_exec) {
+                        let _ = self
+                            .checkpoint_worker
+                            .send_api_request(ApiType::CompleteExecution, p)
+                            .await;
+                    }
+
                     let test_error = TestResultError::new(error_obj.error_type, error.to_string());
                     invocation = invocation.with_error(test_error.clone());
                     let mut test_result = TestResult::failure(test_error, operations);
                     test_result.add_invocation(invocation);
+                    if let Ok(nodejs_events) = self
+                        .checkpoint_worker
+                        .get_nodejs_history_events(&execution_arn)
+                        .await
+                    {
+                        test_result.set_nodejs_history_events(nodejs_events);
+                    }
                     Ok(test_result)
                 }
             }

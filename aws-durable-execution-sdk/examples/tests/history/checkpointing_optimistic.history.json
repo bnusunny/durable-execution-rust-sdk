@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "0fc3e0a6-9b7e-4587-b3d3-6ebf336fda13",
-    "EventTimestamp": "2026-03-12T05:35:19.245Z",
+    "Id": "5ad18f33-c901-4b49-9935-62f513b750ec",
+    "EventTimestamp": "2026-03-12T06:21:04.641Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,8 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 2,
-    "Id": "e915a275bfb43da1dc987f3109eed079",
-    "EventTimestamp": "2026-03-12T05:35:19.246Z",
+    "Id": "8600db74859cff1792c172f9b74158ae",
+    "EventTimestamp": "2026-03-12T06:21:04.652Z",
     "SubType": "Step",
     "Name": "optimistic_step_1",
     "StepSucceededDetails": {
@@ -27,8 +27,8 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 3,
-    "Id": "2324be124d60d701f649aa265b2ab5e2",
-    "EventTimestamp": "2026-03-12T05:35:19.246Z",
+    "Id": "8977110736e9a4a4aa0c88f0bdbb343a",
+    "EventTimestamp": "2026-03-12T06:21:04.661Z",
     "SubType": "Step",
     "Name": "optimistic_step_2",
     "StepSucceededDetails": {
@@ -41,8 +41,8 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 4,
-    "Id": "542f745f32d935b93ae226272ed50d30",
-    "EventTimestamp": "2026-03-12T05:35:19.246Z",
+    "Id": "a5b4701ccc70b466cd63a2e4ab738391",
+    "EventTimestamp": "2026-03-12T06:21:04.666Z",
     "SubType": "Step",
     "Name": "optimistic_step_3",
     "StepSucceededDetails": {
@@ -50,6 +50,28 @@
         "Payload": "\"fast_3\""
       },
       "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 5,
+    "EventTimestamp": "2026-03-12T06:21:04.681Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:04.641Z",
+      "EndTimestamp": "2026-03-12T06:21:04.681Z",
+      "RequestId": "d206d1c0-0f7d-4227-8b41-c29e269bf6bb",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionSucceeded",
+    "EventId": 6,
+    "Id": "5ad18f33-c901-4b49-9935-62f513b750ec",
+    "EventTimestamp": "2026-03-12T06:21:04.711Z",
+    "ExecutionSucceededDetails": {
+      "Result": {
+        "Payload": "\"optimistic: fast_1 + fast_2 + fast_3\""
+      }
     }
   }
 ]

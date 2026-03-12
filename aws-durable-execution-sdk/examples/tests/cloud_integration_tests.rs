@@ -19,10 +19,9 @@ fn get_function_name(binary_name: &str) -> String {
     })
 }
 
-/// Cloud-specific event signature assertion that filters out
-/// InvocationCompleted events (which may differ in count between cloud and local
-/// due to timing) when comparing. All other events including ExecutionStarted,
-/// ExecutionSucceeded/Failed, and SubType are now aligned between runners.
+/// Cloud-specific event signature assertion.
+/// Only filters InvocationCompleted events (count varies between cloud and local
+/// due to timing). All other events now match between runners.
 fn assert_cloud_event_signatures<T>(
     result: &durable_execution_sdk_testing::TestResult<T>,
     history_file_path: &str,
@@ -31,19 +30,31 @@ fn assert_cloud_event_signatures<T>(
         load_nodejs_history_file, NodeJsEventSignature,
     };
 
-    let skip_types = ["InvocationCompleted"];
-
     let actual: Vec<NodeJsEventSignature> = result
         .get_nodejs_history_events()
         .iter()
         .map(NodeJsEventSignature::from_event)
-        .filter(|s| !skip_types.contains(&s.event_type.as_str()))
+        .filter(|s| s.event_type != "InvocationCompleted")
+        .map(|mut s| {
+            // Cloud API sets name to execution ID on Execution events;
+            // local runner doesn't. Normalize to None for comparison.
+            if s.event_type.starts_with("Execution") {
+                s.name = None;
+            }
+            s
+        })
         .collect();
 
     let expected: Vec<NodeJsEventSignature> = load_nodejs_history_file(history_file_path)
         .iter()
         .map(NodeJsEventSignature::from_event)
-        .filter(|s| !skip_types.contains(&s.event_type.as_str()))
+        .filter(|s| s.event_type != "InvocationCompleted")
+        .map(|mut s| {
+            if s.event_type.starts_with("Execution") {
+                s.name = None;
+            }
+            s
+        })
         .collect();
 
     let mut expected_counts: std::collections::HashMap<String, usize> =

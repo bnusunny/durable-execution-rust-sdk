@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "13c863be-a50f-4356-9d3c-93e5d9e04ecd",
-    "EventTimestamp": "2026-03-12T05:35:19.742Z",
+    "Id": "b237f303-aefe-4679-8d72-a716d4dfe3c6",
+    "EventTimestamp": "2026-03-12T06:21:06.332Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,8 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 2,
-    "Id": "4e0502e9ca5d620e897d6d9797320f8b",
-    "EventTimestamp": "2026-03-12T05:35:19.742Z",
+    "Id": "211457d88adb22fd0f1388d1bbcfc8f1",
+    "EventTimestamp": "2026-03-12T06:21:06.332Z",
     "SubType": "Step",
     "Name": "fetch_data",
     "StepSucceededDetails": {
@@ -27,8 +27,8 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 3,
-    "Id": "bfcedc08d95281906bafe3237dc9aa78",
-    "EventTimestamp": "2026-03-12T05:35:19.743Z",
+    "Id": "0c5b87a6a124a4f6cf2cdb92293cead8",
+    "EventTimestamp": "2026-03-12T06:21:06.335Z",
     "SubType": "Step",
     "Name": "process_data",
     "StepSucceededDetails": {
@@ -41,8 +41,8 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 4,
-    "Id": "2144979efa4cb96ae5f10dd86468626b",
-    "EventTimestamp": "2026-03-12T05:35:19.743Z",
+    "Id": "e86387203e658808353869d331b8b91d",
+    "EventTimestamp": "2026-03-12T06:21:06.335Z",
     "SubType": "Step",
     "Name": "finalize",
     "StepSucceededDetails": {
@@ -50,6 +50,28 @@
         "Payload": "{\"step_name\":\"finalize\",\"value\":200}"
       },
       "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 5,
+    "EventTimestamp": "2026-03-12T06:21:06.336Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:06.332Z",
+      "EndTimestamp": "2026-03-12T06:21:06.336Z",
+      "RequestId": "a6f0b239-3120-4ed3-8db7-8191ab4d688c",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionSucceeded",
+    "EventId": 6,
+    "Id": "b237f303-aefe-4679-8d72-a716d4dfe3c6",
+    "EventTimestamp": "2026-03-12T06:21:06.336Z",
+    "ExecutionSucceededDetails": {
+      "Result": {
+        "Payload": "[{\"step_name\":\"fetch_data\",\"value\":42},{\"step_name\":\"process_data\",\"value\":100},{\"step_name\":\"finalize\",\"value\":200}]"
+      }
     }
   }
 ]

@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "b8cc0de6-0058-40f4-b560-e31e1003de52",
-    "EventTimestamp": "2026-03-12T05:35:19.341Z",
+    "Id": "241540d1-9152-44b5-968e-82a8821601c1",
+    "EventTimestamp": "2026-03-12T06:21:05.001Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,8 @@
   {
     "EventType": "ContextStarted",
     "EventId": 2,
-    "Id": "589eadefc2d622db177f8bb24644fb44",
-    "EventTimestamp": "2026-03-12T05:35:19.342Z",
+    "Id": "98a720d58d55a24ba5f052cfab77a4fd",
+    "EventTimestamp": "2026-03-12T06:21:05.011Z",
     "SubType": "Context",
     "Name": "nested_callback",
     "ContextStartedDetails": {}
@@ -22,12 +22,12 @@
   {
     "EventType": "CallbackStarted",
     "EventId": 3,
-    "Id": "e7a72386d65d91e786f167f3a3cdb757",
-    "EventTimestamp": "2026-03-12T05:35:19.342Z",
+    "Id": "d6cce732d3fee6ccbdad11b239ab1772",
+    "EventTimestamp": "2026-03-12T06:21:05.026Z",
     "SubType": "Callback",
-    "ParentId": "589eadefc2d622db177f8bb24644fb44",
+    "ParentId": "98a720d58d55a24ba5f052cfab77a4fd",
     "CallbackStartedDetails": {
-      "CallbackId": "3793cf10-bead-42cb-8f3a-82c881559465",
+      "CallbackId": "d64fcbfd-e54d-4409-b7d3-1000726af18a",
       "Timeout": 0,
       "HeartbeatTimeout": 0
     }
@@ -35,21 +35,21 @@
   {
     "EventType": "ContextStarted",
     "EventId": 4,
-    "Id": "c97115ba17593fb13b30c3b833e79c43",
-    "EventTimestamp": "2026-03-12T05:35:19.343Z",
+    "Id": "baddfad6ddc19f46f6c6e80e9b9a10a7",
+    "EventTimestamp": "2026-03-12T06:21:05.031Z",
     "SubType": "Context",
     "Name": "wait_for_callback_submitter",
-    "ParentId": "589eadefc2d622db177f8bb24644fb44",
+    "ParentId": "98a720d58d55a24ba5f052cfab77a4fd",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 5,
-    "Id": "122153d2dd9152e04872c46bb21bf941",
-    "EventTimestamp": "2026-03-12T05:35:19.343Z",
+    "Id": "373e6f840c8fef2802dedf0b46830926",
+    "EventTimestamp": "2026-03-12T06:21:05.048Z",
     "SubType": "Step",
     "Name": "execute_submitter",
-    "ParentId": "c97115ba17593fb13b30c3b833e79c43",
+    "ParentId": "baddfad6ddc19f46f6c6e80e9b9a10a7",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "null"
@@ -60,15 +60,26 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 6,
-    "Id": "c97115ba17593fb13b30c3b833e79c43",
-    "EventTimestamp": "2026-03-12T05:35:19.343Z",
+    "Id": "baddfad6ddc19f46f6c6e80e9b9a10a7",
+    "EventTimestamp": "2026-03-12T06:21:05.051Z",
     "SubType": "Context",
     "Name": "wait_for_callback_submitter",
-    "ParentId": "589eadefc2d622db177f8bb24644fb44",
+    "ParentId": "98a720d58d55a24ba5f052cfab77a4fd",
     "ContextSucceededDetails": {
       "Result": {
         "Payload": "null"
       }
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 7,
+    "EventTimestamp": "2026-03-12T06:21:05.061Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:05.001Z",
+      "EndTimestamp": "2026-03-12T06:21:05.061Z",
+      "RequestId": "8204bb61-928c-4403-8568-ea9ecfcf7b73",
+      "Error": {}
     }
   }
 ]

@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "55514a30-e7c4-4f81-8026-a32c6338b60d",
-    "EventTimestamp": "2026-03-12T05:35:19.245Z",
+    "Id": "ce77b04c-e0c2-4a2d-883a-674bf743b499",
+    "EventTimestamp": "2026-03-12T06:21:04.641Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,8 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 2,
-    "Id": "3316d17e3be63bdf91c4512d7ac2f5c0",
-    "EventTimestamp": "2026-03-12T05:35:19.245Z",
+    "Id": "624b76b71f00a71c7c1c71cb69439311",
+    "EventTimestamp": "2026-03-12T06:21:04.652Z",
     "SubType": "Step",
     "Name": "setup_step",
     "StepSucceededDetails": {
@@ -22,6 +22,28 @@
         "Payload": "\"setup_done\""
       },
       "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 3,
+    "EventTimestamp": "2026-03-12T06:21:04.661Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:04.641Z",
+      "EndTimestamp": "2026-03-12T06:21:04.661Z",
+      "RequestId": "755d3406-ca03-43f6-bb7b-385b9557dd99",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionFailed",
+    "EventId": 4,
+    "Id": "ce77b04c-e0c2-4a2d-883a-674bf743b499",
+    "EventTimestamp": "2026-03-12T06:21:04.701Z",
+    "ExecutionFailedDetails": {
+      "Error": {
+        "Payload": "{\"ErrorType\":\"ExecutionError\",\"ErrorMessage\":\"handler_level_failure\"}"
+      }
     }
   }
 ]

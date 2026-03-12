@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "94c5ca64-ffd6-4f99-9c3a-21c38c3b3922",
-    "EventTimestamp": "2026-03-12T05:35:19.245Z",
+    "Id": "1f9f69c7-1bda-4909-b54a-fe27fbfef335",
+    "EventTimestamp": "2026-03-12T06:21:04.641Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,8 @@
   {
     "EventType": "StepFailed",
     "EventId": 2,
-    "Id": "2d3c60c6b91e5cd1d15d865a37628e1d",
-    "EventTimestamp": "2026-03-12T05:35:19.245Z",
+    "Id": "cdf650b3347fe65fd7177f8ae8fbaa0c",
+    "EventTimestamp": "2026-03-12T06:21:04.652Z",
     "SubType": "Step",
     "Name": "always_failing_step",
     "StepFailedDetails": {
@@ -22,6 +22,28 @@
         "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"step_always_fails\"}"
       },
       "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 3,
+    "EventTimestamp": "2026-03-12T06:21:04.661Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:04.641Z",
+      "EndTimestamp": "2026-03-12T06:21:04.661Z",
+      "RequestId": "fc69a146-0536-4939-adca-4efd8cd42ed9",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionFailed",
+    "EventId": 4,
+    "Id": "1f9f69c7-1bda-4909-b54a-fe27fbfef335",
+    "EventTimestamp": "2026-03-12T06:21:04.662Z",
+    "ExecutionFailedDetails": {
+      "Error": {
+        "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"step_always_fails\"}"
+      }
     }
   }
 ]

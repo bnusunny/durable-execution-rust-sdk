@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "50fcbfd7-b2dd-4028-a56e-a97558c90a11",
-    "EventTimestamp": "2026-03-12T05:35:19.253Z",
+    "Id": "003af815-39c0-4080-9814-72d007f0d7a8",
+    "EventTimestamp": "2026-03-12T06:21:04.801Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,11 +13,11 @@
   {
     "EventType": "CallbackStarted",
     "EventId": 2,
-    "Id": "aa751fa464409b7d496b4556b8368b73",
-    "EventTimestamp": "2026-03-12T05:35:19.253Z",
+    "Id": "870b82c3d4acc9846b1f73c1cdab824d",
+    "EventTimestamp": "2026-03-12T06:21:04.811Z",
     "SubType": "Callback",
     "CallbackStartedDetails": {
-      "CallbackId": "f371ce40-ceaf-4821-aec6-9f6df223555b",
+      "CallbackId": "8464197a-6733-4f5f-87ea-d510e77d386d",
       "Timeout": 0,
       "HeartbeatTimeout": 0
     }
@@ -25,8 +25,8 @@
   {
     "EventType": "ContextStarted",
     "EventId": 3,
-    "Id": "70fc2314e04668c99e0881880cb8281f",
-    "EventTimestamp": "2026-03-12T05:35:19.254Z",
+    "Id": "8b261d98068fad5f66e947ad4e7e9a84",
+    "EventTimestamp": "2026-03-12T06:21:04.821Z",
     "SubType": "Context",
     "Name": "wait_for_callback_submitter",
     "ContextStartedDetails": {}
@@ -34,11 +34,11 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 4,
-    "Id": "c89c931eb22318bbfd74bd095cced4db",
-    "EventTimestamp": "2026-03-12T05:35:19.254Z",
+    "Id": "4e6195dfdf0fda5d1577754611c4dc09",
+    "EventTimestamp": "2026-03-12T06:21:04.834Z",
     "SubType": "Step",
     "Name": "execute_submitter",
-    "ParentId": "70fc2314e04668c99e0881880cb8281f",
+    "ParentId": "8b261d98068fad5f66e947ad4e7e9a84",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "null"
@@ -49,13 +49,35 @@
   {
     "EventType": "ContextFailed",
     "EventId": 5,
-    "Id": "70fc2314e04668c99e0881880cb8281f",
-    "EventTimestamp": "2026-03-12T05:35:19.255Z",
+    "Id": "8b261d98068fad5f66e947ad4e7e9a84",
+    "EventTimestamp": "2026-03-12T06:21:04.837Z",
     "SubType": "Context",
     "Name": "wait_for_callback_submitter",
     "ContextFailedDetails": {
       "Error": {
         "Payload": "{\"ErrorType\":\"SubmitterError\",\"ErrorMessage\":\"External system unavailable\"}"
+      }
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 6,
+    "EventTimestamp": "2026-03-12T06:21:04.841Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:04.801Z",
+      "EndTimestamp": "2026-03-12T06:21:04.841Z",
+      "RequestId": "f08af43e-60f1-4f3e-b5ef-120d9f96624c",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionSucceeded",
+    "EventId": 7,
+    "Id": "003af815-39c0-4080-9814-72d007f0d7a8",
+    "EventTimestamp": "2026-03-12T06:21:04.849Z",
+    "ExecutionSucceededDetails": {
+      "Result": {
+        "Payload": "{\"status\":\"submitter_failed\",\"message\":\"Submitter error caught: External system unavailable\"}"
       }
     }
   }

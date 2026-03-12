@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "f514dcac-bf6b-4bf3-8379-e095556354b2",
-    "EventTimestamp": "2026-03-12T05:35:19.466Z",
+    "Id": "07806200-0aa0-43cd-9842-9f41e264815e",
+    "EventTimestamp": "2026-03-12T06:21:05.792Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,8 @@
   {
     "EventType": "ContextStarted",
     "EventId": 2,
-    "Id": "e30774c726589322cfff7ae7b36ce502",
-    "EventTimestamp": "2026-03-12T05:35:19.467Z",
+    "Id": "70013927c017e14bfb369ff4be5e384b",
+    "EventTimestamp": "2026-03-12T06:21:05.811Z",
     "SubType": "Context",
     "Name": "child_context",
     "ContextStartedDetails": {}
@@ -22,8 +22,8 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 3,
-    "Id": "279cc7d8d276da6d4d78d93212a768c6",
-    "EventTimestamp": "2026-03-12T05:35:19.467Z",
+    "Id": "e8829cbeed2c95ee05419c647093b189",
+    "EventTimestamp": "2026-03-12T06:21:05.831Z",
     "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
@@ -35,13 +35,35 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 4,
-    "Id": "e30774c726589322cfff7ae7b36ce502",
-    "EventTimestamp": "2026-03-12T05:35:19.467Z",
+    "Id": "70013927c017e14bfb369ff4be5e384b",
+    "EventTimestamp": "2026-03-12T06:21:05.841Z",
     "SubType": "Context",
     "Name": "child_context",
     "ContextSucceededDetails": {
       "Result": {
         "Payload": "\"from_parent\""
+      }
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 5,
+    "EventTimestamp": "2026-03-12T06:21:05.851Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:05.793Z",
+      "EndTimestamp": "2026-03-12T06:21:05.851Z",
+      "RequestId": "79a71ec6-aa62-40af-9737-fff94fb1894a",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionSucceeded",
+    "EventId": 6,
+    "Id": "07806200-0aa0-43cd-9842-9f41e264815e",
+    "EventTimestamp": "2026-03-12T06:21:05.861Z",
+    "ExecutionSucceededDetails": {
+      "Result": {
+        "Payload": "\"unexpected_success: from_parent\""
       }
     }
   }

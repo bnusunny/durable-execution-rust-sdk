@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "10bb0c1b-9798-4149-8553-97f69e766676",
-    "EventTimestamp": "2026-03-12T05:35:19.510Z",
+    "Id": "22957db6-39eb-407c-9b0f-21b7a0d830b1",
+    "EventTimestamp": "2026-03-12T06:21:06.067Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,13 +13,35 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 2,
-    "Id": "882e5182332c7e9c705779646a98fe05",
-    "EventTimestamp": "2026-03-12T05:35:19.564Z",
+    "Id": "4117cdb6320eeaced0ebee9c4fcfcae8",
+    "EventTimestamp": "2026-03-12T06:21:06.079Z",
     "SubType": "Context",
     "Name": "map",
     "ContextSucceededDetails": {
       "Result": {
         "Payload": "{\"items\":[],\"completion_reason\":\"AllCompleted\"}"
+      }
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 3,
+    "EventTimestamp": "2026-03-12T06:21:06.079Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:06.067Z",
+      "EndTimestamp": "2026-03-12T06:21:06.079Z",
+      "RequestId": "25d882a5-8841-448a-91bc-2222a0cfe7b3",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionSucceeded",
+    "EventId": 4,
+    "Id": "22957db6-39eb-407c-9b0f-21b7a0d830b1",
+    "EventTimestamp": "2026-03-12T06:21:06.084Z",
+    "ExecutionSucceededDetails": {
+      "Result": {
+        "Payload": "{\"total_branches\":0,\"message\":\"Empty parallel completed successfully\"}"
       }
     }
   }

@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "21ddd375-6387-4cbf-8489-7873c8c72ac1",
-    "EventTimestamp": "2026-03-12T05:35:19.761Z",
+    "Id": "2e02ffb5-46eb-4b9e-9527-493291de1924",
+    "EventTimestamp": "2026-03-12T06:21:06.361Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,12 +13,45 @@
   {
     "EventType": "WaitStarted",
     "EventId": 2,
-    "Id": "a90b00b3ac7d629d5a31e195081b4c97",
-    "EventTimestamp": "2026-03-12T05:35:19.761Z",
+    "Id": "7eab218364b01c0ece49f0de7286d4b8",
+    "EventTimestamp": "2026-03-12T06:21:06.371Z",
     "SubType": "Wait",
     "WaitStartedDetails": {
       "Duration": "PT2S",
-      "ScheduledEndTimestamp": "2026-03-12T05:35:21.761Z"
+      "ScheduledEndTimestamp": "2026-03-12T06:21:08.371Z"
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 3,
+    "EventTimestamp": "2026-03-12T06:21:06.375Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:06.361Z",
+      "EndTimestamp": "2026-03-12T06:21:06.375Z",
+      "RequestId": "555fd5a0-296d-4167-817c-7ab04a592dd4",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 4,
+    "EventTimestamp": "2026-03-12T06:21:06.376Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:06.376Z",
+      "EndTimestamp": "2026-03-12T06:21:06.376Z",
+      "RequestId": "e7b1bd5b-1be0-42ba-b3d2-5ac6106caf40",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionSucceeded",
+    "EventId": 5,
+    "Id": "2e02ffb5-46eb-4b9e-9527-493291de1924",
+    "EventTimestamp": "2026-03-12T06:21:06.376Z",
+    "ExecutionSucceededDetails": {
+      "Result": {
+        "Payload": "\"Function Completed\""
+      }
     }
   }
 ]

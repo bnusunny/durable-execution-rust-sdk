@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "65a970b7-f9ee-4cb5-9bf6-3bc5eb4f6859",
-    "EventTimestamp": "2026-03-12T05:35:19.561Z",
+    "Id": "1b50ddc1-20f6-4fc8-ab02-b5b8ca86dfd3",
+    "EventTimestamp": "2026-03-12T06:21:06.062Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,13 +13,35 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 2,
-    "Id": "c2ab1dce35ac4c460f6ea93d242bd025",
-    "EventTimestamp": "2026-03-12T05:35:19.564Z",
+    "Id": "d651125bdece5708f79255241b8d5c74",
+    "EventTimestamp": "2026-03-12T06:21:06.063Z",
     "SubType": "Context",
     "Name": "map",
     "ContextSucceededDetails": {
       "Result": {
         "Payload": "{\"items\":[],\"completion_reason\":\"AllCompleted\"}"
+      }
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 3,
+    "EventTimestamp": "2026-03-12T06:21:06.064Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:06.062Z",
+      "EndTimestamp": "2026-03-12T06:21:06.064Z",
+      "RequestId": "2d27594d-f6b5-4f38-8e9c-2eaa99354884",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionSucceeded",
+    "EventId": 4,
+    "Id": "1b50ddc1-20f6-4fc8-ab02-b5b8ca86dfd3",
+    "EventTimestamp": "2026-03-12T06:21:06.065Z",
+    "ExecutionSucceededDetails": {
+      "Result": {
+        "Payload": "{\"total_items\":0,\"message\":\"Empty map completed successfully\"}"
       }
     }
   }

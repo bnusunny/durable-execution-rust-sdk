@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "033e8d21-00e6-4948-a781-d6cfb1992507",
-    "EventTimestamp": "2026-03-12T05:35:19.741Z",
+    "Id": "093f59bd-0941-4ceb-ae05-450334317ec0",
+    "EventTimestamp": "2026-03-12T06:21:06.332Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,8 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 2,
-    "Id": "87585151a973a927e8010db994aa5ca4",
-    "EventTimestamp": "2026-03-12T05:35:19.742Z",
+    "Id": "c613c6dbd501c7eb3514c0366187400d",
+    "EventTimestamp": "2026-03-12T06:21:06.351Z",
     "SubType": "Step",
     "Name": "retryable_operation",
     "StepSucceededDetails": {
@@ -22,6 +22,28 @@
         "Payload": "\"operation_succeeded\""
       },
       "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 3,
+    "EventTimestamp": "2026-03-12T06:21:06.352Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:06.332Z",
+      "EndTimestamp": "2026-03-12T06:21:06.352Z",
+      "RequestId": "7afce15c-0d55-4f6d-9fd8-aa8afdef0709",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionSucceeded",
+    "EventId": 4,
+    "Id": "093f59bd-0941-4ceb-ae05-450334317ec0",
+    "EventTimestamp": "2026-03-12T06:21:06.352Z",
+    "ExecutionSucceededDetails": {
+      "Result": {
+        "Payload": "\"operation_succeeded\""
+      }
     }
   }
 ]

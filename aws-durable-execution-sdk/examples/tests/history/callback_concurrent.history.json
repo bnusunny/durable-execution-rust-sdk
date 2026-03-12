@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "06c0b8ec-5b06-4be7-80c9-63d686699fbf",
-    "EventTimestamp": "2026-03-12T05:35:19.252Z",
+    "Id": "9109ae45-779b-49da-a2f7-eb80762e4fac",
+    "EventTimestamp": "2026-03-12T06:21:04.802Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,12 +13,12 @@
   {
     "EventType": "CallbackStarted",
     "EventId": 2,
-    "Id": "e942fbc98a88150bc2d4eff7de5b8481",
-    "EventTimestamp": "2026-03-12T05:35:19.253Z",
+    "Id": "527f3b47e2c1d28703df7dcf911708b3",
+    "EventTimestamp": "2026-03-12T06:21:04.811Z",
     "SubType": "Callback",
     "Name": "credit_check",
     "CallbackStartedDetails": {
-      "CallbackId": "ff21f6b9-c0b1-486a-82cf-c0e51c7dd48b",
+      "CallbackId": "bad108cb-941b-4d19-89f3-852b0edcd08b",
       "Timeout": 300,
       "HeartbeatTimeout": 0
     }
@@ -26,14 +26,25 @@
   {
     "EventType": "CallbackStarted",
     "EventId": 3,
-    "Id": "68ac3d13fbea2e141187b52d3742ea5c",
-    "EventTimestamp": "2026-03-12T05:35:19.254Z",
+    "Id": "f656890528b30e5e51e282bfd447a21b",
+    "EventTimestamp": "2026-03-12T06:21:04.821Z",
     "SubType": "Callback",
     "Name": "fraud_check",
     "CallbackStartedDetails": {
-      "CallbackId": "407a0ba1-9813-4ca0-a6d3-3a97ced092c0",
+      "CallbackId": "abec6e86-a862-4800-a11a-0cbe0512ea93",
       "Timeout": 300,
       "HeartbeatTimeout": 0
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 4,
+    "EventTimestamp": "2026-03-12T06:21:04.835Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:04.802Z",
+      "EndTimestamp": "2026-03-12T06:21:04.835Z",
+      "RequestId": "8efcfc4a-997b-40c8-9f85-9c1689f641c3",
+      "Error": {}
     }
   }
 ]

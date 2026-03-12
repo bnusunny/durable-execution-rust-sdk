@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "cc69bf99-2a7d-47d4-82b6-d2061a1245c4",
-    "EventTimestamp": "2026-03-12T05:35:19.252Z",
+    "Id": "6605472a-99be-4c1d-a4f8-7456e0788931",
+    "EventTimestamp": "2026-03-12T06:21:05.003Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,8 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 2,
-    "Id": "7220e0834b89b181ba5f8c5e030a21f8",
-    "EventTimestamp": "2026-03-12T05:35:19.253Z",
+    "Id": "7fbc918203d7961a60158b3a4ee80ce4",
+    "EventTimestamp": "2026-03-12T06:21:05.012Z",
     "SubType": "Step",
     "Name": "prepare",
     "StepSucceededDetails": {
@@ -27,26 +27,48 @@
   {
     "EventType": "WaitStarted",
     "EventId": 3,
-    "Id": "4ceb8d5b3cfb35360c7d7f80ecfa2b3d",
-    "EventTimestamp": "2026-03-12T05:35:19.254Z",
+    "Id": "396dec9eb1a25dfbe67c4a03270e85a8",
+    "EventTimestamp": "2026-03-12T06:21:05.012Z",
     "SubType": "Wait",
     "Name": "pre_callback_delay",
     "WaitStartedDetails": {
       "Duration": "PT1S",
-      "ScheduledEndTimestamp": "2026-03-12T05:35:20.254Z"
+      "ScheduledEndTimestamp": "2026-03-12T06:21:06.012Z"
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 4,
+    "EventTimestamp": "2026-03-12T06:21:05.012Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:05.003Z",
+      "EndTimestamp": "2026-03-12T06:21:05.012Z",
+      "RequestId": "af76de95-79cf-49a5-a933-33ded5d806dd",
+      "Error": {}
     }
   },
   {
     "EventType": "CallbackStarted",
-    "EventId": 4,
-    "Id": "6b8303e3ba5fbe8f2869574f4408a387",
-    "EventTimestamp": "2026-03-12T05:35:19.256Z",
+    "EventId": 5,
+    "Id": "07b32af4156c11e3205b59416966c0a1",
+    "EventTimestamp": "2026-03-12T06:21:05.013Z",
     "SubType": "Callback",
     "Name": "mixed_callback",
     "CallbackStartedDetails": {
-      "CallbackId": "e7752ab0-6227-4726-be03-c3a1c086ada5",
+      "CallbackId": "0c29e3b2-9397-4670-91b4-bb424852ea0c",
       "Timeout": 0,
       "HeartbeatTimeout": 0
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 6,
+    "EventTimestamp": "2026-03-12T06:21:05.013Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:05.012Z",
+      "EndTimestamp": "2026-03-12T06:21:05.013Z",
+      "RequestId": "2ca709a7-2f69-4b49-8e41-be52534275d6",
+      "Error": {}
     }
   }
 ]

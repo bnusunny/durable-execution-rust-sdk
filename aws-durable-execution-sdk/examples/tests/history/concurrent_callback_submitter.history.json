@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "a0389145-7828-4d2a-b86a-553177c4c2c8",
-    "EventTimestamp": "2026-03-12T05:35:19.457Z",
+    "Id": "6dc1ae55-8ec0-47b8-82a1-3e5032d11e5c",
+    "EventTimestamp": "2026-03-12T06:21:05.691Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,11 +13,11 @@
   {
     "EventType": "CallbackStarted",
     "EventId": 2,
-    "Id": "6758eae2bf320070e4590ebaed1075bd",
-    "EventTimestamp": "2026-03-12T05:35:19.457Z",
+    "Id": "f7bebec203b14b175cb2c2e9cdb75cd0",
+    "EventTimestamp": "2026-03-12T06:21:05.702Z",
     "SubType": "Callback",
     "CallbackStartedDetails": {
-      "CallbackId": "598f2a82-b80f-4e54-88bd-2c3d6c7dc2e0",
+      "CallbackId": "fb311777-18cf-4584-960c-e483f5fc27ca",
       "Timeout": 600,
       "HeartbeatTimeout": 0
     }
@@ -25,11 +25,11 @@
   {
     "EventType": "CallbackStarted",
     "EventId": 3,
-    "Id": "ba28f5ce4d1e87ef4383086a08991353",
-    "EventTimestamp": "2026-03-12T05:35:19.458Z",
+    "Id": "be88c4f577c5803c4b80f5932015e914",
+    "EventTimestamp": "2026-03-12T06:21:05.702Z",
     "SubType": "Callback",
     "CallbackStartedDetails": {
-      "CallbackId": "29f4e488-c15a-4922-9ed7-ffb3ce9dd412",
+      "CallbackId": "65133161-7d5d-4455-bc04-23490e8197e9",
       "Timeout": 600,
       "HeartbeatTimeout": 0
     }
@@ -37,8 +37,8 @@
   {
     "EventType": "ContextStarted",
     "EventId": 4,
-    "Id": "3449ce238ca51bd8169e7f9288393b9d",
-    "EventTimestamp": "2026-03-12T05:35:19.458Z",
+    "Id": "1bfbba0d12f3d91da73a02f29897051f",
+    "EventTimestamp": "2026-03-12T06:21:05.713Z",
     "SubType": "Context",
     "Name": "wait_for_callback_submitter",
     "ContextStartedDetails": {}
@@ -46,8 +46,8 @@
   {
     "EventType": "ContextStarted",
     "EventId": 5,
-    "Id": "908b1c7b43a2a0ace29607026f849224",
-    "EventTimestamp": "2026-03-12T05:35:19.458Z",
+    "Id": "1b75e1c9c7fdd9bb5dca1905966128d6",
+    "EventTimestamp": "2026-03-12T06:21:05.713Z",
     "SubType": "Context",
     "Name": "wait_for_callback_submitter",
     "ContextStartedDetails": {}
@@ -55,11 +55,11 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 6,
-    "Id": "a292b6b0a2682385cfaac6ab19489a5c",
-    "EventTimestamp": "2026-03-12T05:35:19.458Z",
+    "Id": "4256e1855c80e2e255439c71d9835e72",
+    "EventTimestamp": "2026-03-12T06:21:05.721Z",
     "SubType": "Step",
     "Name": "execute_submitter",
-    "ParentId": "3449ce238ca51bd8169e7f9288393b9d",
+    "ParentId": "1b75e1c9c7fdd9bb5dca1905966128d6",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "null"
@@ -70,11 +70,11 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 7,
-    "Id": "e661fa7247a3d0330be48e804c398b17",
-    "EventTimestamp": "2026-03-12T05:35:19.458Z",
+    "Id": "e2732e4388de1d7bd8a60a58a442c5d4",
+    "EventTimestamp": "2026-03-12T06:21:05.721Z",
     "SubType": "Step",
     "Name": "execute_submitter",
-    "ParentId": "908b1c7b43a2a0ace29607026f849224",
+    "ParentId": "1bfbba0d12f3d91da73a02f29897051f",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "null"
@@ -85,8 +85,8 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 8,
-    "Id": "3449ce238ca51bd8169e7f9288393b9d",
-    "EventTimestamp": "2026-03-12T05:35:19.458Z",
+    "Id": "1bfbba0d12f3d91da73a02f29897051f",
+    "EventTimestamp": "2026-03-12T06:21:05.728Z",
     "SubType": "Context",
     "Name": "wait_for_callback_submitter",
     "ContextSucceededDetails": {
@@ -98,14 +98,25 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 9,
-    "Id": "908b1c7b43a2a0ace29607026f849224",
-    "EventTimestamp": "2026-03-12T05:35:19.458Z",
+    "Id": "1b75e1c9c7fdd9bb5dca1905966128d6",
+    "EventTimestamp": "2026-03-12T06:21:05.728Z",
     "SubType": "Context",
     "Name": "wait_for_callback_submitter",
     "ContextSucceededDetails": {
       "Result": {
         "Payload": "null"
       }
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 10,
+    "EventTimestamp": "2026-03-12T06:21:05.729Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:05.691Z",
+      "EndTimestamp": "2026-03-12T06:21:05.729Z",
+      "RequestId": "4a07a1fb-94ee-41d2-a0da-d03e2296b25c",
+      "Error": {}
     }
   }
 ]

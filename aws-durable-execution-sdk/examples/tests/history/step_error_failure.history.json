@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "e88a8a0c-6649-4148-b9c2-ba0f5a962bb4",
-    "EventTimestamp": "2026-03-12T05:35:19.474Z",
+    "Id": "53b3ce4c-7e9c-47c6-85a7-56e80f62bb47",
+    "EventTimestamp": "2026-03-12T06:21:05.949Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{\"value\":42,\"should_fail\":true}"
@@ -13,8 +13,8 @@
   {
     "EventType": "StepFailed",
     "EventId": 2,
-    "Id": "a6b27fa9017ffa3d200dca5ac2dee544",
-    "EventTimestamp": "2026-03-12T05:35:19.475Z",
+    "Id": "d5119cee6a1caab35da5d6abc56e6113",
+    "EventTimestamp": "2026-03-12T06:21:05.952Z",
     "SubType": "Step",
     "Name": "process_value",
     "StepFailedDetails": {
@@ -22,6 +22,28 @@
         "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"Processing failed due to invalid input\"}"
       },
       "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 3,
+    "EventTimestamp": "2026-03-12T06:21:05.971Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:05.949Z",
+      "EndTimestamp": "2026-03-12T06:21:05.971Z",
+      "RequestId": "a9103218-0a81-471c-a34a-e9c5ce6d1a09",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionFailed",
+    "EventId": 4,
+    "Id": "53b3ce4c-7e9c-47c6-85a7-56e80f62bb47",
+    "EventTimestamp": "2026-03-12T06:21:06.001Z",
+    "ExecutionFailedDetails": {
+      "Error": {
+        "Payload": "{\"ErrorType\":\"ExecutionError\",\"ErrorMessage\":\"Step processing failed\"}"
+      }
     }
   }
 ]

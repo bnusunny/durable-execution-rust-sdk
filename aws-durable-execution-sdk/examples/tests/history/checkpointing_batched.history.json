@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "85cbaaa6-c211-42ff-b177-eee3d301b829",
-    "EventTimestamp": "2026-03-12T05:35:19.245Z",
+    "Id": "4b863a03-7ce7-40e7-8605-61a40b6a2f84",
+    "EventTimestamp": "2026-03-12T06:21:04.641Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,8 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 2,
-    "Id": "fe16b5bee4d21938d9c4a9d75a7abfb8",
-    "EventTimestamp": "2026-03-12T05:35:19.245Z",
+    "Id": "0dd4bd186ee164568b4b15430534f0bc",
+    "EventTimestamp": "2026-03-12T06:21:04.652Z",
     "SubType": "Step",
     "Name": "batched_step_1",
     "StepSucceededDetails": {
@@ -27,8 +27,8 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 3,
-    "Id": "f1fd07cb36df27fb57d20bec7853cc3c",
-    "EventTimestamp": "2026-03-12T05:35:19.246Z",
+    "Id": "dbcdd70c15ee8e68c6f59db279054551",
+    "EventTimestamp": "2026-03-12T06:21:04.661Z",
     "SubType": "Step",
     "Name": "batched_step_2",
     "StepSucceededDetails": {
@@ -41,8 +41,8 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 4,
-    "Id": "fba9b7e552339686aca11edc319dd52b",
-    "EventTimestamp": "2026-03-12T05:35:19.246Z",
+    "Id": "82956d5fb29e30ba56d47e94ba8a3b95",
+    "EventTimestamp": "2026-03-12T06:21:04.681Z",
     "SubType": "Step",
     "Name": "batched_step_3",
     "StepSucceededDetails": {
@@ -50,6 +50,28 @@
         "Payload": "\"batched_3\""
       },
       "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 5,
+    "EventTimestamp": "2026-03-12T06:21:04.701Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:04.641Z",
+      "EndTimestamp": "2026-03-12T06:21:04.701Z",
+      "RequestId": "220e2a2e-9b46-4f7a-95fa-066a043da5ae",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionSucceeded",
+    "EventId": 6,
+    "Id": "4b863a03-7ce7-40e7-8605-61a40b6a2f84",
+    "EventTimestamp": "2026-03-12T06:21:04.721Z",
+    "ExecutionSucceededDetails": {
+      "Result": {
+        "Payload": "\"batched: batched_1 + batched_2 + batched_3\""
+      }
     }
   }
 ]

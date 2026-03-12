@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "cf19fc4f-dde7-403d-b86c-9115c1db1b8c",
-    "EventTimestamp": "2026-03-12T05:35:19.741Z",
+    "Id": "b4f2540a-f016-47e2-b151-3382438aadd9",
+    "EventTimestamp": "2026-03-12T06:21:06.332Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,8 @@
   {
     "EventType": "StepFailed",
     "EventId": 2,
-    "Id": "a9facece13eadfe8b3cd9b48f25729ea",
-    "EventTimestamp": "2026-03-12T05:35:19.742Z",
+    "Id": "0e2f8de9d3ef228b4fa26abafaa6f0fe",
+    "EventTimestamp": "2026-03-12T06:21:06.335Z",
     "SubType": "Step",
     "Name": "always_fails",
     "StepFailedDetails": {
@@ -22,6 +22,28 @@
         "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"deterministic_failure\"}"
       },
       "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 3,
+    "EventTimestamp": "2026-03-12T06:21:06.339Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:06.332Z",
+      "EndTimestamp": "2026-03-12T06:21:06.339Z",
+      "RequestId": "f244bdf5-37f1-4238-b027-37554051cdc8",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionFailed",
+    "EventId": 4,
+    "Id": "b4f2540a-f016-47e2-b151-3382438aadd9",
+    "EventTimestamp": "2026-03-12T06:21:06.340Z",
+    "ExecutionFailedDetails": {
+      "Error": {
+        "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"deterministic_failure\"}"
+      }
     }
   }
 ]

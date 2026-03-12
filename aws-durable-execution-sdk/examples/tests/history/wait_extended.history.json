@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "0ddf9002-5d0f-4160-82e3-7b5d75ee8c39",
-    "EventTimestamp": "2026-03-12T05:35:19.749Z",
+    "Id": "5e4bce18-03d8-479e-a9a1-c12ba087dc90",
+    "EventTimestamp": "2026-03-12T06:21:06.371Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,25 +13,69 @@
   {
     "EventType": "WaitStarted",
     "EventId": 2,
-    "Id": "07e308a59a4e69100ebcb9c16dffdbe3",
-    "EventTimestamp": "2026-03-12T05:35:19.762Z",
+    "Id": "c8ca20c584cefa00e37ff736364f0c56",
+    "EventTimestamp": "2026-03-12T06:21:06.372Z",
     "SubType": "Wait",
     "Name": "seconds_wait",
     "WaitStartedDetails": {
       "Duration": "PT30S",
-      "ScheduledEndTimestamp": "2026-03-12T05:35:49.762Z"
+      "ScheduledEndTimestamp": "2026-03-12T06:21:36.372Z"
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 3,
+    "EventTimestamp": "2026-03-12T06:21:06.372Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:06.371Z",
+      "EndTimestamp": "2026-03-12T06:21:06.372Z",
+      "RequestId": "8276f31b-230f-40b2-9532-cd7b73f75468",
+      "Error": {}
     }
   },
   {
     "EventType": "WaitStarted",
-    "EventId": 3,
-    "Id": "e6aa3e3c3bea4ed5d9f44de0a25c4b68",
-    "EventTimestamp": "2026-03-12T05:35:19.772Z",
+    "EventId": 4,
+    "Id": "543927f115df47c17757b2d831a6da94",
+    "EventTimestamp": "2026-03-12T06:21:06.374Z",
     "SubType": "Wait",
     "Name": "minutes_wait",
     "WaitStartedDetails": {
       "Duration": "PT60S",
-      "ScheduledEndTimestamp": "2026-03-12T05:36:19.772Z"
+      "ScheduledEndTimestamp": "2026-03-12T06:22:06.374Z"
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 5,
+    "EventTimestamp": "2026-03-12T06:21:06.374Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:06.373Z",
+      "EndTimestamp": "2026-03-12T06:21:06.374Z",
+      "RequestId": "cfcc9176-1015-441d-bc6f-a12e34386943",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 6,
+    "EventTimestamp": "2026-03-12T06:21:06.374Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:06.374Z",
+      "EndTimestamp": "2026-03-12T06:21:06.374Z",
+      "RequestId": "1a6ce911-634a-43ca-9d06-4bd0fff8712d",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionSucceeded",
+    "EventId": 7,
+    "Id": "5e4bce18-03d8-479e-a9a1-c12ba087dc90",
+    "EventTimestamp": "2026-03-12T06:21:06.374Z",
+    "ExecutionSucceededDetails": {
+      "Result": {
+        "Payload": "\"Extended duration waits completed\""
+      }
     }
   }
 ]

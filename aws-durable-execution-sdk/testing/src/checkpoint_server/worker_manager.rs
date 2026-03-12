@@ -188,6 +188,7 @@ impl CheckpointWorkerManager {
             ApiType::GetNodeJsHistoryEvents => {
                 Self::handle_get_nodejs_history_events(state, &command.data)
             }
+            ApiType::CompleteExecution => Self::handle_complete_execution(state, &command.data),
             _ => WorkerApiResponse::error(
                 command.data.api_type,
                 command.data.request_id.clone(),
@@ -719,7 +720,45 @@ impl CheckpointWorkerManager {
         }
     }
 
-    /// Send an API request to the checkpoint server and wait for response.
+    /// Handle CompleteExecution request — generates terminal ExecutionSucceeded/Failed event.
+    fn handle_complete_execution(
+        state: &mut CheckpointServerState,
+        request: &WorkerApiRequest,
+    ) -> WorkerApiResponse {
+        let parsed: Result<super::types::CompleteExecutionRequest, _> =
+            serde_json::from_str(&request.payload);
+
+        match parsed {
+            Ok(req) => {
+                match state
+                    .execution_manager
+                    .get_checkpoints_by_execution_mut(&req.execution_id)
+                {
+                    Some(checkpoint_manager) => {
+                        checkpoint_manager
+                            .complete_execution(req.result.as_deref(), req.error.as_ref());
+                        WorkerApiResponse::success(
+                            request.api_type,
+                            request.request_id.clone(),
+                            "{}".to_string(),
+                        )
+                    }
+                    None => WorkerApiResponse::error(
+                        request.api_type,
+                        request.request_id.clone(),
+                        format!("Execution not found: {}", req.execution_id),
+                    ),
+                }
+            }
+            Err(e) => WorkerApiResponse::error(
+                request.api_type,
+                request.request_id.clone(),
+                format!("Failed to parse request: {}", e),
+            ),
+        }
+    }
+
+    /// Send an API request (original doc comment preserved).
     pub async fn send_api_request(
         &self,
         api_type: ApiType,

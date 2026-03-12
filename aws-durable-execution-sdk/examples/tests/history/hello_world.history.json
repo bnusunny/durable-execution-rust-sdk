@@ -2,11 +2,33 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "e43aa7ae-f844-480d-9b68-08a72f531348",
-    "EventTimestamp": "2026-03-12T05:35:19.481Z",
+    "Id": "0926a804-af56-4e04-aa68-f12ba29277bb",
+    "EventTimestamp": "2026-03-12T06:21:06.044Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
+      }
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 2,
+    "EventTimestamp": "2026-03-12T06:21:06.044Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:06.044Z",
+      "EndTimestamp": "2026-03-12T06:21:06.044Z",
+      "RequestId": "a6294813-96b5-47ec-bcb6-3d5a03863f73",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionSucceeded",
+    "EventId": 3,
+    "Id": "0926a804-af56-4e04-aa68-f12ba29277bb",
+    "EventTimestamp": "2026-03-12T06:21:06.045Z",
+    "ExecutionSucceededDetails": {
+      "Result": {
+        "Payload": "\"Hello World!\""
       }
     }
   }

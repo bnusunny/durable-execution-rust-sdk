@@ -340,6 +340,27 @@ where
     pub fn is_invocation_active(&self) -> bool {
         self.invocation_active.load(Ordering::SeqCst)
     }
+
+    /// Notify the checkpoint server that the execution has completed,
+    /// generating the terminal ExecutionSucceeded or ExecutionFailed event.
+    async fn send_complete_execution(
+        &self,
+        execution_arn: &str,
+        result: Option<&str>,
+        error: Option<&durable_execution_sdk::ErrorObject>,
+    ) {
+        let request = super::types::CompleteExecutionRequest {
+            execution_id: execution_arn.to_string(),
+            result: result.map(|s| s.to_string()),
+            error: error.cloned(),
+        };
+        if let Ok(payload) = serde_json::to_string(&request) {
+            let _ = self
+                .checkpoint_api
+                .send_api_request(super::types::ApiType::CompleteExecution, payload)
+                .await;
+        }
+    }
 }
 
 impl<I, O> TestExecutionOrchestrator<I, O>
@@ -434,6 +455,28 @@ where
         let end_time = chrono::Utc::now();
         invocation = invocation.with_end(end_time);
 
+        // Notify checkpoint server that this invocation is complete
+        let complete_request = super::types::CompleteInvocationRequest {
+            execution_id: execution_arn.clone(),
+            invocation_id: invocation_id.clone(),
+            error: match &handler_result {
+                Ok(_) => None,
+                Err(e) if e.is_suspend() => None,
+                Err(e) => Some(durable_execution_sdk::ErrorObject::from(e)),
+            },
+        };
+        if let Ok(complete_payload) = serde_json::to_string(&complete_request) {
+            let resp = self
+                .checkpoint_api
+                .send_api_request(ApiType::CompleteInvocation, complete_payload)
+                .await;
+            if let Ok(r) = &resp {
+                if let Some(err) = &r.error {
+                    tracing::warn!("CompleteInvocation failed: {}", err);
+                }
+            }
+        }
+
         // Retrieve operations from the checkpoint server
         let operations = match self.checkpoint_api.get_operations(&execution_arn, "").await {
             Ok(response) => {
@@ -453,6 +496,9 @@ where
         match handler_result {
             Ok(result) => {
                 self.execution_complete.store(true, Ordering::SeqCst);
+                let result_json = serde_json::to_string(&result).ok();
+                self.send_complete_execution(&execution_arn, result_json.as_deref(), None)
+                    .await;
                 let mut test_result =
                     TestExecutionResult::success(result, operations, execution_arn);
                 test_result.invocations.push(invocation);
@@ -469,6 +515,8 @@ where
                 } else {
                     self.execution_complete.store(true, Ordering::SeqCst);
                     let error_obj = durable_execution_sdk::ErrorObject::from(&error);
+                    self.send_complete_execution(&execution_arn, None, Some(&error_obj))
+                        .await;
                     let test_error = TestResultError::new(error_obj.error_type, error.to_string());
                     let mut test_result =
                         TestExecutionResult::failure(test_error.clone(), operations, execution_arn);
@@ -522,6 +570,8 @@ where
             match process_result {
                 ProcessOperationsResult::ExecutionSucceeded(result_str) => {
                     self.execution_complete.store(true, Ordering::SeqCst);
+                    self.send_complete_execution(&execution_arn, Some(&result_str), None)
+                        .await;
                     if let Ok(result) = serde_json::from_str::<O>(&result_str) {
                         let mut test_result =
                             TestExecutionResult::success(result, operations, execution_arn);
@@ -535,6 +585,13 @@ where
                 }
                 ProcessOperationsResult::ExecutionFailed(error) => {
                     self.execution_complete.store(true, Ordering::SeqCst);
+                    let error_obj = durable_execution_sdk::ErrorObject {
+                        error_type: error.error_type.clone().unwrap_or_default(),
+                        error_message: error.error_message.clone().unwrap_or_default(),
+                        stack_trace: None,
+                    };
+                    self.send_complete_execution(&execution_arn, None, Some(&error_obj))
+                        .await;
                     let mut test_result =
                         TestExecutionResult::failure(error, operations, execution_arn);
                     test_result.invocations = invocations;
@@ -733,10 +790,31 @@ where
             let end_time = chrono::Utc::now();
             invocation = invocation.with_end(end_time);
 
+            // Notify checkpoint server that this invocation is complete
+            let complete_request = super::types::CompleteInvocationRequest {
+                execution_id: execution_arn.clone(),
+                invocation_id: new_invocation_id.clone(),
+                error: match &handler_result {
+                    Ok(_) => None,
+                    Err(e) if e.is_suspend() => None,
+                    Err(e) => Some(durable_execution_sdk::ErrorObject::from(e)),
+                },
+            };
+            if let Ok(complete_payload) = serde_json::to_string(&complete_request) {
+                let _ = self
+                    .checkpoint_api
+                    .send_api_request(super::types::ApiType::CompleteInvocation, complete_payload)
+                    .await;
+            }
+
             match handler_result {
                 Ok(result) => {
                     self.execution_complete.store(true, Ordering::SeqCst);
                     invocations.push(invocation);
+
+                    let result_json = serde_json::to_string(&result).ok();
+                    self.send_complete_execution(&execution_arn, result_json.as_deref(), None)
+                        .await;
 
                     // Get final operations
                     let final_operations =
@@ -761,6 +839,8 @@ where
                     } else {
                         self.execution_complete.store(true, Ordering::SeqCst);
                         let error_obj = durable_execution_sdk::ErrorObject::from(&error);
+                        self.send_complete_execution(&execution_arn, None, Some(&error_obj))
+                            .await;
                         let test_error =
                             TestResultError::new(error_obj.error_type, error.to_string());
                         invocations.push(invocation.with_error(test_error.clone()));

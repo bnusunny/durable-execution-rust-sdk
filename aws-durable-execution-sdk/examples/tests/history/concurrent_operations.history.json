@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "4110b006-ea37-404b-9e8a-bb98422b6145",
-    "EventTimestamp": "2026-03-12T05:35:19.457Z",
+    "Id": "967608ae-0933-409f-8b51-044fea39f2ef",
+    "EventTimestamp": "2026-03-12T06:21:05.691Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,8 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 2,
-    "Id": "06568908136feee5384ce8419049c657",
-    "EventTimestamp": "2026-03-12T05:35:19.457Z",
+    "Id": "00a01a02031052e7615269c0d2308dd0",
+    "EventTimestamp": "2026-03-12T06:21:05.701Z",
     "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
@@ -26,8 +26,8 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 3,
-    "Id": "c3474d34cf9b5614cf6458eecba04371",
-    "EventTimestamp": "2026-03-12T05:35:19.457Z",
+    "Id": "a2622bb4b80723db675d21f4f0c518b4",
+    "EventTimestamp": "2026-03-12T06:21:05.701Z",
     "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
@@ -39,14 +39,36 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 4,
-    "Id": "6f4f9ed12cdcdc00c0d6263a3f8c6a00",
-    "EventTimestamp": "2026-03-12T05:35:19.458Z",
+    "Id": "2481ff8555968a6995b5bb6b3b800aee",
+    "EventTimestamp": "2026-03-12T06:21:05.701Z",
     "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"step_3\""
       },
       "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 5,
+    "EventTimestamp": "2026-03-12T06:21:05.713Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:05.691Z",
+      "EndTimestamp": "2026-03-12T06:21:05.713Z",
+      "RequestId": "3110321a-7c73-4e80-bf74-fd1c2199bc57",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionSucceeded",
+    "EventId": 6,
+    "Id": "967608ae-0933-409f-8b51-044fea39f2ef",
+    "EventTimestamp": "2026-03-12T06:21:05.714Z",
+    "ExecutionSucceededDetails": {
+      "Result": {
+        "Payload": "{\"step_1\":\"step_1\",\"step_2\":\"step_2\",\"step_3\":\"step_3\"}"
+      }
     }
   }
 ]

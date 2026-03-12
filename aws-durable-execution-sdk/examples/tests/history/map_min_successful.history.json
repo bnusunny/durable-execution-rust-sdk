@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "df8ff568-26fa-4569-9c30-b6d028096e82",
-    "EventTimestamp": "2026-03-12T05:35:19.563Z",
+    "Id": "366597da-5e52-45d8-afe7-4841dfad32fe",
+    "EventTimestamp": "2026-03-12T06:21:06.079Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,8 @@
   {
     "EventType": "ContextStarted",
     "EventId": 2,
-    "Id": "b871a7ca435842b1fc5ebfd48b2f3e0f",
-    "EventTimestamp": "2026-03-12T05:35:19.565Z",
+    "Id": "f92745fa6f736ceae9749dd859e3b445",
+    "EventTimestamp": "2026-03-12T06:21:06.080Z",
     "SubType": "Context",
     "Name": "map",
     "ContextStartedDetails": {}
@@ -22,60 +22,60 @@
   {
     "EventType": "ContextStarted",
     "EventId": 3,
-    "Id": "1b24371fd833477f895e66041a84fcd7",
-    "EventTimestamp": "2026-03-12T05:35:19.569Z",
+    "Id": "d820756afd207c614cc86f6c5f3db1af",
+    "EventTimestamp": "2026-03-12T06:21:06.082Z",
     "SubType": "Context",
     "Name": "map-item-0",
-    "ParentId": "b871a7ca435842b1fc5ebfd48b2f3e0f",
+    "ParentId": "f92745fa6f736ceae9749dd859e3b445",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "ContextStarted",
     "EventId": 4,
-    "Id": "1242d56188a5896cbd56aabd9a93068e",
-    "EventTimestamp": "2026-03-12T05:35:19.569Z",
+    "Id": "0c3c992082d1f48d5ffc2bb301c4fe16",
+    "EventTimestamp": "2026-03-12T06:21:06.082Z",
     "SubType": "Context",
     "Name": "map-item-1",
-    "ParentId": "b871a7ca435842b1fc5ebfd48b2f3e0f",
+    "ParentId": "f92745fa6f736ceae9749dd859e3b445",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "ContextStarted",
     "EventId": 5,
-    "Id": "df6445dfc28d31feb5ff7485ca4583c2",
-    "EventTimestamp": "2026-03-12T05:35:19.569Z",
+    "Id": "84eb509bf5ac0bb74f6ce2ed58a29169",
+    "EventTimestamp": "2026-03-12T06:21:06.082Z",
     "SubType": "Context",
     "Name": "map-item-2",
-    "ParentId": "b871a7ca435842b1fc5ebfd48b2f3e0f",
+    "ParentId": "f92745fa6f736ceae9749dd859e3b445",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "ContextStarted",
     "EventId": 6,
-    "Id": "0ba891f640cbbcf93e1f2eb7c1646054",
-    "EventTimestamp": "2026-03-12T05:35:19.569Z",
+    "Id": "5b72974f07a6fbeb30bd15035ad7dfce",
+    "EventTimestamp": "2026-03-12T06:21:06.082Z",
     "SubType": "Context",
     "Name": "map-item-3",
-    "ParentId": "b871a7ca435842b1fc5ebfd48b2f3e0f",
+    "ParentId": "f92745fa6f736ceae9749dd859e3b445",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "ContextStarted",
     "EventId": 7,
-    "Id": "9faf911d3072ed0700a16c42a715a0c2",
-    "EventTimestamp": "2026-03-12T05:35:19.570Z",
+    "Id": "34238ec4a132389add61ed31d6967197",
+    "EventTimestamp": "2026-03-12T06:21:06.083Z",
     "SubType": "Context",
     "Name": "map-item-4",
-    "ParentId": "b871a7ca435842b1fc5ebfd48b2f3e0f",
+    "ParentId": "f92745fa6f736ceae9749dd859e3b445",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 8,
-    "Id": "0896ca426bb50bbb093b10da45c9e675",
-    "EventTimestamp": "2026-03-12T05:35:19.579Z",
+    "Id": "702c209e9e3cd99f980efeadc82a0507",
+    "EventTimestamp": "2026-03-12T06:21:06.084Z",
     "SubType": "Step",
-    "ParentId": "1b24371fd833477f895e66041a84fcd7",
+    "ParentId": "d820756afd207c614cc86f6c5f3db1af",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"response_from_node-1\""
@@ -86,10 +86,10 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 9,
-    "Id": "0d0787e3efbde7569b61c01e3f0102b1",
-    "EventTimestamp": "2026-03-12T05:35:19.579Z",
+    "Id": "aa8d8d1db57353f6bb15b467e05befa6",
+    "EventTimestamp": "2026-03-12T06:21:06.084Z",
     "SubType": "Step",
-    "ParentId": "1242d56188a5896cbd56aabd9a93068e",
+    "ParentId": "0c3c992082d1f48d5ffc2bb301c4fe16",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"response_from_node-2\""
@@ -100,10 +100,10 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 10,
-    "Id": "7dd7f028a8738624c68cdbfce3366169",
-    "EventTimestamp": "2026-03-12T05:35:19.579Z",
+    "Id": "ec8c2c84a33560f26795f7506e331f69",
+    "EventTimestamp": "2026-03-12T06:21:06.085Z",
     "SubType": "Step",
-    "ParentId": "df6445dfc28d31feb5ff7485ca4583c2",
+    "ParentId": "84eb509bf5ac0bb74f6ce2ed58a29169",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"response_from_node-3\""
@@ -114,10 +114,10 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 11,
-    "Id": "448dbd5e5525dad4452d0940100f44b9",
-    "EventTimestamp": "2026-03-12T05:35:19.579Z",
+    "Id": "51d7d2a22afb5940fba8e72b2e47c2bd",
+    "EventTimestamp": "2026-03-12T06:21:06.085Z",
     "SubType": "Step",
-    "ParentId": "0ba891f640cbbcf93e1f2eb7c1646054",
+    "ParentId": "5b72974f07a6fbeb30bd15035ad7dfce",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"response_from_node-4\""
@@ -128,10 +128,10 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 12,
-    "Id": "1e4c353cb44e65b6ea230332e41b8de1",
-    "EventTimestamp": "2026-03-12T05:35:19.579Z",
+    "Id": "073293447bd2db27709d1e54a81a38df",
+    "EventTimestamp": "2026-03-12T06:21:06.085Z",
     "SubType": "Step",
-    "ParentId": "9faf911d3072ed0700a16c42a715a0c2",
+    "ParentId": "34238ec4a132389add61ed31d6967197",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"response_from_node-5\""
@@ -142,11 +142,11 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 13,
-    "Id": "1b24371fd833477f895e66041a84fcd7",
-    "EventTimestamp": "2026-03-12T05:35:19.581Z",
+    "Id": "d820756afd207c614cc86f6c5f3db1af",
+    "EventTimestamp": "2026-03-12T06:21:06.086Z",
     "SubType": "Context",
     "Name": "map-item-0",
-    "ParentId": "b871a7ca435842b1fc5ebfd48b2f3e0f",
+    "ParentId": "f92745fa6f736ceae9749dd859e3b445",
     "ContextSucceededDetails": {
       "Result": {
         "Payload": "\"response_from_node-1\""
@@ -156,11 +156,11 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 14,
-    "Id": "1242d56188a5896cbd56aabd9a93068e",
-    "EventTimestamp": "2026-03-12T05:35:19.581Z",
+    "Id": "0c3c992082d1f48d5ffc2bb301c4fe16",
+    "EventTimestamp": "2026-03-12T06:21:06.086Z",
     "SubType": "Context",
     "Name": "map-item-1",
-    "ParentId": "b871a7ca435842b1fc5ebfd48b2f3e0f",
+    "ParentId": "f92745fa6f736ceae9749dd859e3b445",
     "ContextSucceededDetails": {
       "Result": {
         "Payload": "\"response_from_node-2\""
@@ -170,11 +170,11 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 15,
-    "Id": "df6445dfc28d31feb5ff7485ca4583c2",
-    "EventTimestamp": "2026-03-12T05:35:19.581Z",
+    "Id": "84eb509bf5ac0bb74f6ce2ed58a29169",
+    "EventTimestamp": "2026-03-12T06:21:06.086Z",
     "SubType": "Context",
     "Name": "map-item-2",
-    "ParentId": "b871a7ca435842b1fc5ebfd48b2f3e0f",
+    "ParentId": "f92745fa6f736ceae9749dd859e3b445",
     "ContextSucceededDetails": {
       "Result": {
         "Payload": "\"response_from_node-3\""
@@ -184,11 +184,11 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 16,
-    "Id": "0ba891f640cbbcf93e1f2eb7c1646054",
-    "EventTimestamp": "2026-03-12T05:35:19.582Z",
+    "Id": "5b72974f07a6fbeb30bd15035ad7dfce",
+    "EventTimestamp": "2026-03-12T06:21:06.086Z",
     "SubType": "Context",
     "Name": "map-item-3",
-    "ParentId": "b871a7ca435842b1fc5ebfd48b2f3e0f",
+    "ParentId": "f92745fa6f736ceae9749dd859e3b445",
     "ContextSucceededDetails": {
       "Result": {
         "Payload": "\"response_from_node-4\""
@@ -198,11 +198,11 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 17,
-    "Id": "9faf911d3072ed0700a16c42a715a0c2",
-    "EventTimestamp": "2026-03-12T05:35:19.582Z",
+    "Id": "34238ec4a132389add61ed31d6967197",
+    "EventTimestamp": "2026-03-12T06:21:06.086Z",
     "SubType": "Context",
     "Name": "map-item-4",
-    "ParentId": "b871a7ca435842b1fc5ebfd48b2f3e0f",
+    "ParentId": "f92745fa6f736ceae9749dd859e3b445",
     "ContextSucceededDetails": {
       "Result": {
         "Payload": "\"response_from_node-5\""
@@ -212,13 +212,35 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 18,
-    "Id": "b871a7ca435842b1fc5ebfd48b2f3e0f",
-    "EventTimestamp": "2026-03-12T05:35:19.584Z",
+    "Id": "f92745fa6f736ceae9749dd859e3b445",
+    "EventTimestamp": "2026-03-12T06:21:06.088Z",
     "SubType": "Context",
     "Name": "map",
     "ContextSucceededDetails": {
       "Result": {
         "Payload": "{\"items\":[{\"index\":0,\"status\":\"Succeeded\",\"result\":\"response_from_node-1\",\"error\":null},{\"index\":1,\"status\":\"Succeeded\",\"result\":\"response_from_node-2\",\"error\":null},{\"index\":2,\"status\":\"Succeeded\",\"result\":\"response_from_node-3\",\"error\":null},{\"index\":3,\"status\":\"Succeeded\",\"result\":\"response_from_node-4\",\"error\":null},{\"index\":4,\"status\":\"Succeeded\",\"result\":\"response_from_node-5\",\"error\":null}],\"completion_reason\":\"MinSuccessfulReached\"}"
+      }
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 19,
+    "EventTimestamp": "2026-03-12T06:21:06.090Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T06:21:06.079Z",
+      "EndTimestamp": "2026-03-12T06:21:06.090Z",
+      "RequestId": "60b79b67-b0e7-4080-967c-aad4d10ff75e",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionSucceeded",
+    "EventId": 20,
+    "Id": "366597da-5e52-45d8-afe7-4841dfad32fe",
+    "EventTimestamp": "2026-03-12T06:21:06.094Z",
+    "ExecutionSucceededDetails": {
+      "Result": {
+        "Payload": "{\"required\":3,\"achieved\":5,\"results\":[\"response_from_node-1\",\"response_from_node-2\",\"response_from_node-3\",\"response_from_node-4\",\"response_from_node-5\"]}"
       }
     }
   }

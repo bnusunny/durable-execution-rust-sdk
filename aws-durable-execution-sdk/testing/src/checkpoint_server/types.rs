@@ -43,6 +43,8 @@ pub enum ApiType {
     SendDurableExecutionCallbackHeartbeat,
     /// Get Node.js-compatible history events for an execution
     GetNodeJsHistoryEvents,
+    /// Complete an execution (generate terminal event)
+    CompleteExecution,
 }
 
 /// Command types sent from the main thread to the worker.
@@ -96,6 +98,17 @@ pub struct CompleteInvocationRequest {
     /// The invocation ID
     pub invocation_id: InvocationId,
     /// Optional error if the invocation failed
+    pub error: Option<ErrorObject>,
+}
+
+/// Request to complete an execution (generate terminal event).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompleteExecutionRequest {
+    /// The execution ID
+    pub execution_id: ExecutionId,
+    /// The result payload (for successful executions)
+    pub result: Option<String>,
+    /// The error (for failed executions)
     pub error: Option<ErrorObject>,
 }
 

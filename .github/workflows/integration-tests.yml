@@ -10,7 +10,7 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
-  FUNCTION_PREFIX: durable-rust-integ-${{ github.run_id }}
+  FUNCTION_PREFIX: dri-${{ github.run_id }}
   BINARIES: >-
     hello_world step_basic step_named step_with_config
     step_retry_exponential_backoff step_retry_with_filter step_error_determinism

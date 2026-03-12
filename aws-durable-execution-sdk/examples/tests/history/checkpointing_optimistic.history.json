@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "5ad18f33-c901-4b49-9935-62f513b750ec",
-    "EventTimestamp": "2026-03-12T06:21:04.641Z",
+    "Id": "47dd352b-2b44-4a3d-8426-a70acf931bd6",
+    "EventTimestamp": "2026-03-12T18:21:35.432Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,8 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 2,
-    "Id": "8600db74859cff1792c172f9b74158ae",
-    "EventTimestamp": "2026-03-12T06:21:04.652Z",
+    "Id": "486f0a9e4afa39adf4b37680d179e89b",
+    "EventTimestamp": "2026-03-12T18:21:35.433Z",
     "SubType": "Step",
     "Name": "optimistic_step_1",
     "StepSucceededDetails": {
@@ -27,8 +27,8 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 3,
-    "Id": "8977110736e9a4a4aa0c88f0bdbb343a",
-    "EventTimestamp": "2026-03-12T06:21:04.661Z",
+    "Id": "b0fbc9988576aff6e6728e3a761dbf19",
+    "EventTimestamp": "2026-03-12T18:21:35.433Z",
     "SubType": "Step",
     "Name": "optimistic_step_2",
     "StepSucceededDetails": {
@@ -41,8 +41,8 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 4,
-    "Id": "a5b4701ccc70b466cd63a2e4ab738391",
-    "EventTimestamp": "2026-03-12T06:21:04.666Z",
+    "Id": "98a27d3c9c0f67b872c119c46737d485",
+    "EventTimestamp": "2026-03-12T18:21:35.433Z",
     "SubType": "Step",
     "Name": "optimistic_step_3",
     "StepSucceededDetails": {
@@ -55,19 +55,19 @@
   {
     "EventType": "InvocationCompleted",
     "EventId": 5,
-    "EventTimestamp": "2026-03-12T06:21:04.681Z",
+    "EventTimestamp": "2026-03-12T18:21:35.433Z",
     "InvocationCompletedDetails": {
-      "StartTimestamp": "2026-03-12T06:21:04.641Z",
-      "EndTimestamp": "2026-03-12T06:21:04.681Z",
-      "RequestId": "d206d1c0-0f7d-4227-8b41-c29e269bf6bb",
+      "StartTimestamp": "2026-03-12T18:21:35.432Z",
+      "EndTimestamp": "2026-03-12T18:21:35.433Z",
+      "RequestId": "50cbb469-061a-4141-a140-3e1746c49cc5",
       "Error": {}
     }
   },
   {
     "EventType": "ExecutionSucceeded",
     "EventId": 6,
-    "Id": "5ad18f33-c901-4b49-9935-62f513b750ec",
-    "EventTimestamp": "2026-03-12T06:21:04.711Z",
+    "Id": "47dd352b-2b44-4a3d-8426-a70acf931bd6",
+    "EventTimestamp": "2026-03-12T18:21:35.433Z",
     "ExecutionSucceededDetails": {
       "Result": {
         "Payload": "\"optimistic: fast_1 + fast_2 + fast_3\""

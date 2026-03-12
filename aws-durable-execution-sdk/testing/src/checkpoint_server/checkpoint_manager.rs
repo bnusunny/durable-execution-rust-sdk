@@ -18,7 +18,8 @@ use super::event_processor::{EventProcessor, EventType, HistoryEvent};
 use super::nodejs_event_types::{
     ErrorWrapper, ExecutionStartedDetails, ExecutionStartedDetailsWrapper,
     InvocationCompletedDetails, InvocationCompletedDetailsWrapper, NodeJsEventDetails,
-    NodeJsEventType, NodeJsHistoryEvent, PayloadWrapper,
+    NodeJsEventType, NodeJsHistoryEvent, PayloadWrapper, WaitSucceededDetails,
+    WaitSucceededDetailsWrapper,
 };
 use super::types::{ExecutionId, InvocationId};
 use crate::error::TestError;
@@ -628,6 +629,23 @@ impl CheckpointManager {
     /// (e.g., marking wait operations as SUCCEEDED after time advancement).
     pub fn update_operation_data(&mut self, operation_id: &str, updated_operation: Operation) {
         if let Some(existing) = self.operation_data_map.get_mut(operation_id) {
+            // Generate WaitSucceeded event when a wait transitions to Succeeded,
+            // matching the cloud Lambda service behavior.
+            if updated_operation.operation_type == OperationType::Wait
+                && updated_operation.status == OperationStatus::Succeeded
+                && existing.operation.status != OperationStatus::Succeeded
+            {
+                let details =
+                    NodeJsEventDetails::WaitSucceeded(WaitSucceededDetailsWrapper {
+                        wait_succeeded_details: WaitSucceededDetails {},
+                    });
+                self.event_processor.create_nodejs_event(
+                    NodeJsEventType::WaitSucceeded,
+                    Some(&updated_operation),
+                    details,
+                );
+            }
+
             // Update the operation
             existing.operation = updated_operation;
 

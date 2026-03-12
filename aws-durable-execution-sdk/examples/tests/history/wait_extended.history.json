@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "5e4bce18-03d8-479e-a9a1-c12ba087dc90",
-    "EventTimestamp": "2026-03-12T06:21:06.371Z",
+    "Id": "9f05ac5b-4d54-4511-a89e-b5d06a3a274b",
+    "EventTimestamp": "2026-03-12T18:21:36.057Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,65 +13,83 @@
   {
     "EventType": "WaitStarted",
     "EventId": 2,
-    "Id": "c8ca20c584cefa00e37ff736364f0c56",
-    "EventTimestamp": "2026-03-12T06:21:06.372Z",
+    "Id": "6d98ec36d62eb5e2377d901f5fc6e608",
+    "EventTimestamp": "2026-03-12T18:21:36.057Z",
     "SubType": "Wait",
     "Name": "seconds_wait",
     "WaitStartedDetails": {
       "Duration": "PT30S",
-      "ScheduledEndTimestamp": "2026-03-12T06:21:36.372Z"
+      "ScheduledEndTimestamp": "2026-03-12T18:22:06.057Z"
     }
   },
   {
     "EventType": "InvocationCompleted",
     "EventId": 3,
-    "EventTimestamp": "2026-03-12T06:21:06.372Z",
+    "EventTimestamp": "2026-03-12T18:21:36.058Z",
     "InvocationCompletedDetails": {
-      "StartTimestamp": "2026-03-12T06:21:06.371Z",
-      "EndTimestamp": "2026-03-12T06:21:06.372Z",
-      "RequestId": "8276f31b-230f-40b2-9532-cd7b73f75468",
+      "StartTimestamp": "2026-03-12T18:21:36.057Z",
+      "EndTimestamp": "2026-03-12T18:21:36.058Z",
+      "RequestId": "08cc0b20-9e77-45d0-bf0c-5da8fcdf75f3",
       "Error": {}
     }
   },
   {
-    "EventType": "WaitStarted",
+    "EventType": "WaitSucceeded",
     "EventId": 4,
-    "Id": "543927f115df47c17757b2d831a6da94",
-    "EventTimestamp": "2026-03-12T06:21:06.374Z",
+    "Id": "6d98ec36d62eb5e2377d901f5fc6e608",
+    "EventTimestamp": "2026-03-12T18:21:36.058Z",
+    "SubType": "Wait",
+    "Name": "seconds_wait",
+    "WaitSucceededDetails": {}
+  },
+  {
+    "EventType": "WaitStarted",
+    "EventId": 5,
+    "Id": "1e6544da302ccab75ae0f72c00033525",
+    "EventTimestamp": "2026-03-12T18:21:36.058Z",
     "SubType": "Wait",
     "Name": "minutes_wait",
     "WaitStartedDetails": {
       "Duration": "PT60S",
-      "ScheduledEndTimestamp": "2026-03-12T06:22:06.374Z"
-    }
-  },
-  {
-    "EventType": "InvocationCompleted",
-    "EventId": 5,
-    "EventTimestamp": "2026-03-12T06:21:06.374Z",
-    "InvocationCompletedDetails": {
-      "StartTimestamp": "2026-03-12T06:21:06.373Z",
-      "EndTimestamp": "2026-03-12T06:21:06.374Z",
-      "RequestId": "cfcc9176-1015-441d-bc6f-a12e34386943",
-      "Error": {}
+      "ScheduledEndTimestamp": "2026-03-12T18:22:36.058Z"
     }
   },
   {
     "EventType": "InvocationCompleted",
     "EventId": 6,
-    "EventTimestamp": "2026-03-12T06:21:06.374Z",
+    "EventTimestamp": "2026-03-12T18:21:36.058Z",
     "InvocationCompletedDetails": {
-      "StartTimestamp": "2026-03-12T06:21:06.374Z",
-      "EndTimestamp": "2026-03-12T06:21:06.374Z",
-      "RequestId": "1a6ce911-634a-43ca-9d06-4bd0fff8712d",
+      "StartTimestamp": "2026-03-12T18:21:36.058Z",
+      "EndTimestamp": "2026-03-12T18:21:36.058Z",
+      "RequestId": "07186bc3-5a89-460a-b875-befc9c8423b2",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "WaitSucceeded",
+    "EventId": 7,
+    "Id": "1e6544da302ccab75ae0f72c00033525",
+    "EventTimestamp": "2026-03-12T18:21:36.059Z",
+    "SubType": "Wait",
+    "Name": "minutes_wait",
+    "WaitSucceededDetails": {}
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 8,
+    "EventTimestamp": "2026-03-12T18:21:36.059Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T18:21:36.059Z",
+      "EndTimestamp": "2026-03-12T18:21:36.059Z",
+      "RequestId": "2c56eec8-d14a-46c8-a61b-6e4b894f9996",
       "Error": {}
     }
   },
   {
     "EventType": "ExecutionSucceeded",
-    "EventId": 7,
-    "Id": "5e4bce18-03d8-479e-a9a1-c12ba087dc90",
-    "EventTimestamp": "2026-03-12T06:21:06.374Z",
+    "EventId": 9,
+    "Id": "9f05ac5b-4d54-4511-a89e-b5d06a3a274b",
+    "EventTimestamp": "2026-03-12T18:21:36.059Z",
     "ExecutionSucceededDetails": {
       "Result": {
         "Payload": "\"Extended duration waits completed\""

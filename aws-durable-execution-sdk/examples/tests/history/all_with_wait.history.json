@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "fa0aabec-ea0c-401c-9b45-d8faa01c00be",
-    "EventTimestamp": "2026-03-12T06:21:06.292Z",
+    "Id": "dd6a6439-2a25-4a9b-b92e-562307e90d36",
+    "EventTimestamp": "2026-03-12T18:21:35.957Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,63 +13,81 @@
   {
     "EventType": "WaitStarted",
     "EventId": 2,
-    "Id": "5aaecfef617e455747d53e0572b14a5e",
-    "EventTimestamp": "2026-03-12T06:21:06.293Z",
+    "Id": "f9d01fa06c622a7b54a37acdd180ee46",
+    "EventTimestamp": "2026-03-12T18:21:35.957Z",
     "SubType": "Wait",
     "Name": "wait_1",
     "WaitStartedDetails": {
       "Duration": "PT1S",
-      "ScheduledEndTimestamp": "2026-03-12T06:21:07.293Z"
+      "ScheduledEndTimestamp": "2026-03-12T18:21:36.957Z"
     }
   },
   {
     "EventType": "InvocationCompleted",
     "EventId": 3,
-    "EventTimestamp": "2026-03-12T06:21:06.295Z",
+    "EventTimestamp": "2026-03-12T18:21:35.957Z",
     "InvocationCompletedDetails": {
-      "StartTimestamp": "2026-03-12T06:21:06.292Z",
-      "EndTimestamp": "2026-03-12T06:21:06.295Z",
-      "RequestId": "54b744d2-3855-4414-bf57-d449d3d891c9",
+      "StartTimestamp": "2026-03-12T18:21:35.957Z",
+      "EndTimestamp": "2026-03-12T18:21:35.957Z",
+      "RequestId": "b53d586a-1054-475f-97a9-5207d26de09e",
       "Error": {}
     }
   },
   {
-    "EventType": "WaitStarted",
+    "EventType": "WaitSucceeded",
     "EventId": 4,
-    "Id": "909db35b9135c0605f87e70f2c2bede8",
-    "EventTimestamp": "2026-03-12T06:21:06.302Z",
+    "Id": "f9d01fa06c622a7b54a37acdd180ee46",
+    "EventTimestamp": "2026-03-12T18:21:35.958Z",
+    "SubType": "Wait",
+    "Name": "wait_1",
+    "WaitSucceededDetails": {}
+  },
+  {
+    "EventType": "WaitStarted",
+    "EventId": 5,
+    "Id": "c4472a987007ec83ed2452d28226cabf",
+    "EventTimestamp": "2026-03-12T18:21:35.958Z",
     "SubType": "Wait",
     "Name": "wait_2",
     "WaitStartedDetails": {
       "Duration": "PT2S",
-      "ScheduledEndTimestamp": "2026-03-12T06:21:08.302Z"
+      "ScheduledEndTimestamp": "2026-03-12T18:21:37.958Z"
     }
   },
   {
     "EventType": "InvocationCompleted",
-    "EventId": 5,
-    "EventTimestamp": "2026-03-12T06:21:06.303Z",
+    "EventId": 6,
+    "EventTimestamp": "2026-03-12T18:21:35.958Z",
     "InvocationCompletedDetails": {
-      "StartTimestamp": "2026-03-12T06:21:06.300Z",
-      "EndTimestamp": "2026-03-12T06:21:06.303Z",
-      "RequestId": "8ca6e762-eb19-4f09-bdd8-4f326430ccc8",
+      "StartTimestamp": "2026-03-12T18:21:35.958Z",
+      "EndTimestamp": "2026-03-12T18:21:35.958Z",
+      "RequestId": "9c9e3659-f0cf-4fd8-b203-3a4a9eeecfcc",
       "Error": {}
     }
   },
   {
+    "EventType": "WaitSucceeded",
+    "EventId": 7,
+    "Id": "c4472a987007ec83ed2452d28226cabf",
+    "EventTimestamp": "2026-03-12T18:21:35.958Z",
+    "SubType": "Wait",
+    "Name": "wait_2",
+    "WaitSucceededDetails": {}
+  },
+  {
     "EventType": "StepStarted",
-    "EventId": 6,
-    "Id": "2e5be65fa8fda0d19c7f44020e01446a",
-    "EventTimestamp": "2026-03-12T06:21:06.304Z",
+    "EventId": 8,
+    "Id": "2e47e9d702d9c7cc0e04ec7e4194367a",
+    "EventTimestamp": "2026-03-12T18:21:35.958Z",
     "SubType": "Step",
     "Name": "all",
     "StepStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
-    "EventId": 7,
-    "Id": "28b07ca94869428782d0dc3f6f003e4b",
-    "EventTimestamp": "2026-03-12T06:21:06.304Z",
+    "EventId": 9,
+    "Id": "2be92976676e406bef9ada83d7e40b7f",
+    "EventTimestamp": "2026-03-12T18:21:35.959Z",
     "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
@@ -80,9 +98,9 @@
   },
   {
     "EventType": "StepSucceeded",
-    "EventId": 8,
-    "Id": "70a377471bab0d27c1d732b61ae600bb",
-    "EventTimestamp": "2026-03-12T06:21:06.304Z",
+    "EventId": 10,
+    "Id": "c0b509ce33d2f74d116621898fe5dc2c",
+    "EventTimestamp": "2026-03-12T18:21:35.959Z",
     "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
@@ -93,9 +111,9 @@
   },
   {
     "EventType": "StepSucceeded",
-    "EventId": 9,
-    "Id": "0a3d17f25f5b0118273a3cc67829b0af",
-    "EventTimestamp": "2026-03-12T06:21:06.304Z",
+    "EventId": 11,
+    "Id": "e6e68ac86c925e29109186ce653c101a",
+    "EventTimestamp": "2026-03-12T18:21:35.959Z",
     "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
@@ -106,9 +124,9 @@
   },
   {
     "EventType": "StepSucceeded",
-    "EventId": 10,
-    "Id": "2e5be65fa8fda0d19c7f44020e01446a",
-    "EventTimestamp": "2026-03-12T06:21:06.305Z",
+    "EventId": 12,
+    "Id": "2e47e9d702d9c7cc0e04ec7e4194367a",
+    "EventTimestamp": "2026-03-12T18:21:35.959Z",
     "SubType": "Step",
     "Name": "all",
     "StepSucceededDetails": {
@@ -120,20 +138,20 @@
   },
   {
     "EventType": "InvocationCompleted",
-    "EventId": 11,
-    "EventTimestamp": "2026-03-12T06:21:06.305Z",
+    "EventId": 13,
+    "EventTimestamp": "2026-03-12T18:21:35.959Z",
     "InvocationCompletedDetails": {
-      "StartTimestamp": "2026-03-12T06:21:06.304Z",
-      "EndTimestamp": "2026-03-12T06:21:06.305Z",
-      "RequestId": "5374f30a-c007-4ca7-97eb-af47c096e772",
+      "StartTimestamp": "2026-03-12T18:21:35.958Z",
+      "EndTimestamp": "2026-03-12T18:21:35.959Z",
+      "RequestId": "fc5c0c4c-5bbd-4ed6-8664-5b23c28d065c",
       "Error": {}
     }
   },
   {
     "EventType": "ExecutionSucceeded",
-    "EventId": 12,
-    "Id": "fa0aabec-ea0c-401c-9b45-d8faa01c00be",
-    "EventTimestamp": "2026-03-12T06:21:06.305Z",
+    "EventId": 14,
+    "Id": "dd6a6439-2a25-4a9b-b92e-562307e90d36",
+    "EventTimestamp": "2026-03-12T18:21:35.959Z",
     "ExecutionSucceededDetails": {
       "Result": {
         "Payload": "[\"fast\",\"after_wait_1\",\"after_wait_2\"]"

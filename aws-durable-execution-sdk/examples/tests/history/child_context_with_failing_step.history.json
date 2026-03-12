@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "41851fe7-dbb4-4727-a924-a6a586fbd079",
-    "EventTimestamp": "2026-03-12T06:21:05.141Z",
+    "Id": "db171b45-2b69-486e-ac40-ff6f4397cd93",
+    "EventTimestamp": "2026-03-12T18:21:35.673Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,8 @@
   {
     "EventType": "ContextStarted",
     "EventId": 2,
-    "Id": "9b3839dfca2f7469126f2747b4581a56",
-    "EventTimestamp": "2026-03-12T06:21:05.161Z",
+    "Id": "3eb8835c829c5afb8a7112fc3979983d",
+    "EventTimestamp": "2026-03-12T18:21:35.673Z",
     "SubType": "Context",
     "Name": "failing_child",
     "ContextStartedDetails": {}
@@ -22,10 +22,10 @@
   {
     "EventType": "StepFailed",
     "EventId": 3,
-    "Id": "73a825e8675f5ab2528db24b4a026447",
-    "EventTimestamp": "2026-03-12T06:21:05.181Z",
+    "Id": "23ccc8b681bebf0395a230f9362ec578",
+    "EventTimestamp": "2026-03-12T18:21:35.673Z",
     "SubType": "Step",
-    "ParentId": "9b3839dfca2f7469126f2747b4581a56",
+    "ParentId": "3eb8835c829c5afb8a7112fc3979983d",
     "StepFailedDetails": {
       "Error": {
         "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"step failed intentionally\"}"
@@ -36,8 +36,8 @@
   {
     "EventType": "ContextFailed",
     "EventId": 4,
-    "Id": "9b3839dfca2f7469126f2747b4581a56",
-    "EventTimestamp": "2026-03-12T06:21:05.188Z",
+    "Id": "3eb8835c829c5afb8a7112fc3979983d",
+    "EventTimestamp": "2026-03-12T18:21:35.673Z",
     "SubType": "Context",
     "Name": "failing_child",
     "ContextFailedDetails": {
@@ -49,19 +49,19 @@
   {
     "EventType": "InvocationCompleted",
     "EventId": 5,
-    "EventTimestamp": "2026-03-12T06:21:05.202Z",
+    "EventTimestamp": "2026-03-12T18:21:35.673Z",
     "InvocationCompletedDetails": {
-      "StartTimestamp": "2026-03-12T06:21:05.141Z",
-      "EndTimestamp": "2026-03-12T06:21:05.202Z",
-      "RequestId": "df8d1c4e-d86e-4af1-9af1-c215805e001f",
+      "StartTimestamp": "2026-03-12T18:21:35.673Z",
+      "EndTimestamp": "2026-03-12T18:21:35.673Z",
+      "RequestId": "e224dade-f5f6-4bdb-af1c-5c7d0d8c29e1",
       "Error": {}
     }
   },
   {
     "EventType": "ExecutionSucceeded",
     "EventId": 6,
-    "Id": "41851fe7-dbb4-4727-a924-a6a586fbd079",
-    "EventTimestamp": "2026-03-12T06:21:05.220Z",
+    "Id": "db171b45-2b69-486e-ac40-ff6f4397cd93",
+    "EventTimestamp": "2026-03-12T18:21:35.674Z",
     "ExecutionSucceededDetails": {
       "Result": {
         "Payload": "\"caught error: Execution error: mapped_error: User code error: step failed intentionally\""

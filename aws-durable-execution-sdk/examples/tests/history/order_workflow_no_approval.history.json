@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "178afdd4-ab7d-4f56-b165-83dd35e87569",
-    "EventTimestamp": "2026-03-12T06:21:05.401Z",
+    "Id": "13badff3-ebe9-4df5-b5d6-55a61e9ba425",
+    "EventTimestamp": "2026-03-12T18:21:35.691Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{\"order_id\":\"order-123\",\"customer_id\":\"customer-456\",\"items\":[{\"sku\":\"SKU-001\",\"quantity\":2,\"price_cents\":1000},{\"sku\":\"SKU-002\",\"quantity\":1,\"price_cents\":2500}],\"requires_approval\":false}"
@@ -13,8 +13,8 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 2,
-    "Id": "83348cd93d015ac5aaac3b4582b2487d",
-    "EventTimestamp": "2026-03-12T06:21:05.411Z",
+    "Id": "98a96c4b5584b5d54c255db1b372c9a6",
+    "EventTimestamp": "2026-03-12T18:21:35.692Z",
     "SubType": "Step",
     "Name": "validate_order",
     "StepSucceededDetails": {
@@ -27,8 +27,8 @@
   {
     "EventType": "ContextStarted",
     "EventId": 3,
-    "Id": "871ad846bfb73487691098882a0183d7",
-    "EventTimestamp": "2026-03-12T06:21:05.418Z",
+    "Id": "6b0a8eed6bbbe0cbfafd2ce0927c0d40",
+    "EventTimestamp": "2026-03-12T18:21:35.692Z",
     "SubType": "Context",
     "Name": "check_inventory",
     "ContextStartedDetails": {}
@@ -36,10 +36,10 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 4,
-    "Id": "e06e4a949252803cd77fbd8e8ce2381e",
-    "EventTimestamp": "2026-03-12T06:21:05.431Z",
+    "Id": "0cb89b9b1de3e08df25721dab56fa9f5",
+    "EventTimestamp": "2026-03-12T18:21:35.692Z",
     "SubType": "Step",
-    "ParentId": "871ad846bfb73487691098882a0183d7",
+    "ParentId": "6b0a8eed6bbbe0cbfafd2ce0927c0d40",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"inventory_ok\""
@@ -50,8 +50,8 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 5,
-    "Id": "871ad846bfb73487691098882a0183d7",
-    "EventTimestamp": "2026-03-12T06:21:05.441Z",
+    "Id": "6b0a8eed6bbbe0cbfafd2ce0927c0d40",
+    "EventTimestamp": "2026-03-12T18:21:35.692Z",
     "SubType": "Context",
     "Name": "check_inventory",
     "ContextSucceededDetails": {
@@ -63,8 +63,8 @@
   {
     "EventType": "ContextStarted",
     "EventId": 6,
-    "Id": "cb5d936c258d0bcead386e08e536507b",
-    "EventTimestamp": "2026-03-12T06:21:05.451Z",
+    "Id": "eb8743e6160e8bcc52e9ae8c92e44ad0",
+    "EventTimestamp": "2026-03-12T18:21:35.692Z",
     "SubType": "Context",
     "Name": "check_customer",
     "ContextStartedDetails": {}
@@ -72,10 +72,10 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 7,
-    "Id": "39b226fa418d004d67457f67a9242296",
-    "EventTimestamp": "2026-03-12T06:21:05.461Z",
+    "Id": "6d02b5f98eb9e5ecafca4e37e4f0d303",
+    "EventTimestamp": "2026-03-12T18:21:35.693Z",
     "SubType": "Step",
-    "ParentId": "cb5d936c258d0bcead386e08e536507b",
+    "ParentId": "eb8743e6160e8bcc52e9ae8c92e44ad0",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"customer_ok\""
@@ -86,8 +86,8 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 8,
-    "Id": "cb5d936c258d0bcead386e08e536507b",
-    "EventTimestamp": "2026-03-12T06:21:05.471Z",
+    "Id": "eb8743e6160e8bcc52e9ae8c92e44ad0",
+    "EventTimestamp": "2026-03-12T18:21:35.693Z",
     "SubType": "Context",
     "Name": "check_customer",
     "ContextSucceededDetails": {
@@ -99,8 +99,8 @@
   {
     "EventType": "ContextStarted",
     "EventId": 9,
-    "Id": "f435f2cb5a47476056ea264743dceb5c",
-    "EventTimestamp": "2026-03-12T06:21:05.481Z",
+    "Id": "9f456e0643c90b51485a1461b970800f",
+    "EventTimestamp": "2026-03-12T18:21:35.693Z",
     "SubType": "Context",
     "Name": "map",
     "ContextStartedDetails": {}
@@ -108,31 +108,31 @@
   {
     "EventType": "ContextStarted",
     "EventId": 10,
-    "Id": "61283dd7d917c874fd7d794123e7ea43",
-    "EventTimestamp": "2026-03-12T06:21:05.493Z",
+    "Id": "02297256616126c9425f99c9939813ad",
+    "EventTimestamp": "2026-03-12T18:21:35.693Z",
     "SubType": "Context",
     "Name": "map-item-0",
-    "ParentId": "f435f2cb5a47476056ea264743dceb5c",
+    "ParentId": "9f456e0643c90b51485a1461b970800f",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "ContextStarted",
     "EventId": 11,
-    "Id": "c099929e431392d483e011414d385c34",
-    "EventTimestamp": "2026-03-12T06:21:05.493Z",
+    "Id": "c7507211f9e2efb36a3996758f42dfe0",
+    "EventTimestamp": "2026-03-12T18:21:35.693Z",
     "SubType": "Context",
     "Name": "map-item-1",
-    "ParentId": "f435f2cb5a47476056ea264743dceb5c",
+    "ParentId": "9f456e0643c90b51485a1461b970800f",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 12,
-    "Id": "120e2f627cf6e440efed4ec77590aa48",
-    "EventTimestamp": "2026-03-12T06:21:05.511Z",
+    "Id": "03fb0713ac31842bfff66bd347eb26d9",
+    "EventTimestamp": "2026-03-12T18:21:35.694Z",
     "SubType": "Step",
     "Name": "process_item_0",
-    "ParentId": "61283dd7d917c874fd7d794123e7ea43",
+    "ParentId": "02297256616126c9425f99c9939813ad",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "2000"
@@ -143,11 +143,11 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 13,
-    "Id": "4f196d6c1e15c1c2bc908430eab7b1a4",
-    "EventTimestamp": "2026-03-12T06:21:05.511Z",
+    "Id": "894a799ccc5382e1a9bc2d89effda938",
+    "EventTimestamp": "2026-03-12T18:21:35.694Z",
     "SubType": "Step",
     "Name": "process_item_1",
-    "ParentId": "c099929e431392d483e011414d385c34",
+    "ParentId": "c7507211f9e2efb36a3996758f42dfe0",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "2500"
@@ -158,11 +158,11 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 14,
-    "Id": "61283dd7d917c874fd7d794123e7ea43",
-    "EventTimestamp": "2026-03-12T06:21:05.512Z",
+    "Id": "02297256616126c9425f99c9939813ad",
+    "EventTimestamp": "2026-03-12T18:21:35.694Z",
     "SubType": "Context",
     "Name": "map-item-0",
-    "ParentId": "f435f2cb5a47476056ea264743dceb5c",
+    "ParentId": "9f456e0643c90b51485a1461b970800f",
     "ContextSucceededDetails": {
       "Result": {
         "Payload": "2000"
@@ -172,11 +172,11 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 15,
-    "Id": "c099929e431392d483e011414d385c34",
-    "EventTimestamp": "2026-03-12T06:21:05.512Z",
+    "Id": "c7507211f9e2efb36a3996758f42dfe0",
+    "EventTimestamp": "2026-03-12T18:21:35.694Z",
     "SubType": "Context",
     "Name": "map-item-1",
-    "ParentId": "f435f2cb5a47476056ea264743dceb5c",
+    "ParentId": "9f456e0643c90b51485a1461b970800f",
     "ContextSucceededDetails": {
       "Result": {
         "Payload": "2500"
@@ -186,8 +186,8 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 16,
-    "Id": "f435f2cb5a47476056ea264743dceb5c",
-    "EventTimestamp": "2026-03-12T06:21:05.512Z",
+    "Id": "9f456e0643c90b51485a1461b970800f",
+    "EventTimestamp": "2026-03-12T18:21:35.694Z",
     "SubType": "Context",
     "Name": "map",
     "ContextSucceededDetails": {
@@ -199,31 +199,40 @@
   {
     "EventType": "WaitStarted",
     "EventId": 17,
-    "Id": "a1eac25d3878f8417cf8caa3c525e179",
-    "EventTimestamp": "2026-03-12T06:21:05.512Z",
+    "Id": "742aec38fbdb02b2b5471e48ae2f5d72",
+    "EventTimestamp": "2026-03-12T18:21:35.694Z",
     "SubType": "Wait",
     "Name": "processing_delay",
     "WaitStartedDetails": {
       "Duration": "PT2S",
-      "ScheduledEndTimestamp": "2026-03-12T06:21:07.512Z"
+      "ScheduledEndTimestamp": "2026-03-12T18:21:37.694Z"
     }
   },
   {
     "EventType": "InvocationCompleted",
     "EventId": 18,
-    "EventTimestamp": "2026-03-12T06:21:05.512Z",
+    "EventTimestamp": "2026-03-12T18:21:35.694Z",
     "InvocationCompletedDetails": {
-      "StartTimestamp": "2026-03-12T06:21:05.401Z",
-      "EndTimestamp": "2026-03-12T06:21:05.512Z",
-      "RequestId": "2cd698d1-7f38-4c73-8544-77ec4d70c7a2",
+      "StartTimestamp": "2026-03-12T18:21:35.691Z",
+      "EndTimestamp": "2026-03-12T18:21:35.694Z",
+      "RequestId": "2de3c499-1ca0-4a0b-a050-1cc758ffc6bb",
       "Error": {}
     }
   },
   {
-    "EventType": "StepSucceeded",
+    "EventType": "WaitSucceeded",
     "EventId": 19,
-    "Id": "71d61279246749096c39300eb8d80506",
-    "EventTimestamp": "2026-03-12T06:21:05.514Z",
+    "Id": "742aec38fbdb02b2b5471e48ae2f5d72",
+    "EventTimestamp": "2026-03-12T18:21:35.695Z",
+    "SubType": "Wait",
+    "Name": "processing_delay",
+    "WaitSucceededDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 20,
+    "Id": "9445fc253a604d6a3b21b147c87d5547",
+    "EventTimestamp": "2026-03-12T18:21:35.696Z",
     "SubType": "Step",
     "Name": "finalize_order",
     "StepSucceededDetails": {
@@ -235,20 +244,20 @@
   },
   {
     "EventType": "InvocationCompleted",
-    "EventId": 20,
-    "EventTimestamp": "2026-03-12T06:21:05.514Z",
+    "EventId": 21,
+    "EventTimestamp": "2026-03-12T18:21:35.696Z",
     "InvocationCompletedDetails": {
-      "StartTimestamp": "2026-03-12T06:21:05.513Z",
-      "EndTimestamp": "2026-03-12T06:21:05.514Z",
-      "RequestId": "3e93c801-0b49-4ed7-9105-b65fefa5bcad",
+      "StartTimestamp": "2026-03-12T18:21:35.695Z",
+      "EndTimestamp": "2026-03-12T18:21:35.696Z",
+      "RequestId": "898a59d7-a5b8-452f-b18a-0458db242d18",
       "Error": {}
     }
   },
   {
     "EventType": "ExecutionSucceeded",
-    "EventId": 21,
-    "Id": "178afdd4-ab7d-4f56-b165-83dd35e87569",
-    "EventTimestamp": "2026-03-12T06:21:05.514Z",
+    "EventId": 22,
+    "Id": "13badff3-ebe9-4df5-b5d6-55a61e9ba425",
+    "EventTimestamp": "2026-03-12T18:21:35.696Z",
     "ExecutionSucceededDetails": {
       "Result": {
         "Payload": "{\"order_id\":\"order-123\",\"status\":\"completed\",\"total_cents\":4500,\"items_processed\":2}"

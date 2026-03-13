@@ -635,10 +635,9 @@ impl CheckpointManager {
                 && updated_operation.status == OperationStatus::Succeeded
                 && existing.operation.status != OperationStatus::Succeeded
             {
-                let details =
-                    NodeJsEventDetails::WaitSucceeded(WaitSucceededDetailsWrapper {
-                        wait_succeeded_details: WaitSucceededDetails {},
-                    });
+                let details = NodeJsEventDetails::WaitSucceeded(WaitSucceededDetailsWrapper {
+                    wait_succeeded_details: WaitSucceededDetails {},
+                });
                 self.event_processor.create_nodejs_event(
                     NodeJsEventType::WaitSucceeded,
                     Some(&updated_operation),

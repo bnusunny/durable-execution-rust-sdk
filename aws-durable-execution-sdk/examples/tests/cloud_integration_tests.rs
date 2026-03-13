@@ -228,10 +228,7 @@ async fn cloud_large_payload() {
     let func = get_function_name("large_payload");
     let mut runner: CloudDurableTestRunner<serde_json::Value> =
         CloudDurableTestRunner::new(&func).await.unwrap();
-    let result = runner
-        .run(json!({"data": "x".repeat(1000)}))
-        .await
-        .unwrap();
+    let result = runner.run(json!({"data": "x".repeat(1000)})).await.unwrap();
     assert_eq!(result.get_status(), ExecutionStatus::Succeeded);
 }
 

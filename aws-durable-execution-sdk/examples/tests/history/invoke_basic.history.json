@@ -2,12 +2,23 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "e66320ac-bb4e-41b7-a76c-b8f92d6b29e4",
-    "EventTimestamp": "2026-01-20T23:17:39.204Z",
+    "Id": "17e8846c-20af-48b5-9e3b-7f61285ba4a3",
+    "EventTimestamp": "2026-03-12T18:21:35.795Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
       }
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 2,
+    "EventTimestamp": "2026-03-12T18:21:35.796Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T18:21:35.795Z",
+      "EndTimestamp": "2026-03-12T18:21:35.796Z",
+      "RequestId": "6ca79c8f-7829-484c-bd80-7fd896623ba3",
+      "Error": {}
     }
   }
 ]

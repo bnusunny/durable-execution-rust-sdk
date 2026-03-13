@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "eee0f864-9260-4f3c-af99-4e96f9e99039",
-    "EventTimestamp": "2026-01-20T23:17:39.179Z",
+    "Id": "0ae8e204-c2bb-4c74-843e-fdaa1ca7bced",
+    "EventTimestamp": "2026-03-12T18:21:35.700Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{\"order_id\":\"order-789\",\"customer_id\":\"customer-012\",\"items\":[{\"sku\":\"SKU-003\",\"quantity\":1,\"price_cents\":5000}],\"requires_approval\":true}"
@@ -13,8 +13,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 2,
-    "Id": "55f0c941168cd9ec859ab995d94a6bb0",
-    "EventTimestamp": "2026-01-20T23:17:39.180Z",
+    "Id": "ea3110fcfd912a1a636d2a64acbbeff1",
+    "EventTimestamp": "2026-03-12T18:21:35.700Z",
+    "SubType": "Step",
     "Name": "validate_order",
     "StepSucceededDetails": {
       "Result": {
@@ -26,17 +27,19 @@
   {
     "EventType": "ContextStarted",
     "EventId": 3,
-    "Id": "642b5ede6732880d16b65ab7cfb43c66",
-    "EventTimestamp": "2026-01-20T23:17:39.180Z",
+    "Id": "6c10cbfa4f7d0123da61d3d8e462903d",
+    "EventTimestamp": "2026-03-12T18:21:35.700Z",
+    "SubType": "Context",
     "Name": "check_inventory",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 4,
-    "Id": "d34478bce5e2c8f0749410b340793cbb",
-    "EventTimestamp": "2026-01-20T23:17:39.180Z",
-    "ParentId": "642b5ede6732880d16b65ab7cfb43c66",
+    "Id": "56342b69ad06ac110f027007e2c655c2",
+    "EventTimestamp": "2026-03-12T18:21:35.700Z",
+    "SubType": "Step",
+    "ParentId": "6c10cbfa4f7d0123da61d3d8e462903d",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"inventory_ok\""
@@ -47,8 +50,9 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 5,
-    "Id": "642b5ede6732880d16b65ab7cfb43c66",
-    "EventTimestamp": "2026-01-20T23:17:39.181Z",
+    "Id": "6c10cbfa4f7d0123da61d3d8e462903d",
+    "EventTimestamp": "2026-03-12T18:21:35.701Z",
+    "SubType": "Context",
     "Name": "check_inventory",
     "ContextSucceededDetails": {
       "Result": {
@@ -59,17 +63,19 @@
   {
     "EventType": "ContextStarted",
     "EventId": 6,
-    "Id": "aa2396d9b0ed2adf992ef5cc5ad29bc1",
-    "EventTimestamp": "2026-01-20T23:17:39.181Z",
+    "Id": "ff07c5700a9d5fa39124239e6c8a4e71",
+    "EventTimestamp": "2026-03-12T18:21:35.701Z",
+    "SubType": "Context",
     "Name": "check_customer",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 7,
-    "Id": "36dd661bf69aacda6ca93181bb6f6d64",
-    "EventTimestamp": "2026-01-20T23:17:39.181Z",
-    "ParentId": "aa2396d9b0ed2adf992ef5cc5ad29bc1",
+    "Id": "0830419862546ca9e550ff2cb808b37c",
+    "EventTimestamp": "2026-03-12T18:21:35.701Z",
+    "SubType": "Step",
+    "ParentId": "ff07c5700a9d5fa39124239e6c8a4e71",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"customer_ok\""
@@ -80,8 +86,9 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 8,
-    "Id": "aa2396d9b0ed2adf992ef5cc5ad29bc1",
-    "EventTimestamp": "2026-01-20T23:17:39.181Z",
+    "Id": "ff07c5700a9d5fa39124239e6c8a4e71",
+    "EventTimestamp": "2026-03-12T18:21:35.701Z",
+    "SubType": "Context",
     "Name": "check_customer",
     "ContextSucceededDetails": {
       "Result": {
@@ -92,27 +99,30 @@
   {
     "EventType": "ContextStarted",
     "EventId": 9,
-    "Id": "22049fc8eb491eb868895622025805d6",
-    "EventTimestamp": "2026-01-20T23:17:39.182Z",
+    "Id": "c60d3fef35b2bf2801c41afc79c7be9d",
+    "EventTimestamp": "2026-03-12T18:21:35.701Z",
+    "SubType": "Context",
     "Name": "map",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "ContextStarted",
     "EventId": 10,
-    "Id": "a445cab1675325fceb8c96c56848ddd5",
-    "EventTimestamp": "2026-01-20T23:17:39.182Z",
+    "Id": "6ccccd2ee487b1fc2489cb7c7c134007",
+    "EventTimestamp": "2026-03-12T18:21:35.701Z",
+    "SubType": "Context",
     "Name": "map-item-0",
-    "ParentId": "22049fc8eb491eb868895622025805d6",
+    "ParentId": "c60d3fef35b2bf2801c41afc79c7be9d",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 11,
-    "Id": "42f3e6d678dad863a84b7dc3bff3ee28",
-    "EventTimestamp": "2026-01-20T23:17:39.182Z",
+    "Id": "d8c221b591eb02845fbf4fdcd2301ab4",
+    "EventTimestamp": "2026-03-12T18:21:35.701Z",
+    "SubType": "Step",
     "Name": "process_item_0",
-    "ParentId": "a445cab1675325fceb8c96c56848ddd5",
+    "ParentId": "6ccccd2ee487b1fc2489cb7c7c134007",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "5000"
@@ -123,10 +133,11 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 12,
-    "Id": "a445cab1675325fceb8c96c56848ddd5",
-    "EventTimestamp": "2026-01-20T23:17:39.182Z",
+    "Id": "6ccccd2ee487b1fc2489cb7c7c134007",
+    "EventTimestamp": "2026-03-12T18:21:35.702Z",
+    "SubType": "Context",
     "Name": "map-item-0",
-    "ParentId": "22049fc8eb491eb868895622025805d6",
+    "ParentId": "c60d3fef35b2bf2801c41afc79c7be9d",
     "ContextSucceededDetails": {
       "Result": {
         "Payload": "5000"
@@ -136,8 +147,9 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 13,
-    "Id": "22049fc8eb491eb868895622025805d6",
-    "EventTimestamp": "2026-01-20T23:17:39.182Z",
+    "Id": "c60d3fef35b2bf2801c41afc79c7be9d",
+    "EventTimestamp": "2026-03-12T18:21:35.702Z",
+    "SubType": "Context",
     "Name": "map",
     "ContextSucceededDetails": {
       "Result": {
@@ -148,13 +160,25 @@
   {
     "EventType": "CallbackStarted",
     "EventId": 14,
-    "Id": "781b6443b21f5476f61e3afb63d701c1",
-    "EventTimestamp": "2026-01-20T23:17:39.183Z",
+    "Id": "d98886f66807ce5bd8dad798c4ce4af1",
+    "EventTimestamp": "2026-03-12T18:21:35.702Z",
+    "SubType": "Callback",
     "Name": "order_approval",
     "CallbackStartedDetails": {
-      "CallbackId": "4ce9c5fd-7b1b-47f1-b6d5-634a46517079",
+      "CallbackId": "51021dff-864d-4e22-aba6-22a8274b171e",
       "Timeout": 86400,
       "HeartbeatTimeout": 0
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 15,
+    "EventTimestamp": "2026-03-12T18:21:35.702Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T18:21:35.700Z",
+      "EndTimestamp": "2026-03-12T18:21:35.702Z",
+      "RequestId": "5f81fa63-5419-431d-87b0-da2c4a3e6b3a",
+      "Error": {}
     }
   }
 ]

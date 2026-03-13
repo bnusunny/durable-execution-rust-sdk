@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "1660b5be-9fa1-4946-bb31-782f1bec459b",
-    "EventTimestamp": "2026-02-26T21:56:39.806Z",
+    "Id": "1c3bf058-7172-4562-a7f2-f697dacd7764",
+    "EventTimestamp": "2026-03-12T18:21:35.463Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 2,
-    "Id": "f4a51ac2eb93e7d25f01f368bfca893a",
-    "EventTimestamp": "2026-02-26T21:56:39.807Z",
+    "Id": "5efce13d9f0000ff9bd07b6164e7d8d0",
+    "EventTimestamp": "2026-03-12T18:21:35.463Z",
+    "SubType": "Step",
     "Name": "prepare",
     "StepSucceededDetails": {
       "Result": {
@@ -26,24 +27,57 @@
   {
     "EventType": "WaitStarted",
     "EventId": 3,
-    "Id": "914e5e1412f64e9c8b388be5a6cfa3a8",
-    "EventTimestamp": "2026-02-26T21:56:39.807Z",
+    "Id": "988a40aee3d37803e3fce4966c862dd5",
+    "EventTimestamp": "2026-03-12T18:21:35.463Z",
+    "SubType": "Wait",
     "Name": "pre_callback_delay",
     "WaitStartedDetails": {
       "Duration": "PT1S",
-      "ScheduledEndTimestamp": "2026-02-26T21:56:40.807Z"
+      "ScheduledEndTimestamp": "2026-03-12T18:21:36.463Z"
     }
   },
   {
-    "EventType": "CallbackStarted",
+    "EventType": "InvocationCompleted",
     "EventId": 4,
-    "Id": "47132cb68216cd6a4f3c71a4f91dfe86",
-    "EventTimestamp": "2026-02-26T21:56:39.807Z",
+    "EventTimestamp": "2026-03-12T18:21:35.463Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T18:21:35.463Z",
+      "EndTimestamp": "2026-03-12T18:21:35.463Z",
+      "RequestId": "6da156b9-6380-4aa7-b7af-fade026ea97a",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "WaitSucceeded",
+    "EventId": 5,
+    "Id": "988a40aee3d37803e3fce4966c862dd5",
+    "EventTimestamp": "2026-03-12T18:21:35.463Z",
+    "SubType": "Wait",
+    "Name": "pre_callback_delay",
+    "WaitSucceededDetails": {}
+  },
+  {
+    "EventType": "CallbackStarted",
+    "EventId": 6,
+    "Id": "ed3dc016c3e6153026c46ba1b01fccc9",
+    "EventTimestamp": "2026-03-12T18:21:35.464Z",
+    "SubType": "Callback",
     "Name": "mixed_callback",
     "CallbackStartedDetails": {
-      "CallbackId": "c9e8528e-5ed1-43f8-95e3-b0940143375d",
+      "CallbackId": "0b140cf7-c5d0-437b-b898-5e559f914e0e",
       "Timeout": 0,
       "HeartbeatTimeout": 0
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 7,
+    "EventTimestamp": "2026-03-12T18:21:35.464Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T18:21:35.464Z",
+      "EndTimestamp": "2026-03-12T18:21:35.464Z",
+      "RequestId": "1dd83112-1f8a-48e8-ae31-cb161fe32203",
+      "Error": {}
     }
   }
 ]

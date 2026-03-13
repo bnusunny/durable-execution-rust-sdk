@@ -18,7 +18,8 @@ use super::event_processor::{EventProcessor, EventType, HistoryEvent};
 use super::nodejs_event_types::{
     ErrorWrapper, ExecutionStartedDetails, ExecutionStartedDetailsWrapper,
     InvocationCompletedDetails, InvocationCompletedDetailsWrapper, NodeJsEventDetails,
-    NodeJsEventType, NodeJsHistoryEvent, PayloadWrapper,
+    NodeJsEventType, NodeJsHistoryEvent, PayloadWrapper, WaitSucceededDetails,
+    WaitSucceededDetailsWrapper,
 };
 use super::types::{ExecutionId, InvocationId};
 use crate::error::TestError;
@@ -555,6 +556,68 @@ impl CheckpointManager {
         self.event_processor.get_nodejs_events().to_vec()
     }
 
+    /// Generate a terminal ExecutionSucceeded or ExecutionFailed event.
+    ///
+    /// This should be called when the execution completes to ensure the
+    /// terminal event is recorded in the history, matching cloud behavior.
+    pub fn complete_execution(
+        &mut self,
+        result: Option<&str>,
+        error: Option<&durable_execution_sdk::ErrorObject>,
+    ) {
+        // Only generate if not already completed via operation updates
+        if self.is_execution_completed {
+            return;
+        }
+        self.is_execution_completed = true;
+
+        // Find the execution operation to use as context
+        let exec_op = self.operation_order.iter().find_map(|id| {
+            let events = self.operation_data_map.get(id)?;
+            if events.operation.operation_type == OperationType::Execution {
+                Some(events.operation.clone())
+            } else {
+                None
+            }
+        });
+
+        if let Some(mut op) = exec_op {
+            if let Some(err) = error {
+                op.status = OperationStatus::Failed;
+                let error_payload = serde_json::to_string(err).unwrap_or_default();
+                let details = NodeJsEventDetails::ExecutionFailed(
+                    crate::checkpoint_server::nodejs_event_types::ExecutionFailedDetailsWrapper {
+                        execution_failed_details:
+                            crate::checkpoint_server::nodejs_event_types::ExecutionFailedDetails {
+                                error: crate::checkpoint_server::nodejs_event_types::PayloadWrapper::new(error_payload),
+                            },
+                    },
+                );
+                self.event_processor.create_nodejs_event(
+                    NodeJsEventType::ExecutionFailed,
+                    Some(&op),
+                    details,
+                );
+            } else {
+                op.status = OperationStatus::Succeeded;
+                let result_str = result.unwrap_or("null");
+                let details = NodeJsEventDetails::ExecutionSucceeded(
+                    crate::checkpoint_server::nodejs_event_types::ExecutionSucceededDetailsWrapper {
+                        execution_succeeded_details:
+                            crate::checkpoint_server::nodejs_event_types::ExecutionSucceededDetails {
+                                result: crate::checkpoint_server::nodejs_event_types::PayloadWrapper::new(result_str),
+                            },
+                    },
+                );
+                self.event_processor.create_nodejs_event(
+                    NodeJsEventType::ExecutionSucceeded,
+                    Some(&op),
+                    details,
+                );
+            }
+        }
+    }
+
     /// Get the execution ID.
     pub fn execution_id(&self) -> &str {
         &self.execution_id
@@ -566,6 +629,22 @@ impl CheckpointManager {
     /// (e.g., marking wait operations as SUCCEEDED after time advancement).
     pub fn update_operation_data(&mut self, operation_id: &str, updated_operation: Operation) {
         if let Some(existing) = self.operation_data_map.get_mut(operation_id) {
+            // Generate WaitSucceeded event when a wait transitions to Succeeded,
+            // matching the cloud Lambda service behavior.
+            if updated_operation.operation_type == OperationType::Wait
+                && updated_operation.status == OperationStatus::Succeeded
+                && existing.operation.status != OperationStatus::Succeeded
+            {
+                let details = NodeJsEventDetails::WaitSucceeded(WaitSucceededDetailsWrapper {
+                    wait_succeeded_details: WaitSucceededDetails {},
+                });
+                self.event_processor.create_nodejs_event(
+                    NodeJsEventType::WaitSucceeded,
+                    Some(&updated_operation),
+                    details,
+                );
+            }
+
             // Update the operation
             existing.operation = updated_operation;
 

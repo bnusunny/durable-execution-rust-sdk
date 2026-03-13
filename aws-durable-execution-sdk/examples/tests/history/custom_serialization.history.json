@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "e0aaf183-013b-430f-b723-67cabd4a84f4",
-    "EventTimestamp": "2026-01-20T23:17:39.373Z",
+    "Id": "4f6fb1f8-1f85-4a03-9912-c0fdd844b47e",
+    "EventTimestamp": "2026-03-12T18:21:36.014Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,14 +13,37 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 2,
-    "Id": "2a4a105a20ce448ddc26caeac1e34a8c",
-    "EventTimestamp": "2026-01-20T23:17:39.394Z",
+    "Id": "1e984ab10fbee6192a7659c0a8e55f14",
+    "EventTimestamp": "2026-03-12T18:21:36.015Z",
+    "SubType": "Step",
     "Name": "process_data",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "{\"user_id\":\"user-123\",\"data\":\"sensitive information\"}"
       },
       "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 3,
+    "EventTimestamp": "2026-03-12T18:21:36.015Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T18:21:36.014Z",
+      "EndTimestamp": "2026-03-12T18:21:36.015Z",
+      "RequestId": "58d855e7-8a14-42b2-8eec-7bd7e1adc001",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionSucceeded",
+    "EventId": 4,
+    "Id": "4f6fb1f8-1f85-4a03-9912-c0fdd844b47e",
+    "EventTimestamp": "2026-03-12T18:21:36.015Z",
+    "ExecutionSucceededDetails": {
+      "Result": {
+        "Payload": "{\"user_id\":\"user-123\",\"data\":\"sensitive information\"}"
+      }
     }
   }
 ]

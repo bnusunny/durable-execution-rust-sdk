@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "18f3a24e-83ad-4321-8415-4ffe1851a9b7",
-    "EventTimestamp": "2026-02-26T23:28:01.312Z",
+    "Id": "1244b79a-1db7-4362-95e3-3bcf1c7b6f1d",
+    "EventTimestamp": "2026-03-12T18:21:35.427Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 2,
-    "Id": "7e3a3c40fcfe136d57be3886ec9657e8",
-    "EventTimestamp": "2026-02-26T23:28:01.313Z",
+    "Id": "5d74603c8dc497cb011b0d8f905f16a3",
+    "EventTimestamp": "2026-03-12T18:21:35.428Z",
+    "SubType": "Step",
     "Name": "batched_step_1",
     "StepSucceededDetails": {
       "Result": {
@@ -26,8 +27,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 3,
-    "Id": "c56832ca96287775416adaea6a6094b9",
-    "EventTimestamp": "2026-02-26T23:28:01.313Z",
+    "Id": "5a17583b2e6e9137928a70d1230fc9f1",
+    "EventTimestamp": "2026-03-12T18:21:35.428Z",
+    "SubType": "Step",
     "Name": "batched_step_2",
     "StepSucceededDetails": {
       "Result": {
@@ -39,14 +41,37 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 4,
-    "Id": "986e407635df4786c88445d9f023a4e9",
-    "EventTimestamp": "2026-02-26T23:28:01.313Z",
+    "Id": "f84a245a024147115427401e23bbcd7b",
+    "EventTimestamp": "2026-03-12T18:21:35.428Z",
+    "SubType": "Step",
     "Name": "batched_step_3",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"batched_3\""
       },
       "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 5,
+    "EventTimestamp": "2026-03-12T18:21:35.428Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T18:21:35.427Z",
+      "EndTimestamp": "2026-03-12T18:21:35.428Z",
+      "RequestId": "61187b3e-e39d-48f7-a42f-ca8e899c5c65",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionSucceeded",
+    "EventId": 6,
+    "Id": "1244b79a-1db7-4362-95e3-3bcf1c7b6f1d",
+    "EventTimestamp": "2026-03-12T18:21:35.429Z",
+    "ExecutionSucceededDetails": {
+      "Result": {
+        "Payload": "\"batched: batched_1 + batched_2 + batched_3\""
+      }
     }
   }
 ]

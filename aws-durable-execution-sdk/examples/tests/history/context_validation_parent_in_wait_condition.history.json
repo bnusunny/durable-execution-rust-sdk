@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "f4b309c0-313f-4f9c-9a29-d80cc737ada2",
-    "EventTimestamp": "2026-02-26T23:15:07.992Z",
+    "Id": "81572314-1f32-437b-9654-c4e15b575a43",
+    "EventTimestamp": "2026-03-12T18:21:35.754Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,26 +13,27 @@
   {
     "EventType": "ContextStarted",
     "EventId": 2,
-    "Id": "574ac3e9b51b4a6e0f4cc75b6dcb3705",
-    "EventTimestamp": "2026-02-26T23:15:07.993Z",
+    "Id": "13c3a77fa32476e987dc009e12b6e0c3",
+    "EventTimestamp": "2026-03-12T18:21:35.755Z",
+    "SubType": "Context",
     "Name": "misuse_wait_condition",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "StepStarted",
     "EventId": 3,
-    "Id": "d34fb40b982add124179ee784bbd7db1",
-    "EventTimestamp": "2026-02-26T23:15:07.993Z",
-    "SubType": "wait_for_condition",
+    "Id": "e81996394be0834f13a7ddd73c2323b1",
+    "EventTimestamp": "2026-03-12T18:21:35.755Z",
+    "SubType": "Step",
     "Name": "wait_for_condition",
     "StepStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 4,
-    "Id": "d34fb40b982add124179ee784bbd7db1",
-    "EventTimestamp": "2026-02-26T23:15:07.993Z",
-    "SubType": "wait_for_condition",
+    "Id": "e81996394be0834f13a7ddd73c2323b1",
+    "EventTimestamp": "2026-03-12T18:21:35.755Z",
+    "SubType": "Step",
     "Name": "wait_for_condition",
     "StepSucceededDetails": {
       "Result": {
@@ -44,12 +45,35 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 5,
-    "Id": "574ac3e9b51b4a6e0f4cc75b6dcb3705",
-    "EventTimestamp": "2026-02-26T23:15:07.993Z",
+    "Id": "13c3a77fa32476e987dc009e12b6e0c3",
+    "EventTimestamp": "2026-03-12T18:21:35.755Z",
+    "SubType": "Context",
     "Name": "misuse_wait_condition",
     "ContextSucceededDetails": {
       "Result": {
         "Payload": "\"condition_met\""
+      }
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 6,
+    "EventTimestamp": "2026-03-12T18:21:35.755Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T18:21:35.754Z",
+      "EndTimestamp": "2026-03-12T18:21:35.755Z",
+      "RequestId": "bc46d87a-efde-4203-85cf-5226b9755347",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionSucceeded",
+    "EventId": 7,
+    "Id": "81572314-1f32-437b-9654-c4e15b575a43",
+    "EventTimestamp": "2026-03-12T18:21:35.756Z",
+    "ExecutionSucceededDetails": {
+      "Result": {
+        "Payload": "\"unexpected_success: condition_met\""
       }
     }
   }

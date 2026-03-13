@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "e9fd8e7d-028a-45da-b550-bfa45c22cc8b",
-    "EventTimestamp": "2026-01-20T23:17:39.173Z",
+    "Id": "9c2f8600-d1f2-4945-8b9b-f1f0a79ce914",
+    "EventTimestamp": "2026-03-12T18:21:35.508Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,18 +13,20 @@
   {
     "EventType": "ContextStarted",
     "EventId": 2,
-    "Id": "da7815e7dc472cfe28b0075da06adc52",
-    "EventTimestamp": "2026-01-20T23:17:39.173Z",
+    "Id": "a156a14d3e92f6569f17c0a754e7ab69",
+    "EventTimestamp": "2026-03-12T18:21:35.508Z",
+    "SubType": "Context",
     "Name": "sub_workflow",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 3,
-    "Id": "c11a08b2fdb54306d85f44ff961e08c0",
-    "EventTimestamp": "2026-01-20T23:17:39.174Z",
+    "Id": "f90b6defac472f87194d3c61c1213958",
+    "EventTimestamp": "2026-03-12T18:21:35.508Z",
+    "SubType": "Step",
     "Name": "child_step_1",
-    "ParentId": "da7815e7dc472cfe28b0075da06adc52",
+    "ParentId": "a156a14d3e92f6569f17c0a754e7ab69",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"child step 1 done\""
@@ -35,10 +37,11 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 4,
-    "Id": "44e74c332d230d1f0203127011b706e7",
-    "EventTimestamp": "2026-01-20T23:17:39.174Z",
+    "Id": "4d1f73b55e91db49ba6f6c5837f234f6",
+    "EventTimestamp": "2026-03-12T18:21:35.508Z",
+    "SubType": "Step",
     "Name": "child_step_2",
-    "ParentId": "da7815e7dc472cfe28b0075da06adc52",
+    "ParentId": "a156a14d3e92f6569f17c0a754e7ab69",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"child step 2 done\""
@@ -49,10 +52,33 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 5,
-    "Id": "da7815e7dc472cfe28b0075da06adc52",
-    "EventTimestamp": "2026-01-20T23:17:39.174Z",
+    "Id": "a156a14d3e92f6569f17c0a754e7ab69",
+    "EventTimestamp": "2026-03-12T18:21:35.509Z",
+    "SubType": "Context",
     "Name": "sub_workflow",
     "ContextSucceededDetails": {
+      "Result": {
+        "Payload": "{\"step1\":\"child step 1 done\",\"step2\":\"child step 2 done\"}"
+      }
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 6,
+    "EventTimestamp": "2026-03-12T18:21:35.509Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T18:21:35.508Z",
+      "EndTimestamp": "2026-03-12T18:21:35.509Z",
+      "RequestId": "e67be571-4319-4182-8d89-6ae567c68ff4",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionSucceeded",
+    "EventId": 7,
+    "Id": "9c2f8600-d1f2-4945-8b9b-f1f0a79ce914",
+    "EventTimestamp": "2026-03-12T18:21:35.509Z",
+    "ExecutionSucceededDetails": {
       "Result": {
         "Payload": "{\"step1\":\"child step 1 done\",\"step2\":\"child step 2 done\"}"
       }

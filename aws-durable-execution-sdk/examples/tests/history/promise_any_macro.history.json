@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "70aae4a5-e5aa-4f1f-a27e-687fb7b2ed05",
-    "EventTimestamp": "2026-01-20T23:17:39.256Z",
+    "Id": "77412028-1dbc-4935-863d-d7f748428d66",
+    "EventTimestamp": "2026-03-12T18:21:35.988Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,17 +13,18 @@
   {
     "EventType": "StepStarted",
     "EventId": 2,
-    "Id": "872cad4478018d9fa5abdde9d5095b5f",
-    "EventTimestamp": "2026-01-20T23:17:39.263Z",
-    "SubType": "PromiseCombinator",
+    "Id": "052be1119e25370eb27b271823f2bc52",
+    "EventTimestamp": "2026-03-12T18:21:35.988Z",
+    "SubType": "Step",
     "Name": "any",
     "StepStartedDetails": {}
   },
   {
     "EventType": "StepFailed",
     "EventId": 3,
-    "Id": "f6fbda6ff42aff579e320bfae3fd453d",
-    "EventTimestamp": "2026-01-20T23:17:39.274Z",
+    "Id": "ae802a1c65c28de39c6e6e38922edf11",
+    "EventTimestamp": "2026-03-12T18:21:35.988Z",
+    "SubType": "Step",
     "StepFailedDetails": {
       "Error": {
         "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"primary unavailable\"}"
@@ -34,8 +35,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 4,
-    "Id": "e6702614291de2591a027e86e647ad80",
-    "EventTimestamp": "2026-01-20T23:17:39.274Z",
+    "Id": "2291c6566b8c5c7198cdebefd7fde0b0",
+    "EventTimestamp": "2026-03-12T18:21:35.988Z",
+    "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"data from secondary\""
@@ -46,8 +48,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 5,
-    "Id": "4fbd108097705d16c17ca55f76f65c18",
-    "EventTimestamp": "2026-01-20T23:17:39.274Z",
+    "Id": "1b2e2fc6c1c73475d6b8a7009d56d078",
+    "EventTimestamp": "2026-03-12T18:21:35.988Z",
+    "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"data from fallback\""
@@ -58,15 +61,37 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 6,
-    "Id": "872cad4478018d9fa5abdde9d5095b5f",
-    "EventTimestamp": "2026-01-20T23:17:39.284Z",
-    "SubType": "PromiseCombinator",
+    "Id": "052be1119e25370eb27b271823f2bc52",
+    "EventTimestamp": "2026-03-12T18:21:35.988Z",
+    "SubType": "Step",
     "Name": "any",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"data from secondary\""
       },
       "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 7,
+    "EventTimestamp": "2026-03-12T18:21:35.988Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T18:21:35.988Z",
+      "EndTimestamp": "2026-03-12T18:21:35.988Z",
+      "RequestId": "3d9de3c4-2734-428a-98b0-d9ffe62b0dc5",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionSucceeded",
+    "EventId": 8,
+    "Id": "77412028-1dbc-4935-863d-d7f748428d66",
+    "EventTimestamp": "2026-03-12T18:21:35.989Z",
+    "ExecutionSucceededDetails": {
+      "Result": {
+        "Payload": "\"data from secondary\""
+      }
     }
   }
 ]

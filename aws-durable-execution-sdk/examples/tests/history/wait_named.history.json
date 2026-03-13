@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "33c57771-6ed0-4b04-82cf-1a4152a0d343",
-    "EventTimestamp": "2026-01-20T23:17:39.523Z",
+    "Id": "0a2793cb-1025-499d-85e6-013cc88d4988",
+    "EventTimestamp": "2026-03-12T18:21:36.067Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,19 +13,41 @@
   {
     "EventType": "WaitStarted",
     "EventId": 2,
-    "Id": "8ad0c578bccd0e50210ec4540b84beab",
-    "EventTimestamp": "2026-01-20T23:17:39.533Z",
+    "Id": "edf0d21647fb18b488025415fe7233a7",
+    "EventTimestamp": "2026-03-12T18:21:36.067Z",
+    "SubType": "Wait",
     "Name": "initial_delay",
     "WaitStartedDetails": {
       "Duration": "PT1S",
-      "ScheduledEndTimestamp": "2026-01-20T23:17:40.533Z"
+      "ScheduledEndTimestamp": "2026-03-12T18:21:37.067Z"
     }
   },
   {
-    "EventType": "StepSucceeded",
+    "EventType": "InvocationCompleted",
     "EventId": 3,
-    "Id": "352dbc0e089149ceff15360f2f441cd4",
-    "EventTimestamp": "2026-01-20T23:17:39.612Z",
+    "EventTimestamp": "2026-03-12T18:21:36.067Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T18:21:36.067Z",
+      "EndTimestamp": "2026-03-12T18:21:36.067Z",
+      "RequestId": "6724f694-f05a-4c54-bd12-913a1ac754a7",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "WaitSucceeded",
+    "EventId": 4,
+    "Id": "edf0d21647fb18b488025415fe7233a7",
+    "EventTimestamp": "2026-03-12T18:21:36.068Z",
+    "SubType": "Wait",
+    "Name": "initial_delay",
+    "WaitSucceededDetails": {}
+  },
+  {
+    "EventType": "StepSucceeded",
+    "EventId": 5,
+    "Id": "e441c5c1c8c36edc03975ef7c504a954",
+    "EventTimestamp": "2026-03-12T18:21:36.068Z",
+    "SubType": "Step",
     "Name": "process",
     "StepSucceededDetails": {
       "Result": {
@@ -36,13 +58,56 @@
   },
   {
     "EventType": "WaitStarted",
-    "EventId": 4,
-    "Id": "6cff47756c256cacb84051641e87e234",
-    "EventTimestamp": "2026-01-20T23:17:39.612Z",
+    "EventId": 6,
+    "Id": "f82595f418b99c9b4948bb956f7a687a",
+    "EventTimestamp": "2026-03-12T18:21:36.068Z",
+    "SubType": "Wait",
     "Name": "cooldown_period",
     "WaitStartedDetails": {
       "Duration": "PT2S",
-      "ScheduledEndTimestamp": "2026-01-20T23:17:41.612Z"
+      "ScheduledEndTimestamp": "2026-03-12T18:21:38.068Z"
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 7,
+    "EventTimestamp": "2026-03-12T18:21:36.068Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T18:21:36.068Z",
+      "EndTimestamp": "2026-03-12T18:21:36.068Z",
+      "RequestId": "5f3cdad9-2431-468c-a289-601f7bc9b06a",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "WaitSucceeded",
+    "EventId": 8,
+    "Id": "f82595f418b99c9b4948bb956f7a687a",
+    "EventTimestamp": "2026-03-12T18:21:36.068Z",
+    "SubType": "Wait",
+    "Name": "cooldown_period",
+    "WaitSucceededDetails": {}
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 9,
+    "EventTimestamp": "2026-03-12T18:21:36.069Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T18:21:36.069Z",
+      "EndTimestamp": "2026-03-12T18:21:36.069Z",
+      "RequestId": "b071104b-9ba8-4454-9ecc-66c6ac5374eb",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionSucceeded",
+    "EventId": 10,
+    "Id": "0a2793cb-1025-499d-85e6-013cc88d4988",
+    "EventTimestamp": "2026-03-12T18:21:36.069Z",
+    "ExecutionSucceededDetails": {
+      "Result": {
+        "Payload": "\"All waits completed\""
+      }
     }
   }
 ]

@@ -452,6 +452,7 @@ impl LambdaHistoryApiClient {
             .iter()
             .filter_map(|event| {
                 let sdk_event_type = event.event_type()?;
+
                 let nodejs_event_type = Self::sdk_event_type_to_nodejs(sdk_event_type)?;
                 let sub_type = Self::sdk_event_type_to_sub_type(sdk_event_type);
                 let timestamp = event

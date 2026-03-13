@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "c97cc0f4-c147-4e0b-8330-5e786ee3db7b",
-    "EventTimestamp": "2026-01-20T23:17:39.256Z",
+    "Id": "71f7ef17-7139-4494-8ad0-7dde0d76b476",
+    "EventTimestamp": "2026-03-12T18:21:35.998Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,17 +13,18 @@
   {
     "EventType": "StepStarted",
     "EventId": 2,
-    "Id": "177af12e23e82696240a1033771e52a7",
-    "EventTimestamp": "2026-01-20T23:17:39.263Z",
-    "SubType": "PromiseCombinator",
+    "Id": "654ae376a9dc48af1576c7881549c9d6",
+    "EventTimestamp": "2026-03-12T18:21:35.999Z",
+    "SubType": "Step",
     "Name": "race",
     "StepStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 3,
-    "Id": "48fb0c494ad5003e953dc36ea59acd70",
-    "EventTimestamp": "2026-01-20T23:17:39.273Z",
+    "Id": "599a3dda58e80ce6e551bbf74fb16e33",
+    "EventTimestamp": "2026-03-12T18:21:35.999Z",
+    "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"operation completed\""
@@ -34,8 +35,9 @@
   {
     "EventType": "StepFailed",
     "EventId": 4,
-    "Id": "72416e02100f2842cdfbece049f288e5",
-    "EventTimestamp": "2026-01-20T23:17:39.273Z",
+    "Id": "b4af83b5854c1e0ba59903b1c13e6c0e",
+    "EventTimestamp": "2026-03-12T18:21:35.999Z",
+    "SubType": "Step",
     "StepFailedDetails": {
       "Error": {
         "Payload": "{\"ErrorType\":\"UserCodeError\",\"ErrorMessage\":\"operation timed out\"}"
@@ -46,15 +48,37 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 5,
-    "Id": "177af12e23e82696240a1033771e52a7",
-    "EventTimestamp": "2026-01-20T23:17:39.284Z",
-    "SubType": "PromiseCombinator",
+    "Id": "654ae376a9dc48af1576c7881549c9d6",
+    "EventTimestamp": "2026-03-12T18:21:35.999Z",
+    "SubType": "Step",
     "Name": "race",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"operation completed\""
       },
       "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 6,
+    "EventTimestamp": "2026-03-12T18:21:35.999Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T18:21:35.998Z",
+      "EndTimestamp": "2026-03-12T18:21:35.999Z",
+      "RequestId": "760e2058-d955-42ba-8edc-04102355ef59",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionSucceeded",
+    "EventId": 7,
+    "Id": "71f7ef17-7139-4494-8ad0-7dde0d76b476",
+    "EventTimestamp": "2026-03-12T18:21:35.999Z",
+    "ExecutionSucceededDetails": {
+      "Result": {
+        "Payload": "\"operation completed\""
+      }
     }
   }
 ]

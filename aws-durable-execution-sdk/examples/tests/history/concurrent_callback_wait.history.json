@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "95b890bb-280c-4265-93e7-1ebea53ac37a",
-    "EventTimestamp": "2026-02-26T23:16:22.414Z",
+    "Id": "fbf19246-fdcc-46dc-bf21-cd29942424b7",
+    "EventTimestamp": "2026-03-12T18:21:35.716Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 2,
-    "Id": "a9393d19361792cfb1c2b1fb27922002",
-    "EventTimestamp": "2026-02-26T23:16:22.415Z",
+    "Id": "3d17139982ce5caa106d2090c839afec",
+    "EventTimestamp": "2026-03-12T18:21:35.716Z",
+    "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"step_done\""
@@ -25,13 +26,25 @@
   {
     "EventType": "CallbackStarted",
     "EventId": 3,
-    "Id": "67fb87ac2718f10a58005addb3f845df",
-    "EventTimestamp": "2026-02-26T23:16:22.415Z",
+    "Id": "2fed1dcfe7f22895f3abe020b68c0c78",
+    "EventTimestamp": "2026-03-12T18:21:35.716Z",
+    "SubType": "Callback",
     "Name": "concurrent_cb",
     "CallbackStartedDetails": {
-      "CallbackId": "c61d33b2-6f31-4ed8-bb73-5114a6f4f639",
+      "CallbackId": "d0730b87-d3d2-4960-84bf-ff57451deada",
       "Timeout": 300,
       "HeartbeatTimeout": 0
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 4,
+    "EventTimestamp": "2026-03-12T18:21:35.717Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T18:21:35.716Z",
+      "EndTimestamp": "2026-03-12T18:21:35.717Z",
+      "RequestId": "13629ffe-7734-44a2-a0d6-3cec8ac3770c",
+      "Error": {}
     }
   }
 ]

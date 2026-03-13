@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "00bf1adf-9a91-467a-97fa-e4d4842f5fe7",
-    "EventTimestamp": "2026-02-26T23:15:30.756Z",
+    "Id": "3d6ccff3-70ea-4d88-b69b-4f72e9357902",
+    "EventTimestamp": "2026-03-12T18:21:35.720Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,8 +13,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 2,
-    "Id": "2422ca4bdfc24f3a56fb426881ea4e80",
-    "EventTimestamp": "2026-02-26T23:15:30.756Z",
+    "Id": "6f34aef616153d07a49a79325d1c0be2",
+    "EventTimestamp": "2026-03-12T18:21:35.720Z",
+    "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"step_1\""
@@ -25,8 +26,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 3,
-    "Id": "13e6606ebadd02c3e97d17ff29cb6f7d",
-    "EventTimestamp": "2026-02-26T23:15:30.757Z",
+    "Id": "1cfed322f8de9f94bcd6344e166f7ea5",
+    "EventTimestamp": "2026-03-12T18:21:35.720Z",
+    "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"step_2\""
@@ -37,13 +39,36 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 4,
-    "Id": "dea9624a85e9bc1f57da74746188b935",
-    "EventTimestamp": "2026-02-26T23:15:30.757Z",
+    "Id": "3f951b259d26d0153466ef29e82e6d8e",
+    "EventTimestamp": "2026-03-12T18:21:35.720Z",
+    "SubType": "Step",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "\"step_3\""
       },
       "RetryDetails": {}
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 5,
+    "EventTimestamp": "2026-03-12T18:21:35.721Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T18:21:35.720Z",
+      "EndTimestamp": "2026-03-12T18:21:35.721Z",
+      "RequestId": "1f995960-550b-4fef-a862-25bce1ead009",
+      "Error": {}
+    }
+  },
+  {
+    "EventType": "ExecutionSucceeded",
+    "EventId": 6,
+    "Id": "3d6ccff3-70ea-4d88-b69b-4f72e9357902",
+    "EventTimestamp": "2026-03-12T18:21:35.721Z",
+    "ExecutionSucceededDetails": {
+      "Result": {
+        "Payload": "{\"step_1\":\"step_1\",\"step_2\":\"step_2\",\"step_3\":\"step_3\"}"
+      }
     }
   }
 ]

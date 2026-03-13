@@ -120,12 +120,17 @@ impl EventProcessor {
     ) -> NodeJsHistoryEvent {
         self.nodejs_event_counter += 1;
 
+        // Derive sub_type from the event type to match cloud API behavior.
+        // The cloud's GetDurableExecutionHistory returns SubType based on the
+        // operation category (Step, Wait, Callback, Context, ChainedInvoke).
+        let sub_type = Self::event_type_to_sub_type(event_type);
+
         let event = NodeJsHistoryEvent {
             event_type,
             event_id: self.nodejs_event_counter,
             id: operation.map(|op| op.operation_id.clone()),
             event_timestamp: Self::current_timestamp(),
-            sub_type: operation.and_then(|op| op.sub_type.clone()),
+            sub_type,
             name: operation.and_then(|op| op.name.clone()),
             parent_id: operation.and_then(|op| op.parent_id.clone()),
             details,
@@ -133,6 +138,29 @@ impl EventProcessor {
 
         self.nodejs_events.push(event.clone());
         event
+    }
+
+    /// Maps a NodeJsEventType to its SubType string, matching the cloud API behavior.
+    fn event_type_to_sub_type(event_type: NodeJsEventType) -> Option<String> {
+        match event_type {
+            NodeJsEventType::StepStarted
+            | NodeJsEventType::StepSucceeded
+            | NodeJsEventType::StepFailed => Some("Step".to_string()),
+            NodeJsEventType::WaitStarted
+            | NodeJsEventType::WaitSucceeded
+            | NodeJsEventType::WaitCancelled => Some("Wait".to_string()),
+            NodeJsEventType::CallbackStarted
+            | NodeJsEventType::CallbackSucceeded
+            | NodeJsEventType::CallbackFailed
+            | NodeJsEventType::CallbackTimedOut => Some("Callback".to_string()),
+            NodeJsEventType::ContextStarted
+            | NodeJsEventType::ContextSucceeded
+            | NodeJsEventType::ContextFailed => Some("Context".to_string()),
+            NodeJsEventType::ChainedInvokeStarted
+            | NodeJsEventType::ChainedInvokeSucceeded
+            | NodeJsEventType::ChainedInvokeFailed => Some("ChainedInvoke".to_string()),
+            _ => None,
+        }
     }
 
     /// Process an operation update and generate appropriate Node.js-compatible events.

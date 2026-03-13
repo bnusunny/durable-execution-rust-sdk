@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "984bcca0-c1e8-4062-8504-39b0773545e4",
-    "EventTimestamp": "2026-02-26T21:33:59.491Z",
+    "Id": "17b041de-0c89-40c2-bc83-0dc4975c325b",
+    "EventTimestamp": "2026-03-12T18:21:35.491Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{}"
@@ -13,10 +13,11 @@
   {
     "EventType": "CallbackStarted",
     "EventId": 2,
-    "Id": "bf55c8539c61eeb3fb7f187a1d9a5f7b",
-    "EventTimestamp": "2026-02-26T21:33:59.491Z",
+    "Id": "5538d10a976eb8d1801ff26ecb14da84",
+    "EventTimestamp": "2026-03-12T18:21:35.492Z",
+    "SubType": "Callback",
     "CallbackStartedDetails": {
-      "CallbackId": "c9b824e3-cf69-49ed-8343-01eb4cadff7b",
+      "CallbackId": "6fc50e1f-aa3a-49ba-8cdf-046208a98bd9",
       "Timeout": 0,
       "HeartbeatTimeout": 0
     }
@@ -24,18 +25,20 @@
   {
     "EventType": "ContextStarted",
     "EventId": 3,
-    "Id": "f1fa7b1d65a407db5d7145eb7b31f7f7",
-    "EventTimestamp": "2026-02-26T21:33:59.491Z",
+    "Id": "dd989df68681b39965a58aa06cf89480",
+    "EventTimestamp": "2026-03-12T18:21:35.492Z",
+    "SubType": "Context",
     "Name": "wait_for_callback_submitter",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 4,
-    "Id": "d00d82f514fa8d3e9e399e3e58774085",
-    "EventTimestamp": "2026-02-26T21:33:59.492Z",
+    "Id": "8d8b4a9adc8133f536b15237133134c6",
+    "EventTimestamp": "2026-03-12T18:21:35.492Z",
+    "SubType": "Step",
     "Name": "execute_submitter",
-    "ParentId": "f1fa7b1d65a407db5d7145eb7b31f7f7",
+    "ParentId": "dd989df68681b39965a58aa06cf89480",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "null"
@@ -46,13 +49,25 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 5,
-    "Id": "f1fa7b1d65a407db5d7145eb7b31f7f7",
-    "EventTimestamp": "2026-02-26T21:33:59.492Z",
+    "Id": "dd989df68681b39965a58aa06cf89480",
+    "EventTimestamp": "2026-03-12T18:21:35.492Z",
+    "SubType": "Context",
     "Name": "wait_for_callback_submitter",
     "ContextSucceededDetails": {
       "Result": {
         "Payload": "null"
       }
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 6,
+    "EventTimestamp": "2026-03-12T18:21:35.492Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T18:21:35.491Z",
+      "EndTimestamp": "2026-03-12T18:21:35.492Z",
+      "RequestId": "fc9f5ffd-1819-466e-b6fa-70dcc1314e4d",
+      "Error": {}
     }
   }
 ]

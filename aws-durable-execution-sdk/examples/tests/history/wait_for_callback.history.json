@@ -2,8 +2,8 @@
   {
     "EventType": "ExecutionStarted",
     "EventId": 1,
-    "Id": "d084bdaf-b086-4f40-a8a1-e90d90f8e161",
-    "EventTimestamp": "2026-01-20T23:17:39.166Z",
+    "Id": "c943a9a0-ee89-468a-b388-82f0c13b7799",
+    "EventTimestamp": "2026-03-12T18:21:35.473Z",
     "ExecutionStartedDetails": {
       "Input": {
         "Payload": "{\"payment_id\":\"pay-12345\",\"amount\":100.0,\"currency\":\"USD\",\"customer_email\":\"test@example.com\"}"
@@ -13,8 +13,9 @@
   {
     "EventType": "StepSucceeded",
     "EventId": 2,
-    "Id": "c1b8c1230c210ec81ca162845cb51bda",
-    "EventTimestamp": "2026-01-20T23:17:39.167Z",
+    "Id": "59e8cfd8142db96718b0a86e50783f3e",
+    "EventTimestamp": "2026-03-12T18:21:35.473Z",
+    "SubType": "Step",
     "Name": "validate",
     "StepSucceededDetails": {
       "Result": {
@@ -26,10 +27,11 @@
   {
     "EventType": "CallbackStarted",
     "EventId": 3,
-    "Id": "e18251c17849834ec1b2ad0dfbfee6ee",
-    "EventTimestamp": "2026-01-20T23:17:39.167Z",
+    "Id": "e1a2d35910b2f0bc6875c7e6d592a594",
+    "EventTimestamp": "2026-03-12T18:21:35.473Z",
+    "SubType": "Callback",
     "CallbackStartedDetails": {
-      "CallbackId": "c6774060-bdbf-4801-a552-56ff2c97ba12",
+      "CallbackId": "b428d0a8-9c54-4e6f-ab94-7b486a67fad9",
       "Timeout": 3600,
       "HeartbeatTimeout": 600
     }
@@ -37,18 +39,20 @@
   {
     "EventType": "ContextStarted",
     "EventId": 4,
-    "Id": "5b08d4c775c8d861f58bb7d73ac20478",
-    "EventTimestamp": "2026-01-20T23:17:39.167Z",
+    "Id": "25f4c6de4a488f5c34a587ded372ab08",
+    "EventTimestamp": "2026-03-12T18:21:35.473Z",
+    "SubType": "Context",
     "Name": "wait_for_callback_submitter",
     "ContextStartedDetails": {}
   },
   {
     "EventType": "StepSucceeded",
     "EventId": 5,
-    "Id": "b3614efb382db478039d833072af36dc",
-    "EventTimestamp": "2026-01-20T23:17:39.167Z",
+    "Id": "ef576a1d1b71e90009896e6f40b96de2",
+    "EventTimestamp": "2026-03-12T18:21:35.474Z",
+    "SubType": "Step",
     "Name": "execute_submitter",
-    "ParentId": "5b08d4c775c8d861f58bb7d73ac20478",
+    "ParentId": "25f4c6de4a488f5c34a587ded372ab08",
     "StepSucceededDetails": {
       "Result": {
         "Payload": "null"
@@ -59,13 +63,25 @@
   {
     "EventType": "ContextSucceeded",
     "EventId": 6,
-    "Id": "5b08d4c775c8d861f58bb7d73ac20478",
-    "EventTimestamp": "2026-01-20T23:17:39.167Z",
+    "Id": "25f4c6de4a488f5c34a587ded372ab08",
+    "EventTimestamp": "2026-03-12T18:21:35.474Z",
+    "SubType": "Context",
     "Name": "wait_for_callback_submitter",
     "ContextSucceededDetails": {
       "Result": {
         "Payload": "null"
       }
+    }
+  },
+  {
+    "EventType": "InvocationCompleted",
+    "EventId": 7,
+    "EventTimestamp": "2026-03-12T18:21:35.474Z",
+    "InvocationCompletedDetails": {
+      "StartTimestamp": "2026-03-12T18:21:35.473Z",
+      "EndTimestamp": "2026-03-12T18:21:35.474Z",
+      "RequestId": "b46cb8c2-444c-40f3-8039-e4ac9b450e2a",
+      "Error": {}
     }
   }
 ]

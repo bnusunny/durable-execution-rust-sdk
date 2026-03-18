@@ -1837,7 +1837,7 @@ async fn map_large_scale_handler(
     let result_values: Vec<i32> = results
         .succeeded()
         .iter()
-        .filter_map(|item| item.result.clone())
+        .filter_map(|item| item.result)
         .collect();
 
     Ok(LargeScaleResult {

@@ -142,7 +142,7 @@ async fn test_replay_preserves_result_order() {
         assert!(result.is_ok());
         match result.unwrap() {
             ReplayResult::Replayed(value) => {
-                assert_eq!(value, i as i32, "Step {} should return {}", i, i)
+                assert_eq!(value, i, "Step {} should return {}", i, i)
             }
             _ => panic!("Expected Replayed result for step-{}", i),
         }

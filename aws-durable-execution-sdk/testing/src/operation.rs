@@ -1441,7 +1441,7 @@ mod property_tests {
 
     /// Strategy to generate an optional callback ID
     fn optional_callback_id_strategy() -> impl Strategy<Value = Option<String>> {
-        prop_oneof![Just(None), "[a-zA-Z0-9_-]{8,16}".prop_map(|s| Some(s)),]
+        prop_oneof![Just(None), "[a-zA-Z0-9_-]{8,16}".prop_map(Some),]
     }
 
     /// Strategy to generate an optional timestamp

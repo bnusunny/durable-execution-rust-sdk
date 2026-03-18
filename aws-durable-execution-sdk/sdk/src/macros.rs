@@ -598,6 +598,8 @@ mod tests {
     use crate::lambda::InitialExecutionState;
     use crate::state::ExecutionState;
 
+    type DurableFuture<T> = Pin<Box<dyn Future<Output = Result<T, DurableError>> + Send>>;
+
     fn create_mock_client() -> SharedDurableServiceClient {
         Arc::new(
             MockDurableServiceClient::new()
@@ -876,7 +878,7 @@ mod tests {
         let state2 = create_test_state(client2);
         let ctx2 = MockContext::new(state2);
 
-        let futures: Vec<Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>> = vec![
+        let futures: Vec<DurableFuture<i32>> = vec![
             Box::pin(async { Ok::<_, DurableError>(10) }),
             Box::pin(async { Ok(20) }),
             Box::pin(async { Ok(30) }),
@@ -912,7 +914,7 @@ mod tests {
         let state2 = create_test_state(client2);
         let ctx2 = MockContext::new(state2);
 
-        let futures: Vec<Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>> = vec![
+        let futures: Vec<DurableFuture<i32>> = vec![
             Box::pin(async { Ok::<_, DurableError>(1) }),
             Box::pin(async { Err(DurableError::execution("test error")) }),
         ];
@@ -1101,7 +1103,7 @@ mod tests {
         let state2 = create_test_state(client2);
         let ctx2 = MockContext::new(state2);
 
-        let futures: Vec<Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>> = vec![
+        let futures: Vec<DurableFuture<i32>> = vec![
             Box::pin(async { Err::<i32, _>(DurableError::execution("fail")) }),
             Box::pin(async { Ok(42) }),
         ];
@@ -1296,7 +1298,7 @@ mod tests {
         let state2 = create_test_state(client2);
         let ctx2 = MockContext::new(state2);
 
-        let futures: Vec<Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>> = vec![
+        let futures: Vec<DurableFuture<i32>> = vec![
             Box::pin(async { Ok::<_, DurableError>(10) }),
             Box::pin(async {
                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
@@ -1336,7 +1338,7 @@ mod tests {
         let state2 = create_test_state(client2);
         let ctx2 = MockContext::new(state2);
 
-        let futures: Vec<Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>> = vec![
+        let futures: Vec<DurableFuture<i32>> = vec![
             Box::pin(async { Err::<i32, _>(DurableError::execution("fast error")) }),
             Box::pin(async {
                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
@@ -1551,7 +1553,7 @@ mod tests {
         let state2 = create_test_state(client2);
         let ctx2 = MockContext::new(state2);
 
-        let futures: Vec<Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>> = vec![
+        let futures: Vec<DurableFuture<i32>> = vec![
             Box::pin(async { Ok::<_, DurableError>(10) }),
             Box::pin(async { Err(DurableError::execution("test error")) }),
             Box::pin(async { Ok(30) }),

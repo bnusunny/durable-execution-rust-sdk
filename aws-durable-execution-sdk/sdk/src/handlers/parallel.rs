@@ -296,6 +296,14 @@ mod tests {
     use crate::context::TracingLogger;
     use crate::lambda::InitialExecutionState;
 
+    type AsyncBranch<T> = Box<
+        dyn FnOnce(
+                DurableContext,
+            ) -> std::pin::Pin<
+                Box<dyn std::future::Future<Output = Result<T, DurableError>> + Send>,
+            > + Send,
+    >;
+
     fn create_mock_client() -> SharedDurableServiceClient {
         Arc::new(MockDurableServiceClient::new().with_checkpoint_responses(10))
     }
@@ -338,15 +346,7 @@ mod tests {
         let logger = create_test_logger();
         let parent_ctx = create_test_parent_ctx(state.clone());
 
-        let branches: Vec<
-            Box<
-                dyn FnOnce(
-                        DurableContext,
-                    ) -> std::pin::Pin<
-                        Box<dyn std::future::Future<Output = Result<i32, DurableError>> + Send>,
-                    > + Send,
-            >,
-        > = vec![];
+        let branches: Vec<AsyncBranch<i32>> = vec![];
         let result =
             parallel_handler(branches, &state, &op_id, &parent_ctx, &config, &logger).await;
 
@@ -368,15 +368,7 @@ mod tests {
         let logger = create_test_logger();
         let parent_ctx = create_test_parent_ctx(state.clone());
 
-        let branches: Vec<
-            Box<
-                dyn FnOnce(
-                        DurableContext,
-                    ) -> std::pin::Pin<
-                        Box<dyn std::future::Future<Output = Result<i32, DurableError>> + Send>,
-                    > + Send,
-            >,
-        > = vec![Box::new(|_ctx| {
+        let branches: Vec<AsyncBranch<i32>> = vec![Box::new(|_ctx| {
             Box::pin(async { Ok(42) })
                 as std::pin::Pin<
                     Box<dyn std::future::Future<Output = Result<i32, DurableError>> + Send>,
@@ -401,15 +393,7 @@ mod tests {
         let logger = create_test_logger();
         let parent_ctx = create_test_parent_ctx(state.clone());
 
-        let branches: Vec<
-            Box<
-                dyn FnOnce(
-                        DurableContext,
-                    ) -> std::pin::Pin<
-                        Box<dyn std::future::Future<Output = Result<i32, DurableError>> + Send>,
-                    > + Send,
-            >,
-        > = vec![
+        let branches: Vec<AsyncBranch<i32>> = vec![
             Box::new(|_ctx| {
                 Box::pin(async { Ok(1) })
                     as std::pin::Pin<
@@ -451,15 +435,7 @@ mod tests {
         let logger = create_test_logger();
         let parent_ctx = create_test_parent_ctx(state.clone());
 
-        let branches: Vec<
-            Box<
-                dyn FnOnce(
-                        DurableContext,
-                    ) -> std::pin::Pin<
-                        Box<dyn std::future::Future<Output = Result<i32, DurableError>> + Send>,
-                    > + Send,
-            >,
-        > = vec![
+        let branches: Vec<AsyncBranch<i32>> = vec![
             Box::new(|_ctx| {
                 Box::pin(async { Ok(1) })
                     as std::pin::Pin<

@@ -10,6 +10,14 @@ mod common;
 
 use std::sync::Arc;
 
+type AsyncBranch<T> = Box<
+    dyn FnOnce(
+            DurableContext,
+        ) -> std::pin::Pin<
+            Box<dyn std::future::Future<Output = Result<T, DurableError>> + Send>,
+        > + Send,
+>;
+
 use durable_execution_sdk::concurrency::{BatchItem, BatchResult, CompletionReason};
 use durable_execution_sdk::config::{CompletionConfig, MapConfig, ParallelConfig};
 use durable_execution_sdk::context::{DurableContext, Logger, OperationIdentifier, TracingLogger};
@@ -225,15 +233,7 @@ async fn test_parallel_operation_multiple_branches() {
     let parent_ctx = DurableContext::new(state.clone());
 
     // Create 3 branches that return different values
-    let branches: Vec<
-        Box<
-            dyn FnOnce(
-                    DurableContext,
-                ) -> std::pin::Pin<
-                    Box<dyn std::future::Future<Output = Result<String, DurableError>> + Send>,
-                > + Send,
-        >,
-    > = vec![
+    let branches: Vec<AsyncBranch<String>> = vec![
         Box::new(|_ctx| Box::pin(async { Ok("branch-0".to_string()) }) as _),
         Box::new(|_ctx| Box::pin(async { Ok("branch-1".to_string()) }) as _),
         Box::new(|_ctx| Box::pin(async { Ok("branch-2".to_string()) }) as _),
@@ -282,15 +282,7 @@ async fn test_parallel_operation_empty_branches() {
     let logger: Arc<dyn Logger> = Arc::new(TracingLogger);
     let parent_ctx = DurableContext::new(state.clone());
 
-    let branches: Vec<
-        Box<
-            dyn FnOnce(
-                    DurableContext,
-                ) -> std::pin::Pin<
-                    Box<dyn std::future::Future<Output = Result<i32, DurableError>> + Send>,
-                > + Send,
-        >,
-    > = vec![];
+    let branches: Vec<AsyncBranch<i32>> = vec![];
 
     let result = parallel_handler(branches, &state, &op_id, &parent_ctx, &config, &logger).await;
 
@@ -331,15 +323,7 @@ async fn test_parallel_operation_with_concurrency_limit() {
     let parent_ctx = DurableContext::new(state.clone());
 
     // Create 5 branches
-    let branches: Vec<
-        Box<
-            dyn FnOnce(
-                    DurableContext,
-                ) -> std::pin::Pin<
-                    Box<dyn std::future::Future<Output = Result<i32, DurableError>> + Send>,
-                > + Send,
-        >,
-    > = vec![
+    let branches: Vec<AsyncBranch<i32>> = vec![
         Box::new(|_ctx| Box::pin(async { Ok(1) }) as _),
         Box::new(|_ctx| Box::pin(async { Ok(2) }) as _),
         Box::new(|_ctx| Box::pin(async { Ok(3) }) as _),
@@ -607,15 +591,7 @@ async fn test_parallel_operation_branch_failure_propagation() {
     let parent_ctx = DurableContext::new(state.clone());
 
     // Second branch will fail
-    let branches: Vec<
-        Box<
-            dyn FnOnce(
-                    DurableContext,
-                ) -> std::pin::Pin<
-                    Box<dyn std::future::Future<Output = Result<String, DurableError>> + Send>,
-                > + Send,
-        >,
-    > = vec![
+    let branches: Vec<AsyncBranch<String>> = vec![
         Box::new(|_ctx| Box::pin(async { Ok("success-0".to_string()) }) as _),
         Box::new(|_ctx| {
             Box::pin(async {
@@ -691,15 +667,7 @@ async fn test_parallel_operation_with_failure_tolerance() {
     let parent_ctx = DurableContext::new(state.clone());
 
     // One branch fails (within tolerance)
-    let branches: Vec<
-        Box<
-            dyn FnOnce(
-                    DurableContext,
-                ) -> std::pin::Pin<
-                    Box<dyn std::future::Future<Output = Result<i32, DurableError>> + Send>,
-                > + Send,
-        >,
-    > = vec![
+    let branches: Vec<AsyncBranch<i32>> = vec![
         Box::new(|_ctx| Box::pin(async { Ok(1) }) as _),
         Box::new(|_ctx| {
             Box::pin(async {
@@ -755,15 +723,7 @@ async fn test_parallel_operation_min_successful() {
     let logger: Arc<dyn Logger> = Arc::new(TracingLogger);
     let parent_ctx = DurableContext::new(state.clone());
 
-    let branches: Vec<
-        Box<
-            dyn FnOnce(
-                    DurableContext,
-                ) -> std::pin::Pin<
-                    Box<dyn std::future::Future<Output = Result<i32, DurableError>> + Send>,
-                > + Send,
-        >,
-    > = vec![
+    let branches: Vec<AsyncBranch<i32>> = vec![
         Box::new(|_ctx| Box::pin(async { Ok(1) }) as _),
         Box::new(|_ctx| Box::pin(async { Ok(2) }) as _),
         Box::new(|_ctx| Box::pin(async { Ok(3) }) as _),
@@ -986,15 +946,7 @@ async fn test_replay_completed_parallel_returns_cached_result() {
     let parent_ctx = DurableContext::new(state.clone());
 
     // Create branches that would return different values if executed
-    let branches: Vec<
-        Box<
-            dyn FnOnce(
-                    DurableContext,
-                ) -> std::pin::Pin<
-                    Box<dyn std::future::Future<Output = Result<String, DurableError>> + Send>,
-                > + Send,
-        >,
-    > = vec![
+    let branches: Vec<AsyncBranch<String>> = vec![
         Box::new(|_ctx| Box::pin(async { Ok("new-branch-0".to_string()) }) as _),
         Box::new(|_ctx| Box::pin(async { Ok("new-branch-1".to_string()) }) as _),
     ];

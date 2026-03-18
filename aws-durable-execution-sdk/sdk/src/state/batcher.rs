@@ -990,8 +990,8 @@ mod tests {
 
         assert_eq!(sorted[0].operation.operation_id, "parent-ctx");
 
-        for i in 1..4 {
-            assert!(sorted[i].operation.parent_id.as_deref() == Some("parent-ctx"));
+        for item in &sorted[1..4] {
+            assert!(item.operation.parent_id.as_deref() == Some("parent-ctx"));
         }
     }
 
@@ -1146,7 +1146,7 @@ mod property_tests {
                 drop(sender);
                 batcher.run().await;
 
-                let expected_max_calls = (num_requests + max_ops_per_batch - 1) / max_ops_per_batch;
+                let expected_max_calls = num_requests.div_ceil(max_ops_per_batch);
                 let actual_calls = call_count.load(AtomicOrdering::SeqCst);
 
                 if actual_calls > expected_max_calls {
@@ -1206,7 +1206,7 @@ mod property_tests {
 
                 let estimated_request_size = 100 + result_size;
                 let total_size = num_requests * estimated_request_size;
-                let expected_max_calls = (total_size + max_batch_size - 1) / max_batch_size;
+                let expected_max_calls = total_size.div_ceil(max_batch_size);
                 let actual_calls = call_count.load(AtomicOrdering::SeqCst);
 
                 if actual_calls > expected_max_calls.max(1) * 2 {

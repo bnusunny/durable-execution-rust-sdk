@@ -516,8 +516,7 @@ proptest! {
         ],
     ) {
         // Build LogInfo with extra fields
-        let mut log_info = LogInfo::default();
-        log_info.is_replay = is_replay;
+        let mut log_info = LogInfo { is_replay, ..Default::default() };
 
         if let Some(ref arn) = durable_execution_arn {
             log_info.durable_execution_arn = Some(arn.clone());

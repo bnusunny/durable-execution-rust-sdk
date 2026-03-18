@@ -565,7 +565,7 @@ async fn test_wait_for_callback_timeout_error() {
         Err(e) => {
             // Other errors might occur depending on implementation
             // Just verify it's an error
-            assert!(true, "Got error as expected: {:?}", e);
+            let _ = e; // Other errors are acceptable
         }
     }
 }

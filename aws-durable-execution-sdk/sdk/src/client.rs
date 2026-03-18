@@ -597,12 +597,19 @@ pub struct MockDurableServiceClient {
 }
 
 #[cfg(test)]
-impl MockDurableServiceClient {
-    pub fn new() -> Self {
+impl Default for MockDurableServiceClient {
+    fn default() -> Self {
         Self {
             checkpoint_responses: std::sync::Mutex::new(Vec::new()),
             get_operations_responses: std::sync::Mutex::new(Vec::new()),
         }
+    }
+}
+
+#[cfg(test)]
+impl MockDurableServiceClient {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn with_checkpoint_response(

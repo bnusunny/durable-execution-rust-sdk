@@ -888,7 +888,7 @@ mod property_tests {
 
         /// Strategy for generating optional strings.
         fn optional_string_strategy() -> impl Strategy<Value = Option<String>> {
-            prop_oneof![Just(None), "[a-zA-Z0-9_-]{1,32}".prop_map(|s| Some(s)),]
+            prop_oneof![Just(None), "[a-zA-Z0-9_-]{1,32}".prop_map(Some),]
         }
 
         /// Strategy for generating optional result payloads (JSON strings).
@@ -1242,7 +1242,7 @@ mod property_tests {
 
         /// Strategy for generating optional strings.
         fn optional_string_strategy() -> impl Strategy<Value = Option<String>> {
-            prop_oneof![Just(None), "[a-zA-Z0-9_-]{1,32}".prop_map(|s| Some(s)),]
+            prop_oneof![Just(None), "[a-zA-Z0-9_-]{1,32}".prop_map(Some),]
         }
 
         /// Strategy for generating optional result payloads.

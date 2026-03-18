@@ -1789,7 +1789,7 @@ mod tests {
         exec_op.status = OperationStatus::Succeeded;
         exec_op.result = Some("\"success\"".to_string());
 
-        let operations = vec![exec_op];
+        let operations = [exec_op];
 
         // Find execution operation and check status
         let execution_op = operations
@@ -1812,7 +1812,7 @@ mod tests {
             stack_trace: None,
         });
 
-        let operations = vec![exec_op];
+        let operations = [exec_op];
 
         let execution_op = operations
             .iter()
@@ -1829,7 +1829,7 @@ mod tests {
         let mut exec_op = Operation::new("exec-1", OperationType::Execution);
         exec_op.status = OperationStatus::Started;
 
-        let operations = vec![exec_op];
+        let operations = [exec_op];
 
         let execution_op = operations
             .iter()
@@ -2457,8 +2457,8 @@ mod property_tests {
                         // (may be slightly less due to time elapsed during test)
                         if let Some(advance_ms) = advance_time_ms {
                             // Allow some tolerance for test execution time
-                            let expected_min = (wait_seconds as u64).saturating_sub(1) * 1000;
-                            let expected_max = (wait_seconds as u64 + 1) * 1000;
+                            let expected_min = wait_seconds.saturating_sub(1) * 1000;
+                            let expected_max = (wait_seconds + 1) * 1000;
                             prop_assert!(
                                 advance_ms >= expected_min && advance_ms <= expected_max,
                                 "Advance time {} should be approximately {} seconds ({}ms - {}ms)",
@@ -2512,7 +2512,7 @@ mod property_tests {
                 let mut operations = Vec::new();
                 for (i, &duration) in wait_durations.iter().enumerate() {
                     let scheduled_end_ms = now_ms + (duration as i64 * 1000);
-                    let mut wait_op = Operation::new(&format!("wait-{}", i), OperationType::Wait);
+                    let mut wait_op = Operation::new(format!("wait-{}", i), OperationType::Wait);
                     wait_op.status = OperationStatus::Started;
                     wait_op.wait_details = Some(WaitDetails {
                         scheduled_end_timestamp: Some(scheduled_end_ms),

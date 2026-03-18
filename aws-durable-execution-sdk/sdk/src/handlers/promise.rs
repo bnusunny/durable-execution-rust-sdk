@@ -664,6 +664,8 @@ mod tests {
     use crate::lambda::InitialExecutionState;
     use std::pin::Pin;
 
+    type DurableFuture<T> = Pin<Box<dyn Future<Output = Result<T, DurableError>> + Send>>;
+
     fn create_mock_client() -> SharedDurableServiceClient {
         Arc::new(
             MockDurableServiceClient::new()
@@ -734,7 +736,7 @@ mod tests {
         let op_id = create_test_op_id("all-empty");
         let logger = create_test_logger();
 
-        let futures: Vec<Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>> = vec![];
+        let futures: Vec<DurableFuture<i32>> = vec![];
 
         let result = all_handler(futures, &state, &op_id, &logger).await;
         assert!(result.is_ok());
@@ -833,7 +835,7 @@ mod tests {
         let op_id = create_test_op_id("race-empty");
         let logger = create_test_logger();
 
-        let futures: Vec<Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>> = vec![];
+        let futures: Vec<DurableFuture<i32>> = vec![];
 
         let result = race_handler(futures, &state, &op_id, &logger).await;
         assert!(result.is_err());
@@ -889,7 +891,7 @@ mod tests {
         let op_id = create_test_op_id("any-empty");
         let logger = create_test_logger();
 
-        let futures: Vec<Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>> = vec![];
+        let futures: Vec<DurableFuture<i32>> = vec![];
 
         let result = any_handler(futures, &state, &op_id, &logger).await;
         assert!(result.is_err());
@@ -927,6 +929,8 @@ mod property_tests {
     use crate::lambda::InitialExecutionState;
     use proptest::prelude::*;
     use std::pin::Pin;
+
+    type DurableFuture<T> = Pin<Box<dyn Future<Output = Result<T, DurableError>> + Send>>;
 
     fn create_mock_client_with_responses(count: usize) -> SharedDurableServiceClient {
         let mut client = MockDurableServiceClient::new();
@@ -982,9 +986,9 @@ mod property_tests {
                     let logger = create_test_logger();
 
                     let expected = values.clone();
-                    let futures: Vec<Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>> =
+                    let futures: Vec<DurableFuture<i32>> =
                         values.into_iter()
-                            .map(|v| Box::pin(async move { Ok(v) }) as Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>)
+                            .map(|v| Box::pin(async move { Ok(v) }) as DurableFuture<i32>)
                             .collect();
 
                     let result = all_handler(futures, &state, &op_id, &logger).await;
@@ -1012,13 +1016,13 @@ mod property_tests {
                     let op_id = create_test_op_id(&format!("all-fail-prop-{}", total));
                     let logger = create_test_logger();
 
-                    let futures: Vec<Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>> =
+                    let futures: Vec<DurableFuture<i32>> =
                         (0..total)
                             .map(|i| {
                                 if i == error_index {
-                                    Box::pin(async move { Err(DurableError::execution("test error")) }) as Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>
+                                    Box::pin(async move { Err(DurableError::execution("test error")) }) as DurableFuture<i32>
                                 } else {
-                                    Box::pin(async move { Ok(i as i32) }) as Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>
+                                    Box::pin(async move { Ok(i as i32) }) as DurableFuture<i32>
                                 }
                             })
                             .collect();
@@ -1050,13 +1054,13 @@ mod property_tests {
                     let expected_successes = success_set.len();
                     let expected_failures = total - expected_successes;
 
-                    let futures: Vec<Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>> =
+                    let futures: Vec<DurableFuture<i32>> =
                         (0..total)
                             .map(|i| {
                                 if success_set.contains(&i) {
-                                    Box::pin(async move { Ok(i as i32) }) as Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>
+                                    Box::pin(async move { Ok(i as i32) }) as DurableFuture<i32>
                                 } else {
-                                    Box::pin(async move { Err(DurableError::execution("test error")) }) as Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>
+                                    Box::pin(async move { Err(DurableError::execution("test error")) }) as DurableFuture<i32>
                                 }
                             })
                             .collect();
@@ -1087,9 +1091,9 @@ mod property_tests {
                     let logger = create_test_logger();
 
                     // Create futures: some failures followed by one success
-                    let mut futures: Vec<Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>> =
+                    let mut futures: Vec<DurableFuture<i32>> =
                         (0..failure_count)
-                            .map(|_| Box::pin(async { Err(DurableError::execution("test error")) }) as Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>)
+                            .map(|_| Box::pin(async { Err(DurableError::execution("test error")) }) as DurableFuture<i32>)
                             .collect();
 
                     // Add the success
@@ -1116,9 +1120,9 @@ mod property_tests {
                     let op_id = create_test_op_id(&format!("any-all-fail-prop-{}", failure_count));
                     let logger = create_test_logger();
 
-                    let futures: Vec<Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>> =
+                    let futures: Vec<DurableFuture<i32>> =
                         (0..failure_count)
-                            .map(|i| Box::pin(async move { Err(DurableError::execution(format!("error {}", i))) }) as Pin<Box<dyn Future<Output = Result<i32, DurableError>> + Send>>)
+                            .map(|i| Box::pin(async move { Err(DurableError::execution(format!("error {}", i))) }) as DurableFuture<i32>)
                             .collect();
 
                     let result = any_handler(futures, &state, &op_id, &logger).await;

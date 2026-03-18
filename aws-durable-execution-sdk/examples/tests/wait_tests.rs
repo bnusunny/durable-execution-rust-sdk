@@ -414,7 +414,7 @@ async fn test_wait_for_condition_basic() {
     // Verify handler was invoked multiple times for polling
     let invocations = result.get_invocations();
     assert!(
-        invocations.len() >= 1,
+        !invocations.is_empty(),
         "Handler should be invoked at least once. Got {} invocations",
         invocations.len()
     );

@@ -1764,7 +1764,7 @@ mod tests {
 
     #[test]
     fn test_no_retry_default() {
-        let strategy = NoRetry::default();
+        let strategy = NoRetry;
         assert_eq!(strategy.next_delay(0, "error"), None);
     }
 
@@ -2264,7 +2264,7 @@ mod tests {
         for attempt in 0..20 {
             let result = jitter.apply(10.0, attempt);
             assert!(
-                result >= 0.0 && result <= 10.0,
+                (0.0..=10.0).contains(&result),
                 "Full jitter for attempt {} produced {}, expected [0, 10]",
                 attempt,
                 result
@@ -2278,7 +2278,7 @@ mod tests {
         for attempt in 0..20 {
             let result = jitter.apply(10.0, attempt);
             assert!(
-                result >= 5.0 && result <= 10.0,
+                (5.0..=10.0).contains(&result),
                 "Half jitter for attempt {} produced {}, expected [5, 10]",
                 attempt,
                 result

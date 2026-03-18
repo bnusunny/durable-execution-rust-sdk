@@ -667,11 +667,8 @@ mod property_tests {
                 );
 
                 // Should NOT return NonDeterministic error
-                match &replay_result {
-                    Err(DurableError::NonDeterministic { .. }) => {
-                        prop_assert!(false, "Should not return NonDeterministic error for matching types");
-                    }
-                    _ => {} // Any other result is acceptable
+                if let Err(DurableError::NonDeterministic { .. }) = &replay_result {
+                    prop_assert!(false, "Should not return NonDeterministic error for matching types");
                 }
 
                 // Should return the replayed result

@@ -177,7 +177,7 @@ async fn test_callback_failure_propagation() {
         error
             .error_message
             .as_ref()
-            .map_or(false, |msg| msg.contains("Input validation failed")),
+            .is_some_and(|msg| msg.contains("Input validation failed")),
         "Error message should contain the callback failure message, got: {:?}",
         error.error_message
     );

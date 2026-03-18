@@ -2376,7 +2376,7 @@ mod property_tests {
                 {
                     let mut storage = runner.operation_storage.write().await;
                     for (i, name) in names.iter().enumerate() {
-                        let mut op = Operation::new(&format!("op-{}", i), OperationType::Step);
+                        let mut op = Operation::new(format!("op-{}", i), OperationType::Step);
                         op.name = Some(name.clone());
                         storage.add_operation(op);
                     }

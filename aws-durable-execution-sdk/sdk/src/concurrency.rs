@@ -1248,18 +1248,18 @@ mod tests {
     mod concurrent_executor_tests {
         use super::*;
 
+        type TaskFn<T> = Box<
+            dyn FnOnce(
+                    usize,
+                ) -> std::pin::Pin<
+                    Box<dyn std::future::Future<Output = Result<T, DurableError>> + Send>,
+                > + Send,
+        >;
+
         #[tokio::test]
         async fn test_execute_empty() {
             let executor = ConcurrentExecutor::new(0, None, CompletionConfig::all_completed());
-            let tasks: Vec<
-                Box<
-                    dyn FnOnce(
-                            usize,
-                        ) -> std::pin::Pin<
-                            Box<dyn std::future::Future<Output = Result<i32, DurableError>> + Send>,
-                        > + Send,
-                >,
-            > = vec![];
+            let tasks: Vec<TaskFn<i32>> = vec![];
             let result = executor.execute(tasks).await;
 
             assert!(result.items.is_empty());
@@ -1285,15 +1285,7 @@ mod tests {
             let executor = ConcurrentExecutor::new(3, None, CompletionConfig::all_completed());
 
             // Use a single closure type that handles all cases
-            let tasks: Vec<
-                Box<
-                    dyn FnOnce(
-                            usize,
-                        ) -> std::pin::Pin<
-                            Box<dyn std::future::Future<Output = Result<i32, DurableError>> + Send>,
-                        > + Send,
-                >,
-            > = vec![
+            let tasks: Vec<TaskFn<i32>> = vec![
                 Box::new(|_idx: usize| {
                     Box::pin(async { Ok(1) })
                         as std::pin::Pin<

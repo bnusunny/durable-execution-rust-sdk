@@ -381,7 +381,7 @@ async fn child_context_with_failing_step_handler(
     use std::sync::Arc;
 
     let config = ChildConfig::new().set_error_mapper(Arc::new(|err: DurableError| {
-        DurableError::execution(&format!("mapped_error: {}", err))
+        DurableError::execution(format!("mapped_error: {}", err))
     }));
 
     let result = ctx

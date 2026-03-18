@@ -3057,7 +3057,7 @@ mod durable_context_tests {
         let ctx = DurableContext::new(state.clone());
 
         // Verify we can access the state
-        assert!(Arc::ptr_eq(&ctx.state(), &state));
+        assert!(Arc::ptr_eq(ctx.state(), &state));
     }
 
     #[test]

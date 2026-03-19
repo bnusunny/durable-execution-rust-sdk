@@ -34,11 +34,13 @@ pub async fn handler_with_macro(
         ctx,
         async move {
             // Fast operation
-            ctx1.step(|_| Ok("fast result".to_string()), None).await
+            ctx1.step(|_| async move { Ok("fast result".to_string()) }, None)
+                .await
         },
         async move {
             // Slower operation (may not complete if fast wins)
-            ctx2.step(|_| Ok("slow result".to_string()), None).await
+            ctx2.step(|_| async move { Ok("slow result".to_string()) }, None)
+                .await
         },
     )
     .await?;
@@ -63,13 +65,19 @@ pub async fn handler_with_timeout(
         ctx,
         async move {
             // Simulate a slow operation
-            ctx1.step(|_| Ok("operation completed".to_string()), None)
-                .await
+            ctx1.step(
+                |_| async move { Ok("operation completed".to_string()) },
+                None,
+            )
+            .await
         },
         async move {
             // Timeout - returns error to signal timeout
-            ctx2.step(|_| Err::<String, _>("operation timed out".into()), None)
-                .await
+            ctx2.step(
+                |_| async move { Err::<String, _>("operation timed out".into()) },
+                None,
+            )
+            .await
         },
     )
     .await;
@@ -111,7 +119,7 @@ pub async fn handler(
             |child_ctx: DurableContext, name: String, _index: usize| {
                 Box::pin(async move {
                     child_ctx
-                        .step(|_| Ok(format!("{} result", name)), None)
+                        .step(|_| async move { Ok(format!("{} result", name)) }, None)
                         .await
                 })
             },

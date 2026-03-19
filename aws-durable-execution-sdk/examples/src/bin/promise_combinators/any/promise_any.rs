@@ -32,18 +32,27 @@ pub async fn handler_with_macro(
         ctx,
         async move {
             // Simulate primary source failure
-            ctx1.step(|_| Err::<String, _>("primary unavailable".into()), None)
-                .await
+            ctx1.step(
+                |_| async move { Err::<String, _>("primary unavailable".into()) },
+                None,
+            )
+            .await
         },
         async move {
             // Secondary source succeeds
-            ctx2.step(|_| Ok("data from secondary".to_string()), None)
-                .await
+            ctx2.step(
+                |_| async move { Ok("data from secondary".to_string()) },
+                None,
+            )
+            .await
         },
         async move {
             // Fallback source (may not be called if secondary succeeds)
-            ctx3.step(|_| Ok("data from fallback".to_string()), None)
-                .await
+            ctx3.step(
+                |_| async move { Ok("data from fallback".to_string()) },
+                None,
+            )
+            .await
         },
     )
     .await?;
@@ -82,12 +91,12 @@ pub async fn handler(
                 Box::pin(async move {
                     if should_succeed {
                         child_ctx
-                            .step(|_| Ok(format!("{} succeeded", name)), None)
+                            .step(|_| async move { Ok(format!("{} succeeded", name)) }, None)
                             .await
                     } else {
                         child_ctx
                             .step(
-                                |_| Err::<String, _>(format!("{} failed", name).into()),
+                                |_| async move { Err::<String, _>(format!("{} failed", name).into()) },
                                 None,
                             )
                             .await

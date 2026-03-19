@@ -25,7 +25,7 @@
 //! - **Promise Combinators**: Coordinate multiple durable promises with `all`, `any`, `race`, and `all_settled`.
 //! - **Replay-Safe Helpers**: Generate deterministic UUIDs and timestamps that are safe for replay.
 //! - **Configurable Checkpointing**: Choose between eager, batched, or optimistic checkpointing modes.
-//! - **Trait Aliases**: Cleaner function signatures with [`DurableValue`] and [`StepFn`] trait aliases.
+//! - **Trait Aliases**: Cleaner function signatures with [`DurableValue`] trait alias.
 //! - **Sealed Traits**: Internal traits are sealed to allow API evolution without breaking changes.
 //!
 //! ## Important Documentation
@@ -484,32 +484,6 @@
 //! }
 //! ```
 //!
-//! ### StepFn
-//!
-//! [`StepFn`] is a trait alias for step function closures:
-//!
-//! ```rust
-//! use durable_execution_sdk::{StepFn, DurableValue};
-//! use durable_execution_sdk::handlers::StepContext;
-//!
-//! // StepFn<T> is equivalent to:
-//! // FnOnce(StepContext) -> Result<T, Box<dyn Error + Send + Sync>> + Send
-//!
-//! // Use in generic functions
-//! fn execute_step<T: DurableValue, F: StepFn<T>>(func: F) {
-//!     // func can be called with a StepContext
-//! }
-//!
-//! // Works with closures
-//! execute_step(|_ctx| Ok(42i32));
-//!
-//! // Works with named functions
-//! fn my_step(ctx: StepContext) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-//!     Ok(format!("Processed by {}", ctx.operation_id))
-//! }
-//! execute_step(my_step);
-//! ```
-//!
 //! ## Sealed Traits and Factory Functions
 //!
 //! Some SDK traits are "sealed" - they cannot be implemented outside this crate.
@@ -801,7 +775,7 @@
 //! 9. **Use type-safe identifiers**: Prefer [`OperationId`], [`ExecutionArn`], and
 //!    [`CallbackId`] over raw strings to catch type mismatches at compile time.
 //!
-//! 10. **Use trait aliases**: Use [`DurableValue`] and [`StepFn`] in your generic
+//! 10. **Use trait aliases**: Use [`DurableValue`] in your generic
 //!     functions for cleaner, more maintainable signatures.
 //!
 //! ## Result Type Aliases
@@ -843,7 +817,7 @@
 //! - [`replay_safe`]: Replay-safe helpers for deterministic UUIDs and timestamps
 //! - [`serdes`]: Serialization/deserialization system (includes [`custom_serdes`] factory function)
 //! - [`state`]: Execution state and checkpointing system
-//! - [`traits`]: Trait aliases for common bounds ([`DurableValue`], [`StepFn`])
+//! - [`traits`]: Trait aliases for common bounds ([`DurableValue`])
 //! - [`types`]: Type-safe newtype wrappers for domain identifiers ([`OperationId`], [`ExecutionArn`], [`CallbackId`])
 
 pub mod client;
@@ -907,7 +881,7 @@ pub use state::{
 pub use types::{CallbackId, ExecutionArn, OperationId, ValidationError};
 
 // Re-export trait aliases for common bounds
-pub use traits::{DurableValue, StepFn};
+pub use traits::DurableValue;
 
 // Re-export concurrency types
 pub use concurrency::{

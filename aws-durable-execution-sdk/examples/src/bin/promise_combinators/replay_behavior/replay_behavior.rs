@@ -30,9 +30,18 @@ pub async fn handler(
 
     let all_results = all!(
         ctx,
-        async move { ctx1.step(|_| Ok("result_a".to_string()), None).await },
-        async move { ctx2.step(|_| Ok("result_b".to_string()), None).await },
-        async move { ctx3.step(|_| Ok("result_c".to_string()), None).await },
+        async move {
+            ctx1.step(|_| async move { Ok("result_a".to_string()) }, None)
+                .await
+        },
+        async move {
+            ctx2.step(|_| async move { Ok("result_b".to_string()) }, None)
+                .await
+        },
+        async move {
+            ctx3.step(|_| async move { Ok("result_c".to_string()) }, None)
+                .await
+        },
     )
     .await?;
 
@@ -42,8 +51,14 @@ pub async fn handler(
 
     let race_result = race!(
         ctx,
-        async move { ctx4.step(|_| Ok("fast_path".to_string()), None).await },
-        async move { ctx5.step(|_| Ok("slow_path".to_string()), None).await },
+        async move {
+            ctx4.step(|_| async move { Ok("fast_path".to_string()) }, None)
+                .await
+        },
+        async move {
+            ctx5.step(|_| async move { Ok("slow_path".to_string()) }, None)
+                .await
+        },
     )
     .await?;
 

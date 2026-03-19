@@ -26,7 +26,11 @@ pub async fn handler(
         .map(
             Vec::<i32>::new(),
             |child_ctx: DurableContext, _item: i32, _index: usize| {
-                Box::pin(async move { child_ctx.step(|_| Ok("".to_string()), None).await })
+                Box::pin(async move {
+                    child_ctx
+                        .step(|_| async move { Ok("".to_string()) }, None)
+                        .await
+                })
             },
             None,
         )

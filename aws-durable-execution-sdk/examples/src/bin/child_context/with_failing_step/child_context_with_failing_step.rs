@@ -29,7 +29,7 @@ pub async fn handler(
                     // This step will fail
                     let _: String = child_ctx
                         .step(
-                            |_| Err::<String, _>("step failed intentionally".into()),
+                            |_| async move { Err::<String, _>("step failed intentionally".into()) },
                             None,
                         )
                         .await?;

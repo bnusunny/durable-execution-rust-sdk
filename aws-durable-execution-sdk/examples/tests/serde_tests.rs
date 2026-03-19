@@ -21,7 +21,7 @@ async fn custom_serialization_handler(
     let data: SensitiveData = ctx
         .step_named(
             "process_data",
-            |_| {
+            |_| async move {
                 Ok(SensitiveData {
                     user_id: "user-123".to_string(),
                     data: "sensitive information".to_string(),

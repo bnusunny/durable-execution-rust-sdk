@@ -32,7 +32,7 @@ pub async fn handler(
         .map(
             items,
             |child_ctx: DurableContext, item: i32, _index: usize| {
-                Box::pin(async move { child_ctx.step(|_| Ok(item * 2), None).await })
+                Box::pin(async move { child_ctx.step(|_| async move { Ok(item * 2) }, None).await })
             },
             Some(config),
         )

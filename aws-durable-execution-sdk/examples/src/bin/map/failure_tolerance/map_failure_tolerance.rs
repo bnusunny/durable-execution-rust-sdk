@@ -42,7 +42,7 @@ pub async fn handler(
                 Box::pin(async move {
                     child_ctx
                         .step(
-                            |_| {
+                            |_| async move {
                                 // Simulate some items failing
                                 if item % 7 == 0 {
                                     Err("Simulated failure".into())

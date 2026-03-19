@@ -30,7 +30,7 @@ async fn child_context_basic_handler(
                     let step1: String = child_ctx
                         .step_named(
                             "child_step_1",
-                            |_| Ok("child step 1 done".to_string()),
+                            |_| async move { Ok("child step 1 done".to_string()) },
                             None,
                         )
                         .await?;
@@ -38,7 +38,7 @@ async fn child_context_basic_handler(
                     let step2: String = child_ctx
                         .step_named(
                             "child_step_2",
-                            |_| Ok("child step 2 done".to_string()),
+                            |_| async move { Ok("child step 2 done".to_string()) },
                             None,
                         )
                         .await?;
@@ -113,7 +113,7 @@ async fn child_context_nested_handler(
                 Box::pin(async move {
                     let result: NestedResult = child_ctx
                         .step(
-                            |_| {
+                            |_| async move {
                                 Ok(NestedResult {
                                     level: 1,
                                     value: "level 1 complete".to_string(),
@@ -130,7 +130,7 @@ async fn child_context_nested_handler(
                                 Box::pin(async move {
                                     nested_ctx
                                         .step(
-                                            |_| {
+                                            |_| async move {
                                                 Ok(NestedResult {
                                                     level: 2,
                                                     value: "level 2 complete".to_string(),
@@ -223,7 +223,7 @@ async fn child_context_large_data_handler(
                 Box::pin(async move {
                     let large_data: String = child_ctx
                         .step(
-                            |_| {
+                            |_| async move {
                                 let data = "x".repeat(300_000);
                                 Ok(data)
                             },
@@ -309,7 +309,7 @@ async fn child_context_checkpoint_size_limit_handler(
                 Box::pin(async move {
                     let data: String = child_ctx
                         .step(
-                            |_| {
+                            |_| async move {
                                 let payload = "y".repeat(300_000);
                                 Ok(payload)
                             },
@@ -391,7 +391,7 @@ async fn child_context_with_failing_step_handler(
                 Box::pin(async move {
                     let _: String = child_ctx
                         .step(
-                            |_| Err::<String, _>("step failed intentionally".into()),
+                            |_| async move { Err::<String, _>("step failed intentionally".into()) },
                             None,
                         )
                         .await?;

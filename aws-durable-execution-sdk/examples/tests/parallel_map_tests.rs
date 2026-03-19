@@ -43,7 +43,10 @@ async fn parallel_basic_handler(
             |child_ctx: DurableContext, task_id: i32, _index: usize| {
                 Box::pin(async move {
                     child_ctx
-                        .step(|_| Ok(format!("task {} completed", task_id)), None)
+                        .step(
+                            |_| async move { Ok(format!("task {} completed", task_id)) },
+                            None,
+                        )
                         .await
                 })
             },
@@ -129,7 +132,10 @@ async fn parallel_heterogeneous_handler(
             |child_ctx| {
                 Box::pin(async move {
                     child_ctx
-                        .step(|_| Ok("inventory_available".to_string()), None)
+                        .step(
+                            |_| async move { Ok("inventory_available".to_string()) },
+                            None,
+                        )
                         .await
                 })
             },
@@ -147,7 +153,7 @@ async fn parallel_heterogeneous_handler(
                         .wait(Duration::from_seconds(1), Some("payment_delay"))
                         .await?;
                     child_ctx
-                        .step(|_| Ok("payment_completed".to_string()), None)
+                        .step(|_| async move { Ok("payment_completed".to_string()) }, None)
                         .await
                 })
             },
@@ -161,7 +167,10 @@ async fn parallel_heterogeneous_handler(
             |child_ctx| {
                 Box::pin(async move {
                     child_ctx
-                        .step(|_| Ok("shipping_calculated".to_string()), None)
+                        .step(
+                            |_| async move { Ok("shipping_calculated".to_string()) },
+                            None,
+                        )
                         .await
                 })
             },
@@ -266,10 +275,13 @@ async fn parallel_first_successful_handler(
                         .step_named(
                             &format!("{}_db", source),
                             |_| {
-                                Ok(DataResult {
-                                    source: source.clone(),
-                                    data: format!("data_from_{}", source),
-                                })
+                                let src = source.clone();
+                                async move {
+                                    Ok(DataResult {
+                                        source: src.clone(),
+                                        data: format!("data_from_{}", src),
+                                    })
+                                }
                             },
                             None,
                         )
@@ -350,7 +362,7 @@ async fn map_basic_handler(
         .map(
             items,
             |child_ctx, item: i32, _index: usize| {
-                Box::pin(async move { child_ctx.step(|_| Ok(item * 2), None).await })
+                Box::pin(async move { child_ctx.step(|_| async move { Ok(item * 2) }, None).await })
             },
             None,
         )
@@ -442,10 +454,13 @@ async fn map_with_concurrency_handler(
                         .step_named(
                             &format!("process_{}", index),
                             |_| {
-                                Ok(ProcessedItem {
-                                    id: item.clone(),
-                                    result: format!("processed_{}", item),
-                                })
+                                let it = item.clone();
+                                async move {
+                                    Ok(ProcessedItem {
+                                        id: it.clone(),
+                                        result: format!("processed_{}", it),
+                                    })
+                                }
                             },
                             None,
                         )
@@ -545,7 +560,7 @@ async fn map_failure_tolerance_handler(
                 Box::pin(async move {
                     child_ctx
                         .step(
-                            |_| {
+                            |_| async move {
                                 // Simulate some items failing
                                 if item % 7 == 0 {
                                     Err("Simulated failure".into())
@@ -647,7 +662,10 @@ async fn map_min_successful_handler(
             |child_ctx, item: String, _index: usize| {
                 Box::pin(async move {
                     child_ctx
-                        .step(|_| Ok(format!("response_from_{}", item)), None)
+                        .step(
+                            |_| async move { Ok(format!("response_from_{}", item)) },
+                            None,
+                        )
                         .await
                 })
             },
@@ -740,7 +758,11 @@ async fn parallel_empty_array_handler(
         .map(
             Vec::<i32>::new(),
             |child_ctx: DurableContext, _item: i32, _index: usize| {
-                Box::pin(async move { child_ctx.step(|_| Ok("".to_string()), None).await })
+                Box::pin(async move {
+                    child_ctx
+                        .step(|_| async move { Ok("".to_string()) }, None)
+                        .await
+                })
             },
             None,
         )
@@ -806,7 +828,7 @@ async fn parallel_with_wait_handler(
                         .await?;
                     // Then do a step that returns a result
                     child_ctx
-                        .step(|_| Ok(format!("branch {} done", item)), None)
+                        .step(|_| async move { Ok(format!("branch {} done", item)) }, None)
                         .await
                 })
             },
@@ -903,7 +925,7 @@ async fn parallel_error_preservation_handler(
                 Box::pin(async move {
                     child_ctx
                         .step(
-                            |_| {
+                            |_| async move {
                                 if item % 2 == 0 {
                                     Err(format!("Item {} failed: even numbers not allowed", item)
                                         .into())
@@ -1025,9 +1047,11 @@ async fn parallel_min_successful_handler(
                 "task-e".to_string(),
             ],
             |child_ctx: DurableContext, item: String, _index: usize| {
-                Box::pin(
-                    async move { child_ctx.step(|_| Ok(format!("{} done", item)), None).await },
-                )
+                Box::pin(async move {
+                    child_ctx
+                        .step(|_| async move { Ok(format!("{} done", item)) }, None)
+                        .await
+                })
             },
             Some(config),
         )
@@ -1242,7 +1266,7 @@ async fn parallel_tolerated_failure_count_handler(
                 Box::pin(async move {
                     child_ctx
                         .step(
-                            |_| {
+                            |_| async move {
                                 if item == 3 || item == 6 {
                                     Err(format!("Item {} failed", item).into())
                                 } else {
@@ -1345,7 +1369,7 @@ async fn parallel_tolerated_failure_pct_handler(
                 Box::pin(async move {
                     child_ctx
                         .step(
-                            |_| {
+                            |_| async move {
                                 if item == 3 || item == 7 {
                                     Err(format!("Item {} failed", item).into())
                                 } else {
@@ -1447,7 +1471,7 @@ async fn parallel_failure_threshold_exceeded_handler(
                 Box::pin(async move {
                     child_ctx
                         .step(
-                            |_| {
+                            |_| async move {
                                 if item % 2 == 1 {
                                     Err(format!("Item {} failed", item).into())
                                 } else {
@@ -1546,7 +1570,11 @@ async fn map_empty_array_handler(
         .map(
             Vec::<i32>::new(),
             |child_ctx: DurableContext, _item: i32, _index: usize| {
-                Box::pin(async move { child_ctx.step(|_| Ok("".to_string()), None).await })
+                Box::pin(async move {
+                    child_ctx
+                        .step(|_| async move { Ok("".to_string()) }, None)
+                        .await
+                })
             },
             None,
         )
@@ -1623,7 +1651,7 @@ async fn map_error_preservation_handler(
                 Box::pin(async move {
                     child_ctx
                         .step(
-                            |_| {
+                            |_| async move {
                                 if item == 2 || item == 5 || item == 8 {
                                     Err(format!("Item {} processing failed", item).into())
                                 } else {
@@ -1737,7 +1765,7 @@ async fn map_high_concurrency_handler(
             |child_ctx: DurableContext, item: i32, _index: usize| {
                 Box::pin(async move {
                     child_ctx
-                        .step(|_| Ok(format!("processed_{}", item)), None)
+                        .step(|_| async move { Ok(format!("processed_{}", item)) }, None)
                         .await
                 })
             },
@@ -1828,7 +1856,7 @@ async fn map_large_scale_handler(
         .map(
             items,
             |child_ctx: DurableContext, item: i32, _index: usize| {
-                Box::pin(async move { child_ctx.step(|_| Ok(item * 2), None).await })
+                Box::pin(async move { child_ctx.step(|_| async move { Ok(item * 2) }, None).await })
             },
             Some(config),
         )

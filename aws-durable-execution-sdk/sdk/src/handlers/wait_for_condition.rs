@@ -45,7 +45,7 @@ struct WaitForConditionState<S> {
 /// # Returns
 ///
 /// The result when the condition is met, or an error if timeout/max attempts exceeded.
-pub async fn wait_for_condition_handler<T, S, F>(
+pub async fn wait_for_condition_handler<T, S, F, Fut>(
     check: F,
     config: WaitForConditionConfig<S>,
     state: &Arc<ExecutionState>,
@@ -55,9 +55,8 @@ pub async fn wait_for_condition_handler<T, S, F>(
 where
     T: Serialize + DeserializeOwned + Send,
     S: Serialize + DeserializeOwned + Clone + Send + Sync,
-    F: Fn(&S, &WaitForConditionContext) -> Result<T, Box<dyn std::error::Error + Send + Sync>>
-        + Send
-        + Sync,
+    F: Fn(&S, &WaitForConditionContext) -> Fut + Send + Sync,
+    Fut: std::future::Future<Output = Result<T, Box<dyn std::error::Error + Send + Sync>>> + Send,
 {
     let mut log_info =
         LogInfo::new(state.durable_execution_arn()).with_operation_id(&op_id.operation_id);
@@ -99,7 +98,7 @@ where
     }
 
     // Execute the condition check
-    match check(&user_state, &check_ctx) {
+    match check(&user_state, &check_ctx).await {
         Ok(result) => {
             // Condition met - checkpoint success
             logger.debug(
@@ -470,7 +469,7 @@ mod tests {
             move |_state: &i32, ctx: &WaitForConditionContext| {
                 check_called_clone.fetch_add(1, Ordering::SeqCst);
                 assert_eq!(ctx.attempt, 1, "First attempt should be 1");
-                Ok::<_, Box<dyn std::error::Error + Send + Sync>>(42)
+                async move { Ok::<_, Box<dyn std::error::Error + Send + Sync>>(42) }
             },
             config,
             &state,
@@ -512,19 +511,22 @@ mod tests {
             Some(3),
         );
 
-        let result = wait_for_condition_handler(
-            |state: &TestState, _ctx: &WaitForConditionContext| {
-                // Verify initial state is passed correctly
-                assert_eq!(state.counter, 42);
-                assert_eq!(state.name, "test");
-                Ok::<_, Box<dyn std::error::Error + Send + Sync>>("success".to_string())
-            },
-            config,
-            &state,
-            &op_id,
-            &logger,
-        )
-        .await;
+        let result =
+            wait_for_condition_handler(
+                |state: &TestState, _ctx: &WaitForConditionContext| {
+                    // Verify initial state is passed correctly
+                    assert_eq!(state.counter, 42);
+                    assert_eq!(state.name, "test");
+                    async move {
+                        Ok::<_, Box<dyn std::error::Error + Send + Sync>>("success".to_string())
+                    }
+                },
+                config,
+                &state,
+                &op_id,
+                &logger,
+            )
+            .await;
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "success");
@@ -547,7 +549,7 @@ mod tests {
 
         // Condition that fails (returns error to trigger retry)
         let result = wait_for_condition_handler(
-            |_state: &i32, _ctx: &WaitForConditionContext| {
+            |_state: &i32, _ctx: &WaitForConditionContext| async move {
                 Err::<String, _>("condition not met".into())
             },
             config,
@@ -598,7 +600,7 @@ mod tests {
 
         // Condition that succeeds immediately
         let result = wait_for_condition_handler(
-            |_state: &i32, _ctx: &WaitForConditionContext| {
+            |_state: &i32, _ctx: &WaitForConditionContext| async move {
                 Ok::<_, Box<dyn std::error::Error + Send + Sync>>("success_result".to_string())
             },
             config,
@@ -657,7 +659,9 @@ mod tests {
             |_state: &i32, ctx: &WaitForConditionContext| {
                 // This should be called with attempt 2 (from the payload)
                 assert_eq!(ctx.attempt, 2, "Should be on attempt 2");
-                Ok::<_, Box<dyn std::error::Error + Send + Sync>>("resumed_result".to_string())
+                async move {
+                    Ok::<_, Box<dyn std::error::Error + Send + Sync>>("resumed_result".to_string())
+                }
             },
             config,
             &state,
@@ -690,7 +694,7 @@ mod tests {
 
         // Condition that always fails
         let result = wait_for_condition_handler(
-            |_state: &i32, _ctx: &WaitForConditionContext| {
+            |_state: &i32, _ctx: &WaitForConditionContext| async move {
                 Err::<String, _>("condition never met".into())
             },
             config,
@@ -763,19 +767,22 @@ mod tests {
             Some(5),
         );
 
-        let result = wait_for_condition_handler(
-            |state: &TestState, ctx: &WaitForConditionContext| {
-                // Verify the state from retry payload is passed
-                assert_eq!(state.counter, 42, "State should be from retry payload");
-                assert_eq!(ctx.attempt, 2, "Attempt should be 2 from payload");
-                Ok::<_, Box<dyn std::error::Error + Send + Sync>>("success".to_string())
-            },
-            config,
-            &state,
-            &op_id,
-            &logger,
-        )
-        .await;
+        let result =
+            wait_for_condition_handler(
+                |state: &TestState, ctx: &WaitForConditionContext| {
+                    // Verify the state from retry payload is passed
+                    assert_eq!(state.counter, 42, "State should be from retry payload");
+                    assert_eq!(ctx.attempt, 2, "Attempt should be 2 from payload");
+                    async move {
+                        Ok::<_, Box<dyn std::error::Error + Send + Sync>>("success".to_string())
+                    }
+                },
+                config,
+                &state,
+                &op_id,
+                &logger,
+            )
+            .await;
 
         assert!(result.is_ok());
     }
@@ -810,7 +817,7 @@ mod tests {
                 // On first attempt, should receive initial state
                 assert_eq!(ctx.attempt, 1, "Should be first attempt");
                 assert_eq!(state.value, "initial", "Should receive initial state");
-                Ok::<_, Box<dyn std::error::Error + Send + Sync>>("done".to_string())
+                async move { Ok::<_, Box<dyn std::error::Error + Send + Sync>>("done".to_string()) }
             },
             config,
             &state,
@@ -839,7 +846,7 @@ mod tests {
 
         // Condition that returns an error (not met)
         let result = wait_for_condition_handler(
-            |_state: &i32, _ctx: &WaitForConditionContext| {
+            |_state: &i32, _ctx: &WaitForConditionContext| async move {
                 Err::<String, _>("condition check failed".into())
             },
             config,
@@ -886,8 +893,8 @@ mod tests {
 
         // Function should NOT be called during replay
         let result: Result<String, DurableError> = wait_for_condition_handler(
-            |_state: &i32, _ctx: &WaitForConditionContext| {
-                panic!("Function should not be called during replay of succeeded operation");
+            |_state: &i32, _ctx: &WaitForConditionContext| async move {
+                panic!("Function should not be called during replay of succeeded operation")
             },
             config,
             &state,
@@ -920,8 +927,8 @@ mod tests {
 
         // Function should NOT be called during replay
         let result: Result<String, DurableError> = wait_for_condition_handler(
-            |_state: &i32, _ctx: &WaitForConditionContext| {
-                panic!("Function should not be called during replay of failed operation");
+            |_state: &i32, _ctx: &WaitForConditionContext| async move {
+                panic!("Function should not be called during replay of failed operation")
             },
             config,
             &state,
@@ -954,7 +961,7 @@ mod tests {
         let config = create_test_config(0i32);
 
         let result = wait_for_condition_handler(
-            |_state: &i32, _ctx: &WaitForConditionContext| {
+            |_state: &i32, _ctx: &WaitForConditionContext| async move {
                 Ok::<_, Box<dyn std::error::Error + Send + Sync>>("should not reach".to_string())
             },
             config,
@@ -999,7 +1006,7 @@ mod tests {
 
         // Function SHOULD be called for READY status
         let result = wait_for_condition_handler(
-            |_state: &i32, _ctx: &WaitForConditionContext| {
+            |_state: &i32, _ctx: &WaitForConditionContext| async move {
                 Ok::<_, Box<dyn std::error::Error + Send + Sync>>("ready_result".to_string())
             },
             config,
@@ -1011,5 +1018,35 @@ mod tests {
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "ready_result");
+    }
+
+    /// Test that wait_for_condition_handler works with a genuinely async
+    /// check closure that suspends via `tokio::time::sleep`, proving
+    /// `.await` works end-to-end for async polling.
+    #[tokio::test]
+    async fn test_wait_for_condition_genuinely_async_closure() {
+        let client = create_mock_client();
+        let state = create_test_state(client);
+        let op_id = create_test_op_id();
+        let logger = create_test_logger();
+
+        let config = create_test_config(0i32);
+
+        let result = wait_for_condition_handler(
+            |_state: &i32, _ctx: &WaitForConditionContext| async move {
+                // Genuinely suspend the task — this would fail if the handler
+                // did not properly `.await` the check closure's future.
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                Ok::<_, Box<dyn std::error::Error + Send + Sync>>("async_poll_result".to_string())
+            },
+            config,
+            &state,
+            &op_id,
+            &logger,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "async_poll_result");
     }
 }

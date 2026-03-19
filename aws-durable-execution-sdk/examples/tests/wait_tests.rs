@@ -127,7 +127,9 @@ async fn wait_named_handler(
         .await?;
 
     // Perform some work
-    let _result: i32 = ctx.step_named("process", |_| Ok(42), None).await?;
+    let _result: i32 = ctx
+        .step_named("process", |_| async move { Ok(42) }, None)
+        .await?;
 
     // Second wait with a different name
     ctx.wait(Duration::from_seconds(2), Some("cooldown_period"))
@@ -350,23 +352,23 @@ async fn wait_for_condition_basic_handler(
     let result: JobStatus = ctx
         .wait_for_condition(
             |state: &PollingState, wait_ctx: &WaitForConditionContext| {
-                // Simulate checking job status
-                let status = if wait_ctx.attempt >= 3 {
-                    "completed"
-                } else {
-                    "running"
-                };
+                let job_id = state.job_id.clone();
+                let attempt = wait_ctx.attempt;
+                async move {
+                    // Simulate checking job status
+                    let status = if attempt >= 3 { "completed" } else { "running" };
 
-                if status == "completed" {
-                    // Return Ok(T) when condition is met
-                    Ok(JobStatus {
-                        job_id: state.job_id.clone(),
-                        status: status.to_string(),
-                        result: Some("Job finished successfully".to_string()),
-                    })
-                } else {
-                    // Return Err to continue polling
-                    Err(format!("Job still running, attempt {}", wait_ctx.attempt).into())
+                    if status == "completed" {
+                        // Return Ok(T) when condition is met
+                        Ok(JobStatus {
+                            job_id,
+                            status: status.to_string(),
+                            result: Some("Job finished successfully".to_string()),
+                        })
+                    } else {
+                        // Return Err to continue polling
+                        Err(format!("Job still running, attempt {}", attempt).into())
+                    }
                 }
             },
             config,
@@ -449,7 +451,7 @@ async fn multiple_waits_handler(
     let _stage1: String = ctx
         .step_named(
             "stage_1_process",
-            |_| Ok("stage 1 complete".to_string()),
+            |_| async move { Ok("stage 1 complete".to_string()) },
             None,
         )
         .await?;
@@ -462,7 +464,7 @@ async fn multiple_waits_handler(
     let _stage2: String = ctx
         .step_named(
             "stage_2_process",
-            |_| Ok("stage 2 complete".to_string()),
+            |_| async move { Ok("stage 2 complete".to_string()) },
             None,
         )
         .await?;
@@ -475,7 +477,7 @@ async fn multiple_waits_handler(
     let _stage3: String = ctx
         .step_named(
             "stage_3_process",
-            |_| Ok("stage 3 complete".to_string()),
+            |_| async move { Ok("stage 3 complete".to_string()) },
             None,
         )
         .await?;

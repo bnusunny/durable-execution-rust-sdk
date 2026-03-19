@@ -22,10 +22,16 @@ pub async fn handler(
     let result = race!(
         ctx,
         async move {
-            ctx1.step(|_| Ok("operation completed".to_string()), None)
+            ctx1.step(
+                |_| async move { Ok("operation completed".to_string()) },
+                None,
+            )
+            .await
+        },
+        async move {
+            ctx2.step(|_| async move { Ok("timed out".to_string()) }, None)
                 .await
         },
-        async move { ctx2.step(|_| Ok("timed out".to_string()), None).await },
     )
     .await?;
 

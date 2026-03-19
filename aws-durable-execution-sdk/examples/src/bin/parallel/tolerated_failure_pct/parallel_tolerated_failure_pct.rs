@@ -42,7 +42,7 @@ pub async fn handler(
                 Box::pin(async move {
                     child_ctx
                         .step(
-                            |_| {
+                            |_| async move {
                                 if item == 3 || item == 7 {
                                     Err(format!("Item {} failed", item).into())
                                 } else {

@@ -39,7 +39,7 @@ pub async fn handler(
         let entity: EntityWithId = ctx
             .step_named(
                 &format!("create_entity_{}", i),
-                |_| {
+                |_| async move {
                     Ok(EntityWithId {
                         id: uuid.clone(),
                         name: format!("Entity {}", i),

@@ -31,7 +31,7 @@ pub async fn handler(
                         .await?;
                     // Then do a step that returns a result
                     child_ctx
-                        .step(|_| Ok(format!("branch {} done", item)), None)
+                        .step(|_| async move { Ok(format!("branch {} done", item)) }, None)
                         .await
                 })
             },

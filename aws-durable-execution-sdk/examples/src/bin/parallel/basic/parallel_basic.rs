@@ -22,7 +22,10 @@ pub async fn handler(
             |child_ctx: DurableContext, task_id: i32, _index: usize| {
                 Box::pin(async move {
                     child_ctx
-                        .step(|_| Ok(format!("task {} completed", task_id)), None)
+                        .step(
+                            |_| async move { Ok(format!("task {} completed", task_id)) },
+                            None,
+                        )
                         .await
                 })
             },

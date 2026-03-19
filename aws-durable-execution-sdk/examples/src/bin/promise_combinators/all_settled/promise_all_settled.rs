@@ -38,12 +38,21 @@ pub async fn handler_with_macro(
 
     let batch = all_settled!(
         ctx,
-        async move { ctx1.step(|_| Ok("op1 success".to_string()), None).await },
         async move {
-            ctx2.step(|_| Err::<String, _>("op2 failed".into()), None)
+            ctx1.step(|_| async move { Ok("op1 success".to_string()) }, None)
                 .await
         },
-        async move { ctx3.step(|_| Ok("op3 success".to_string()), None).await },
+        async move {
+            ctx2.step(
+                |_| async move { Err::<String, _>("op2 failed".into()) },
+                None,
+            )
+            .await
+        },
+        async move {
+            ctx3.step(|_| async move { Ok("op3 success".to_string()) }, None)
+                .await
+        },
     )
     .await?;
 
@@ -102,12 +111,12 @@ pub async fn handler(
                 Box::pin(async move {
                     if should_succeed {
                         child_ctx
-                            .step(|_| Ok(format!("{} success", name)), None)
+                            .step(|_| async move { Ok(format!("{} success", name)) }, None)
                             .await
                     } else {
                         child_ctx
                             .step(
-                                |_| Err::<String, _>(format!("{} failed", name).into()),
+                                |_| async move { Err::<String, _>(format!("{} failed", name).into()) },
                                 None,
                             )
                             .await

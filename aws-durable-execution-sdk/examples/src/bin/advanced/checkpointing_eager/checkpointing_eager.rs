@@ -22,7 +22,7 @@ pub async fn handler(
     let step1: String = ctx
         .step_named(
             "critical_step_1",
-            |_step_ctx| Ok("checkpoint_after_this".to_string()),
+            |_step_ctx| async move { Ok("checkpoint_after_this".to_string()) },
             None,
         )
         .await?;
@@ -30,7 +30,7 @@ pub async fn handler(
     let step2: String = ctx
         .step_named(
             "critical_step_2",
-            |_step_ctx| Ok("also_checkpointed".to_string()),
+            |_step_ctx| async move { Ok("also_checkpointed".to_string()) },
             None,
         )
         .await?;

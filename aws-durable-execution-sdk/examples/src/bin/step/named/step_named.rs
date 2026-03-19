@@ -25,7 +25,7 @@ pub async fn handler(
     let first: ProcessingResult = ctx
         .step_named(
             "fetch_data",
-            |_step_ctx| {
+            |_step_ctx| async move {
                 Ok(ProcessingResult {
                     step_name: "fetch_data".to_string(),
                     value: 42,
@@ -39,7 +39,7 @@ pub async fn handler(
     let second: ProcessingResult = ctx
         .step_named(
             "process_data",
-            |_step_ctx| {
+            |_step_ctx| async move {
                 Ok(ProcessingResult {
                     step_name: "process_data".to_string(),
                     value: 100,
@@ -53,7 +53,7 @@ pub async fn handler(
     let third: ProcessingResult = ctx
         .step_named(
             "finalize",
-            |_step_ctx| {
+            |_step_ctx| async move {
                 Ok(ProcessingResult {
                     step_name: "finalize".to_string(),
                     value: 200,

@@ -24,7 +24,7 @@ async fn checkpointing_eager_handler(
     let step1: String = ctx
         .step_named(
             "critical_step_1",
-            |_step_ctx| Ok("checkpoint_after_this".to_string()),
+            |_step_ctx| async move { Ok("checkpoint_after_this".to_string()) },
             None,
         )
         .await?;
@@ -32,7 +32,7 @@ async fn checkpointing_eager_handler(
     let step2: String = ctx
         .step_named(
             "critical_step_2",
-            |_step_ctx| Ok("also_checkpointed".to_string()),
+            |_step_ctx| async move { Ok("also_checkpointed".to_string()) },
             None,
         )
         .await?;
@@ -82,7 +82,7 @@ async fn checkpointing_batched_handler(
     let step1: String = ctx
         .step_named(
             "batched_step_1",
-            |_step_ctx| Ok("batched_1".to_string()),
+            |_step_ctx| async move { Ok("batched_1".to_string()) },
             None,
         )
         .await?;
@@ -90,7 +90,7 @@ async fn checkpointing_batched_handler(
     let step2: String = ctx
         .step_named(
             "batched_step_2",
-            |_step_ctx| Ok("batched_2".to_string()),
+            |_step_ctx| async move { Ok("batched_2".to_string()) },
             None,
         )
         .await?;
@@ -98,7 +98,7 @@ async fn checkpointing_batched_handler(
     let step3: String = ctx
         .step_named(
             "batched_step_3",
-            |_step_ctx| Ok("batched_3".to_string()),
+            |_step_ctx| async move { Ok("batched_3".to_string()) },
             None,
         )
         .await?;
@@ -148,7 +148,7 @@ async fn checkpointing_optimistic_handler(
     let step1: String = ctx
         .step_named(
             "optimistic_step_1",
-            |_step_ctx| Ok("fast_1".to_string()),
+            |_step_ctx| async move { Ok("fast_1".to_string()) },
             None,
         )
         .await?;
@@ -156,7 +156,7 @@ async fn checkpointing_optimistic_handler(
     let step2: String = ctx
         .step_named(
             "optimistic_step_2",
-            |_step_ctx| Ok("fast_2".to_string()),
+            |_step_ctx| async move { Ok("fast_2".to_string()) },
             None,
         )
         .await?;
@@ -164,7 +164,7 @@ async fn checkpointing_optimistic_handler(
     let step3: String = ctx
         .step_named(
             "optimistic_step_3",
-            |_step_ctx| Ok("fast_3".to_string()),
+            |_step_ctx| async move { Ok("fast_3".to_string()) },
             None,
         )
         .await?;
@@ -225,7 +225,7 @@ async fn retry_exhaustion_handler(
     let result: String = ctx
         .step_named(
             "always_failing_step",
-            |_step_ctx| Err::<String, _>("step_always_fails".into()),
+            |_step_ctx| async move { Err::<String, _>("step_always_fails".into()) },
             Some(config),
         )
         .await?;
@@ -280,7 +280,7 @@ async fn large_payload_handler(
     let processed: String = ctx
         .step_named(
             "process_large_data",
-            |_step_ctx| Ok(format!("processed_{}_bytes", event.data.len())),
+            |_step_ctx| async move { Ok(format!("processed_{}_bytes", event.data.len())) },
             None,
         )
         .await?;
@@ -341,7 +341,11 @@ async fn handler_error_handler(
     ctx: DurableContext,
 ) -> Result<String, DurableError> {
     let _setup: String = ctx
-        .step_named("setup_step", |_step_ctx| Ok("setup_done".to_string()), None)
+        .step_named(
+            "setup_step",
+            |_step_ctx| async move { Ok("setup_done".to_string()) },
+            None,
+        )
         .await?;
 
     Err(DurableError::execution("handler_level_failure"))

@@ -27,9 +27,9 @@ pub async fn handler(
     let ctx3 = ctx.clone();
 
     let (r1, r2, r3) = tokio::join!(
-        ctx1.step(|_| Ok("step_1".to_string()), None),
-        ctx2.step(|_| Ok("step_2".to_string()), None),
-        ctx3.step(|_| Ok("step_3".to_string()), None),
+        ctx1.step(|_| async move { Ok("step_1".to_string()) }, None),
+        ctx2.step(|_| async move { Ok("step_2".to_string()) }, None),
+        ctx3.step(|_| async move { Ok("step_3".to_string()) }, None),
     );
 
     Ok(ConcurrentResult {

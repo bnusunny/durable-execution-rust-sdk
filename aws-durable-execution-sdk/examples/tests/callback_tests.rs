@@ -299,10 +299,13 @@ async fn wait_for_callback_handler(
         .step_named(
             "validate",
             |_| {
-                if event.amount <= 0.0 {
-                    return Err("Amount must be positive".into());
+                let ev = event.clone();
+                async move {
+                    if ev.amount <= 0.0 {
+                        return Err("Amount must be positive".into());
+                    }
+                    Ok(ev)
                 }
-                Ok(event.clone())
             },
             None,
         )
@@ -791,7 +794,9 @@ async fn wfc_child_context_handler(
     ctx: DurableContext,
 ) -> Result<WfcChildContextCallbackResponse, DurableError> {
     // Step before the child context
-    let _prepared = ctx.step(|_| Ok("prepared".to_string()), None).await?;
+    let _prepared = ctx
+        .step(|_| async move { Ok("prepared".to_string()) }, None)
+        .await?;
 
     // Run wait_for_callback inside an unnamed child context
     let result = ctx
@@ -1210,7 +1215,11 @@ async fn callback_mixed_ops_handler(
 ) -> Result<MixedOpsResult, DurableError> {
     // Step 1: Prepare data
     let prepared_data = ctx
-        .step_named("prepare", |_| Ok("prepared_payload".to_string()), None)
+        .step_named(
+            "prepare",
+            |_| async move { Ok("prepared_payload".to_string()) },
+            None,
+        )
         .await?;
 
     // Step 2: Wait before creating callback

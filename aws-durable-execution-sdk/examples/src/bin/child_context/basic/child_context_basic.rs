@@ -30,7 +30,7 @@ pub async fn handler(
                     let step1: String = child_ctx
                         .step_named(
                             "child_step_1",
-                            |_| Ok("child step 1 done".to_string()),
+                            |_| async move { Ok("child step 1 done".to_string()) },
                             None,
                         )
                         .await?;
@@ -38,7 +38,7 @@ pub async fn handler(
                     let step2: String = child_ctx
                         .step_named(
                             "child_step_2",
-                            |_| Ok("child step 2 done".to_string()),
+                            |_| async move { Ok("child step 2 done".to_string()) },
                             None,
                         )
                         .await?;

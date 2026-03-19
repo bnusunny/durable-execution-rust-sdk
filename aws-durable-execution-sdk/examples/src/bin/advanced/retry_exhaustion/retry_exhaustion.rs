@@ -29,7 +29,7 @@ pub async fn handler(
     let result: String = ctx
         .step_named(
             "always_failing_step",
-            |_step_ctx| Err::<String, _>("step_always_fails".into()),
+            |_step_ctx| async move { Err::<String, _>("step_always_fails".into()) },
             Some(config),
         )
         .await?;

@@ -17,7 +17,9 @@ pub async fn handler(
         .await?;
 
     // Perform some work
-    let _result: i32 = ctx.step_named("process", |_| Ok(42), None).await?;
+    let _result: i32 = ctx
+        .step_named("process", |_| async move { Ok(42) }, None)
+        .await?;
 
     // Second wait with a different name
     ctx.wait(Duration::from_seconds(2), Some("cooldown_period"))

@@ -39,7 +39,9 @@ pub async fn handler(
     ctx: DurableContext,
 ) -> Result<ChildContextCallbackResponse, DurableError> {
     // Step before the child context
-    let _prepared = ctx.step(|_| Ok("prepared".to_string()), None).await?;
+    let _prepared = ctx
+        .step(|_| async move { Ok("prepared".to_string()) }, None)
+        .await?;
 
     // Run wait_for_callback inside an unnamed child context
     let result = ctx

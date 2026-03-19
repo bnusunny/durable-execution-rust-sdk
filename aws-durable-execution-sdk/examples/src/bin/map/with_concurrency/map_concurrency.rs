@@ -47,7 +47,7 @@ pub async fn handler(
                     child_ctx
                         .step_named(
                             &format!("process_{}", index),
-                            |_| {
+                            |_| async move {
                                 Ok(ProcessedItem {
                                     id: item.clone(),
                                     result: format!("processed_{}", item),

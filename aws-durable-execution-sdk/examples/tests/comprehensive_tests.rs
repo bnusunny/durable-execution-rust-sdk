@@ -47,8 +47,9 @@ async fn order_workflow_handler(
     let order_id = event.order_id.clone();
 
     // Step 1: Validate order
+    let items_empty = event.items.is_empty();
     let is_valid: bool = ctx
-        .step_named("validate_order", |_| Ok(!event.items.is_empty()), None)
+        .step_named("validate_order", |_| async move { Ok(!items_empty) }, None)
         .await?;
 
     if !is_valid {
@@ -62,7 +63,7 @@ async fn order_workflow_handler(
             |child_ctx| {
                 Box::pin(async move {
                     child_ctx
-                        .step(|_| Ok("inventory_ok".to_string()), None)
+                        .step(|_| async move { Ok("inventory_ok".to_string()) }, None)
                         .await
                 })
             },
@@ -76,7 +77,7 @@ async fn order_workflow_handler(
             |child_ctx| {
                 Box::pin(async move {
                     child_ctx
-                        .step(|_| Ok("customer_ok".to_string()), None)
+                        .step(|_| async move { Ok("customer_ok".to_string()) }, None)
                         .await
                 })
             },
@@ -93,7 +94,7 @@ async fn order_workflow_handler(
                     child_ctx
                         .step_named(
                             &format!("process_item_{}", index),
-                            |_| Ok(item.price_cents * item.quantity as u64),
+                            |_| async move { Ok(item.price_cents * item.quantity as u64) },
                             None,
                         )
                         .await
@@ -141,7 +142,9 @@ async fn order_workflow_handler(
         .await?;
 
     // Step 6: Finalize order
-    let _finalized: bool = ctx.step_named("finalize_order", |_| Ok(true), None).await?;
+    let _finalized: bool = ctx
+        .step_named("finalize_order", |_| async move { Ok(true) }, None)
+        .await?;
 
     Ok(OrderResult {
         order_id,

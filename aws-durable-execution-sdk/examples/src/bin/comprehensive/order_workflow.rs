@@ -52,7 +52,14 @@ pub async fn handler(event: OrderEvent, ctx: DurableContext) -> Result<OrderResu
 
     // Step 1: Validate order
     let is_valid: bool = ctx
-        .step_named("validate_order", |_| Ok(!event.items.is_empty()), None)
+        .step_named(
+            "validate_order",
+            |_| {
+                let items_empty = event.items.is_empty();
+                async move { Ok(!items_empty) }
+            },
+            None,
+        )
         .await?;
 
     if !is_valid {
@@ -66,7 +73,7 @@ pub async fn handler(event: OrderEvent, ctx: DurableContext) -> Result<OrderResu
             |child_ctx| {
                 Box::pin(async move {
                     child_ctx
-                        .step(|_| Ok("inventory_ok".to_string()), None)
+                        .step(|_| async move { Ok("inventory_ok".to_string()) }, None)
                         .await
                 })
             },
@@ -80,7 +87,7 @@ pub async fn handler(event: OrderEvent, ctx: DurableContext) -> Result<OrderResu
             |child_ctx| {
                 Box::pin(async move {
                     child_ctx
-                        .step(|_| Ok("customer_ok".to_string()), None)
+                        .step(|_| async move { Ok("customer_ok".to_string()) }, None)
                         .await
                 })
             },
@@ -97,7 +104,7 @@ pub async fn handler(event: OrderEvent, ctx: DurableContext) -> Result<OrderResu
                     child_ctx
                         .step_named(
                             &format!("process_item_{}", index),
-                            |_| Ok(item.price_cents * item.quantity as u64),
+                            |_| async move { Ok(item.price_cents * item.quantity as u64) },
                             None,
                         )
                         .await
@@ -146,7 +153,9 @@ pub async fn handler(event: OrderEvent, ctx: DurableContext) -> Result<OrderResu
         .await?;
 
     // Step 6: Finalize order
-    let _finalized: bool = ctx.step_named("finalize_order", |_| Ok(true), None).await?;
+    let _finalized: bool = ctx
+        .step_named("finalize_order", |_| async move { Ok(true) }, None)
+        .await?;
 
     Ok(OrderResult {
         order_id,

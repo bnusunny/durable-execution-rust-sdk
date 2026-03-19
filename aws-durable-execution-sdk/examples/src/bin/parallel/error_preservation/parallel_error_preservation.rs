@@ -43,7 +43,7 @@ pub async fn handler(
                 Box::pin(async move {
                     child_ctx
                         .step(
-                            |_| {
+                            |_| async move {
                                 if item % 2 == 0 {
                                     Err(format!("Item {} failed: even numbers not allowed", item)
                                         .into())

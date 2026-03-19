@@ -13,7 +13,7 @@ use crate::error::{DurableError, ErrorObject, StepResult, TerminationReason};
 use crate::operation::{OperationType, OperationUpdate};
 use crate::serdes::{JsonSerDes, SerDes, SerDesContext};
 use crate::state::{CheckpointedResult, ExecutionState};
-use crate::traits::{DurableValue, StepFn};
+use crate::traits::DurableValue;
 
 /// Context provided to step functions during execution.
 ///
@@ -178,7 +178,7 @@ impl StepContext {
 /// # Returns
 ///
 /// The result of the step function, or an error if execution fails.
-pub async fn step_handler<T, F>(
+pub async fn step_handler<T, F, Fut>(
     func: F,
     state: &Arc<ExecutionState>,
     op_id: &OperationIdentifier,
@@ -187,7 +187,8 @@ pub async fn step_handler<T, F>(
 ) -> StepResult<T>
 where
     T: DurableValue,
-    F: StepFn<T>,
+    F: FnOnce(StepContext) -> Fut + Send,
+    Fut: std::future::Future<Output = Result<T, Box<dyn std::error::Error + Send + Sync>>> + Send,
 {
     // Create tracing span for this operation
     // Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6
@@ -410,7 +411,7 @@ where
 /// If skip_start_checkpoint is true (operation is in READY status), the START
 /// checkpoint is skipped as per Requirements 3.7.
 #[allow(clippy::too_many_arguments)]
-async fn execute_at_most_once<T, F>(
+async fn execute_at_most_once<T, F, Fut>(
     func: F,
     state: &Arc<ExecutionState>,
     op_id: &OperationIdentifier,
@@ -423,7 +424,8 @@ async fn execute_at_most_once<T, F>(
 ) -> StepResult<T>
 where
     T: DurableValue,
-    F: StepFn<T>,
+    F: FnOnce(StepContext) -> Fut + Send,
+    Fut: std::future::Future<Output = Result<T, Box<dyn std::error::Error + Send + Sync>>> + Send,
 {
     let mut log_info =
         LogInfo::new(state.durable_execution_arn()).with_operation_id(&op_id.operation_id);
@@ -445,7 +447,7 @@ where
     }
 
     // Execute the function
-    let result = execute_with_retry(func, step_ctx.clone(), config, logger, &log_info);
+    let result = execute_with_retry(func, step_ctx.clone(), config, logger, &log_info).await;
 
     // Checkpoint the result
     match result {
@@ -482,7 +484,7 @@ where
 ///
 /// Checkpoint is created AFTER execution to guarantee at least once execution.
 #[allow(clippy::too_many_arguments)]
-async fn execute_at_least_once<T, F>(
+async fn execute_at_least_once<T, F, Fut>(
     func: F,
     state: &Arc<ExecutionState>,
     op_id: &OperationIdentifier,
@@ -494,7 +496,8 @@ async fn execute_at_least_once<T, F>(
 ) -> StepResult<T>
 where
     T: DurableValue,
-    F: StepFn<T>,
+    F: FnOnce(StepContext) -> Fut + Send,
+    Fut: std::future::Future<Output = Result<T, Box<dyn std::error::Error + Send + Sync>>> + Send,
 {
     let mut log_info =
         LogInfo::new(state.durable_execution_arn()).with_operation_id(&op_id.operation_id);
@@ -505,7 +508,7 @@ where
     logger.debug("Executing step (AT_LEAST_ONCE)", &log_info);
 
     // Execute the function first
-    let result = execute_with_retry(func, step_ctx.clone(), config, logger, &log_info);
+    let result = execute_with_retry(func, step_ctx.clone(), config, logger, &log_info).await;
 
     // Checkpoint AFTER execution (AT_LEAST_ONCE semantics)
     match result {
@@ -539,7 +542,7 @@ where
 }
 
 /// Executes a function with retry logic.
-fn execute_with_retry<T, F>(
+async fn execute_with_retry<T, F, Fut>(
     func: F,
     step_ctx: StepContext,
     config: &StepConfig,
@@ -548,7 +551,8 @@ fn execute_with_retry<T, F>(
 ) -> Result<T, Box<dyn std::error::Error + Send + Sync>>
 where
     T: Send,
-    F: FnOnce(StepContext) -> Result<T, Box<dyn std::error::Error + Send + Sync>> + Send,
+    F: FnOnce(StepContext) -> Fut + Send,
+    Fut: std::future::Future<Output = Result<T, Box<dyn std::error::Error + Send + Sync>>> + Send,
 {
     // For now, execute without retry since we consume the function
     // Retry logic would require FnMut or cloneable functions
@@ -561,7 +565,7 @@ where
         );
     }
 
-    let result = func(step_ctx);
+    let result = func(step_ctx).await;
 
     // When the function fails and a retryable_error_filter is configured,
     // check whether the error is retryable before delegating to the retry strategy.
@@ -839,8 +843,14 @@ mod tests {
         let config = StepConfig::default();
         let logger = create_test_logger();
 
-        let result: Result<i32, DurableError> =
-            step_handler(|_ctx| Ok(42), &state, &op_id, &config, &logger).await;
+        let result: Result<i32, DurableError> = step_handler(
+            |_ctx| async move { Ok(42) },
+            &state,
+            &op_id,
+            &config,
+            &logger,
+        )
+        .await;
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 42);
@@ -855,7 +865,7 @@ mod tests {
         let logger = create_test_logger();
 
         let result: Result<i32, DurableError> = step_handler(
-            |_ctx| Err("test error".into()),
+            |_ctx| async move { Err("test error".into()) },
             &state,
             &op_id,
             &config,
@@ -895,7 +905,7 @@ mod tests {
 
         // The function should NOT be called during replay
         let result: Result<i32, DurableError> = step_handler(
-            |_ctx| panic!("Function should not be called during replay"),
+            |_ctx| async move { panic!("Function should not be called during replay") },
             &state,
             &op_id,
             &config,
@@ -929,7 +939,7 @@ mod tests {
         let logger = create_test_logger();
 
         let result: Result<i32, DurableError> = step_handler(
-            |_ctx| panic!("Function should not be called during replay"),
+            |_ctx| async move { panic!("Function should not be called during replay") },
             &state,
             &op_id,
             &config,
@@ -966,8 +976,14 @@ mod tests {
         let config = StepConfig::default();
         let logger = create_test_logger();
 
-        let result: Result<i32, DurableError> =
-            step_handler(|_ctx| Ok(42), &state, &op_id, &config, &logger).await;
+        let result: Result<i32, DurableError> = step_handler(
+            |_ctx| async move { Ok(42) },
+            &state,
+            &op_id,
+            &config,
+            &logger,
+        )
+        .await;
 
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -990,7 +1006,7 @@ mod tests {
         let logger = create_test_logger();
 
         let result: Result<String, DurableError> = step_handler(
-            |_ctx| Ok("at_most_once_result".to_string()),
+            |_ctx| async move { Ok("at_most_once_result".to_string()) },
             &state,
             &op_id,
             &config,
@@ -1014,7 +1030,7 @@ mod tests {
         let logger = create_test_logger();
 
         let result: Result<String, DurableError> = step_handler(
-            |_ctx| Ok("at_least_once_result".to_string()),
+            |_ctx| async move { Ok("at_least_once_result".to_string()) },
             &state,
             &op_id,
             &config,
@@ -1059,6 +1075,35 @@ mod tests {
         assert_eq!(update.operation_id, "op-123");
         assert!(update.error.is_some());
         assert_eq!(update.error.unwrap().error_type, "TestError");
+    }
+
+    /// Test that step_handler works with a genuinely async closure that
+    /// suspends and resumes via `tokio::time::sleep`, proving `.await`
+    /// works end-to-end (not just wrapping sync code).
+    #[tokio::test]
+    async fn test_step_handler_genuinely_async_closure() {
+        let client = create_mock_client();
+        let state = create_test_state(client);
+        let op_id = create_test_op_id();
+        let config = StepConfig::default();
+        let logger = create_test_logger();
+
+        let result: Result<String, DurableError> = step_handler(
+            |_ctx| async move {
+                // Genuinely suspend the task — this would fail if the handler
+                // did not properly `.await` the closure's future.
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                Ok("async_result".to_string())
+            },
+            &state,
+            &op_id,
+            &config,
+            &logger,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "async_result");
     }
 }
 
@@ -1132,7 +1177,7 @@ mod property_tests {
                     let logger = create_test_logger();
 
                     let result: Result<i32, DurableError> = step_handler(
-                        move |_ctx| {
+                        move |_ctx| async move {
                             // Record when execution happens
                             let order = order_counter_clone.fetch_add(1, Ordering::SeqCst);
                             execution_order_clone.store(order, Ordering::SeqCst);
@@ -1182,7 +1227,7 @@ mod property_tests {
                     let logger = create_test_logger();
 
                     let result: Result<i32, DurableError> = step_handler(
-                        move |_ctx| Ok(result_value),
+                        move |_ctx| async move { Ok(result_value) },
                         &state,
                         &op_id,
                         &config,
@@ -1235,7 +1280,7 @@ mod property_tests {
 
                     let error_msg_clone = error_msg.clone();
                     let result: Result<i32, DurableError> = step_handler(
-                        move |_ctx| Err(error_msg_clone.into()),
+                        move |_ctx| async move { Err(error_msg_clone.into()) },
                         &state,
                         &op_id,
                         &config,
@@ -1280,7 +1325,7 @@ mod property_tests {
 
                     let error_msg_clone = error_msg.clone();
                     let result: Result<i32, DurableError> = step_handler(
-                        move |_ctx| Err(error_msg_clone.into()),
+                        move |_ctx| async move { Err(error_msg_clone.into()) },
                         &state,
                         &op_id,
                         &config,
@@ -1339,7 +1384,7 @@ mod property_tests {
                     let was_called_clone = was_called.clone();
 
                     let result: Result<i32, DurableError> = step_handler(
-                        move |_ctx| {
+                        move |_ctx| async move {
                             was_called_clone.store(true, Ordering::SeqCst);
                             Ok(999) // Different value to prove we're not executing
                         },
@@ -1400,7 +1445,7 @@ mod property_tests {
                     let was_called_clone = was_called.clone();
 
                     let result: Result<i32, DurableError> = step_handler(
-                        move |_ctx| {
+                        move |_ctx| async move {
                             was_called_clone.store(true, Ordering::SeqCst);
                             Ok(result_value)
                         },

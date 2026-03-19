@@ -99,10 +99,13 @@ pub async fn process_batch(
     ctx.step_named(
         "validate_batch",
         |_| {
-            if event.items.is_empty() {
-                return Err("Batch must contain at least one item".into());
+            let items_empty = event.items.is_empty();
+            async move {
+                if items_empty {
+                    return Err("Batch must contain at least one item".into());
+                }
+                Ok(())
             }
-            Ok(())
         },
         None,
     )
@@ -134,7 +137,7 @@ pub async fn process_batch(
                     child_ctx
                         .step_named(
                             &format!("process_item_{}", index),
-                            |_| {
+                            |_| async move {
                                 // Simulated item processing
                                 let start = std::time::Instant::now();
 
@@ -198,7 +201,7 @@ pub async fn quorum_processing(
                 Box::pin(async move {
                     child_ctx
                         .step(
-                            |_| {
+                            |_| async move {
                                 Ok(ItemResult {
                                     id: item.id.clone(),
                                     status: "success".to_string(),
@@ -241,7 +244,7 @@ pub async fn strict_processing(
                 Box::pin(async move {
                     child_ctx
                         .step(
-                            |_| {
+                            |_| async move {
                                 Ok(ItemResult {
                                     id: item.id.clone(),
                                     status: "success".to_string(),

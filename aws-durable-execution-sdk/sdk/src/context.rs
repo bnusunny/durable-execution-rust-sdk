@@ -9,9 +9,10 @@ use std::sync::{Arc, RwLock};
 use blake2::{Blake2b512, Digest};
 
 use crate::error::DurableResult;
+use crate::handlers::StepContext;
 use crate::sealed::Sealed;
 use crate::state::ExecutionState;
-use crate::traits::{DurableValue, StepFn};
+use crate::traits::DurableValue;
 use crate::types::OperationId;
 
 /// Identifies an operation within a durable execution.
@@ -835,7 +836,7 @@ where
 /// ```rust,ignore
 /// async fn my_workflow(ctx: DurableContext) -> Result<String, DurableError> {
 ///     // Execute a step (automatically checkpointed)
-///     let result = ctx.step(|_| Ok("hello".to_string()), None).await?;
+///     let result = ctx.step(|_| async move { Ok("hello".to_string()) }, None).await?;
 ///     
 ///     // Wait for 5 seconds (suspends Lambda, resumes later)
 ///     ctx.wait(Duration::from_seconds(5), None).await?;
@@ -1427,18 +1428,20 @@ impl DurableContext {
     /// # Example
     ///
     /// ```rust,ignore
-    /// let result: i32 = ctx.step(|_step_ctx| {
+    /// let result: i32 = ctx.step(|_step_ctx| async move {
     ///     Ok(42)
     /// }, None).await?;
     /// ```
-    pub async fn step<T, F>(
+    pub async fn step<T, F, Fut>(
         &self,
         func: F,
         config: Option<crate::config::StepConfig>,
     ) -> DurableResult<T>
     where
         T: DurableValue,
-        F: StepFn<T>,
+        F: FnOnce(StepContext) -> Fut + Send,
+        Fut: std::future::Future<Output = Result<T, Box<dyn std::error::Error + Send + Sync>>>
+            + Send,
     {
         let op_id = self.next_operation_identifier(None);
         let config = config.unwrap_or_default();
@@ -1468,11 +1471,11 @@ impl DurableContext {
     /// # Example
     ///
     /// ```rust,ignore
-    /// let result: i32 = ctx.step_named("validate_input", |_step_ctx| {
+    /// let result: i32 = ctx.step_named("validate_input", |_step_ctx| async move {
     ///     Ok(42)
     /// }, None).await?;
     /// ```
-    pub async fn step_named<T, F>(
+    pub async fn step_named<T, F, Fut>(
         &self,
         name: &str,
         func: F,
@@ -1480,7 +1483,9 @@ impl DurableContext {
     ) -> DurableResult<T>
     where
         T: DurableValue,
-        F: StepFn<T>,
+        F: FnOnce(StepContext) -> Fut + Send,
+        Fut: std::future::Future<Output = Result<T, Box<dyn std::error::Error + Send + Sync>>>
+            + Send,
     {
         let op_id = self.next_operation_identifier(Some(name.to_string()));
         let config = config.unwrap_or_default();
@@ -1917,12 +1922,15 @@ impl DurableContext {
     /// ```rust,ignore
     /// let result = ctx.wait_for_condition(
     ///     |state, ctx| {
-    ///         // Check if order is ready
-    ///         let status = check_order_status(&state.order_id)?;
-    ///         if status == "ready" {
-    ///             Ok(OrderReady { order_id: state.order_id.clone() })
-    ///         } else {
-    ///             Err("Order not ready yet".into())
+    ///         let order_id = state.order_id.clone();
+    ///         async move {
+    ///             // Check if order is ready
+    ///             let status = check_order_status(&order_id).await?;
+    ///             if status == "ready" {
+    ///                 Ok(OrderReady { order_id })
+    ///             } else {
+    ///                 Err("Order not ready yet".into())
+    ///             }
     ///         }
     ///     },
     ///     WaitForConditionConfig::from_interval(
@@ -1932,7 +1940,7 @@ impl DurableContext {
     ///     ),
     /// ).await?;
     /// ```
-    pub async fn wait_for_condition<T, S, F>(
+    pub async fn wait_for_condition<T, S, F, Fut>(
         &self,
         check: F,
         config: WaitForConditionConfig<S>,
@@ -1940,9 +1948,9 @@ impl DurableContext {
     where
         T: serde::Serialize + serde::de::DeserializeOwned + Send,
         S: serde::Serialize + serde::de::DeserializeOwned + Clone + Send + Sync,
-        F: Fn(&S, &WaitForConditionContext) -> Result<T, Box<dyn std::error::Error + Send + Sync>>
-            + Send
-            + Sync,
+        F: Fn(&S, &WaitForConditionContext) -> Fut + Send + Sync,
+        Fut: std::future::Future<Output = Result<T, Box<dyn std::error::Error + Send + Sync>>>
+            + Send,
     {
         let op_id = self.next_operation_identifier(Some("wait_for_condition".to_string()));
 
@@ -2029,7 +2037,7 @@ impl DurableContext {
                     child_ctx
                         .step_named(
                             "execute_submitter",
-                            move |_| {
+                            move |_| async move {
                                 // The step just marks that we're executing the submitter
                                 // The actual async submitter call happens after this checkpoint
                                 Ok(())

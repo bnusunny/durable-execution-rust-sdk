@@ -20,7 +20,10 @@ async fn step_basic_handler(
     ctx: DurableContext,
 ) -> Result<String, DurableError> {
     let result = ctx
-        .step(|_step_ctx| Ok("step completed".to_string()), None)
+        .step(
+            |_step_ctx| async move { Ok("step completed".to_string()) },
+            None,
+        )
         .await?;
 
     Ok(result)
@@ -73,7 +76,7 @@ async fn step_named_handler(
     let first: ProcessingResult = ctx
         .step_named(
             "fetch_data",
-            |_step_ctx| {
+            |_step_ctx| async move {
                 Ok(ProcessingResult {
                     step_name: "fetch_data".to_string(),
                     value: 42,
@@ -86,7 +89,7 @@ async fn step_named_handler(
     let second: ProcessingResult = ctx
         .step_named(
             "process_data",
-            |_step_ctx| {
+            |_step_ctx| async move {
                 Ok(ProcessingResult {
                     step_name: "process_data".to_string(),
                     value: 100,
@@ -99,7 +102,7 @@ async fn step_named_handler(
     let third: ProcessingResult = ctx
         .step_named(
             "finalize",
-            |_step_ctx| {
+            |_step_ctx| async move {
                 Ok(ProcessingResult {
                     step_name: "finalize".to_string(),
                     value: 200,
@@ -173,7 +176,7 @@ async fn step_with_config_handler(
     let payment: PaymentResult = ctx
         .step_named(
             "charge_payment",
-            |_step_ctx| {
+            |_step_ctx| async move {
                 Ok(PaymentResult {
                     transaction_id: "txn_abc123".to_string(),
                     amount: 9999,
@@ -185,7 +188,7 @@ async fn step_with_config_handler(
         .await?;
 
     let _logged: bool = ctx
-        .step_named("log_transaction", |_step_ctx| Ok(true), None)
+        .step_named("log_transaction", |_step_ctx| async move { Ok(true) }, None)
         .await?;
 
     Ok(payment)
@@ -251,7 +254,7 @@ async fn step_retry_exponential_backoff_handler(
     let result: String = ctx
         .step_named(
             "retryable_operation",
-            |_step_ctx| Ok("operation_succeeded".to_string()),
+            |_step_ctx| async move { Ok("operation_succeeded".to_string()) },
             Some(config),
         )
         .await?;
@@ -311,7 +314,7 @@ async fn step_retry_with_filter_handler(
     let result: String = ctx
         .step_named(
             "filtered_operation",
-            |_step_ctx| Ok("filter_configured".to_string()),
+            |_step_ctx| async move { Ok("filter_configured".to_string()) },
             Some(config),
         )
         .await?;
@@ -358,7 +361,7 @@ async fn step_error_determinism_handler(
     let result: String = ctx
         .step_named(
             "always_fails",
-            |_step_ctx| Err::<String, _>("deterministic_failure".into()),
+            |_step_ctx| async move { Err::<String, _>("deterministic_failure".into()) },
             None,
         )
         .await?;

@@ -214,9 +214,9 @@
 //!
 //! let results = ctx.parallel(
 //!     vec![
-//!         |ctx| Box::pin(async move { ctx.step(|_| Ok("a"), None).await }),
-//!         |ctx| Box::pin(async move { ctx.step(|_| Ok("b"), None).await }),
-//!         |ctx| Box::pin(async move { ctx.step(|_| Ok("c"), None).await }),
+//!         |ctx| Box::pin(async move { ctx.step(|_| async move { Ok("a") }, None).await }),
+//!         |ctx| Box::pin(async move { ctx.step(|_| async move { Ok("b") }, None).await }),
+//!         |ctx| Box::pin(async move { ctx.step(|_| async move { Ok("c") }, None).await }),
 //!     ],
 //!     None,
 //! ).await?;
@@ -625,7 +625,7 @@
 //!
 //! The [`DurableContext`] provides convenience methods for logging with automatic context:
 //!
-//! ```rust,ignore
+//! ```rust,no_run
 //! use durable_execution_sdk::{DurableContext, DurableError};
 //!
 //! async fn my_workflow(ctx: DurableContext) -> Result<(), DurableError> {
@@ -788,7 +788,7 @@
 //! - [`StepResult<T>`](StepResult): Alias for `Result<T, DurableError>` - step operation results
 //! - [`CheckpointResult<T>`](CheckpointResult): Alias for `Result<T, DurableError>` - checkpoint operation results
 //!
-//! ```rust,ignore
+//! ```rust,no_run
 //! use durable_execution_sdk::{DurableResult, StepResult, DurableError};
 //!
 //! // Use in function signatures for clarity

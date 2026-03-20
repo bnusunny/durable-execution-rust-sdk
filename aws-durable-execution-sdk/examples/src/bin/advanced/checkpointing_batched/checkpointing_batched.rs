@@ -22,7 +22,7 @@ pub async fn handler(
     let step1: String = ctx
         .step_named(
             "batched_step_1",
-            |_step_ctx| Ok("batched_1".to_string()),
+            |_step_ctx| async move { Ok("batched_1".to_string()) },
             None,
         )
         .await?;
@@ -30,7 +30,7 @@ pub async fn handler(
     let step2: String = ctx
         .step_named(
             "batched_step_2",
-            |_step_ctx| Ok("batched_2".to_string()),
+            |_step_ctx| async move { Ok("batched_2".to_string()) },
             None,
         )
         .await?;
@@ -38,7 +38,7 @@ pub async fn handler(
     let step3: String = ctx
         .step_named(
             "batched_step_3",
-            |_step_ctx| Ok("batched_3".to_string()),
+            |_step_ctx| async move { Ok("batched_3".to_string()) },
             None,
         )
         .await?;

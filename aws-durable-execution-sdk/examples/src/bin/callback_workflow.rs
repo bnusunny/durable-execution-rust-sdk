@@ -111,7 +111,7 @@ pub async fn approval_workflow(
     let validated_request = ctx
         .step_named(
             "validate_request",
-            |_| {
+            |_| async move {
                 // Validate the approval request
                 if event.approvers.is_empty() {
                     return Err("At least one approver is required".into());
@@ -157,12 +157,13 @@ pub async fn approval_workflow(
     // =========================================================================
     // Send the callback ID to the external approval system.
     // In a real application, this would send emails, Slack messages, etc.
+    let callback_id_for_notify = callback.callback_id.clone();
     ctx.step_named(
         "notify_approvers",
-        |_| {
+        |_| async move {
             let notification = ApprovalNotification {
                 request_id: validated_request.request_id.clone(),
-                callback_id: callback.callback_id.clone(),
+                callback_id: callback_id_for_notify.clone(),
                 approval_type: validated_request.approval_type.clone(),
                 requester: validated_request.requester.clone(),
                 description: validated_request.description.clone(),
@@ -170,11 +171,11 @@ pub async fn approval_workflow(
                 // In production, these would be actual URLs to your approval UI
                 approve_url: format!(
                     "https://approvals.example.com/approve?callback_id={}",
-                    callback.callback_id
+                    callback_id_for_notify
                 ),
                 reject_url: format!(
                     "https://approvals.example.com/reject?callback_id={}",
-                    callback.callback_id
+                    callback_id_for_notify
                 ),
             };
 
@@ -211,7 +212,7 @@ pub async fn approval_workflow(
     let final_result = ctx
         .step_named(
             "process_decision",
-            |_| {
+            |_| async move {
                 if approval.approved {
                     // Handle approval
                     // In a real application, this might:
@@ -268,12 +269,13 @@ pub async fn multi_level_approval(
         .await?;
 
     // Notify manager
+    let manager_callback_id = manager_callback.callback_id.clone();
     ctx.step_named(
         "notify_manager",
-        |_| {
+        |_| async move {
             println!(
                 "Manager approval requested. Callback ID: {}",
-                manager_callback.callback_id
+                manager_callback_id
             );
             Ok(())
         },
@@ -309,12 +311,13 @@ pub async fn multi_level_approval(
             .await?;
 
         // Notify director
+        let director_callback_id = director_callback.callback_id.clone();
         ctx.step_named(
             "notify_director",
-            |_| {
+            |_| async move {
                 println!(
                     "Director approval requested. Callback ID: {}",
-                    director_callback.callback_id
+                    director_callback_id
                 );
                 Ok(())
             },

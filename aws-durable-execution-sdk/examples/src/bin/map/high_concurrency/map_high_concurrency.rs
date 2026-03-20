@@ -35,7 +35,7 @@ pub async fn handler(
             |child_ctx: DurableContext, item: i32, _index: usize| {
                 Box::pin(async move {
                     child_ctx
-                        .step(|_| Ok(format!("processed_{}", item)), None)
+                        .step(|_| async move { Ok(format!("processed_{}", item)) }, None)
                         .await
                 })
             },

@@ -45,7 +45,11 @@ pub async fn handler(
     ctx.log_info("Starting workflow");
 
     let result: String = ctx
-        .step_named("process", |_| Ok("processed".to_string()), None)
+        .step_named(
+            "process",
+            |_| async move { Ok("processed".to_string()) },
+            None,
+        )
         .await?;
 
     ctx.log_info("Workflow completed");

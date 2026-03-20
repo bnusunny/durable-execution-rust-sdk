@@ -46,22 +46,23 @@ pub async fn handler(
             |state: &PollingState, wait_ctx: &WaitForConditionContext| {
                 // Simulate checking job status
                 // In production, this would call an external API
-                let status = if wait_ctx.attempt >= 3 {
-                    "completed"
-                } else {
-                    "running"
-                };
+                let job_id = state.job_id.clone();
+                let attempt = wait_ctx.attempt;
 
-                if status == "completed" {
-                    // Return Ok(T) when condition is met
-                    Ok(JobStatus {
-                        job_id: state.job_id.clone(),
-                        status: status.to_string(),
-                        result: Some("Job finished successfully".to_string()),
-                    })
-                } else {
-                    // Return Err to continue polling
-                    Err(format!("Job still running, attempt {}", wait_ctx.attempt).into())
+                async move {
+                    let status = if attempt >= 3 { "completed" } else { "running" };
+
+                    if status == "completed" {
+                        // Return Ok(T) when condition is met
+                        Ok(JobStatus {
+                            job_id,
+                            status: status.to_string(),
+                            result: Some("Job finished successfully".to_string()),
+                        })
+                    } else {
+                        // Return Err to continue polling
+                        Err(format!("Job still running, attempt {}", attempt).into())
+                    }
                 }
             },
             config,

@@ -24,7 +24,7 @@ pub async fn handler(
     let _stage1: String = ctx
         .step_named(
             "stage_1_process",
-            |_| Ok("stage 1 complete".to_string()),
+            |_| async move { Ok("stage 1 complete".to_string()) },
             None,
         )
         .await?;
@@ -37,7 +37,7 @@ pub async fn handler(
     let _stage2: String = ctx
         .step_named(
             "stage_2_process",
-            |_| Ok("stage 2 complete".to_string()),
+            |_| async move { Ok("stage 2 complete".to_string()) },
             None,
         )
         .await?;
@@ -50,7 +50,7 @@ pub async fn handler(
     let _stage3: String = ctx
         .step_named(
             "stage_3_process",
-            |_| Ok("stage 3 complete".to_string()),
+            |_| async move { Ok("stage 3 complete".to_string()) },
             None,
         )
         .await?;

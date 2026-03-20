@@ -29,7 +29,7 @@ pub async fn handler(
                     // Produce a large string > 256KB (262144 bytes)
                     let large_data: String = child_ctx
                         .step(
-                            |_| {
+                            |_| async move {
                                 let data = "x".repeat(300_000);
                                 Ok(data)
                             },

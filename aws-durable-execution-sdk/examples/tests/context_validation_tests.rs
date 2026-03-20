@@ -30,7 +30,9 @@ async fn context_validation_parent_in_child_handler(
                 let parent = parent_ctx;
                 Box::pin(async move {
                     // Misuse: calling step on the PARENT context inside a child context
-                    let val: String = parent.step(|_| Ok("from_parent".to_string()), None).await?;
+                    let val: String = parent
+                        .step(|_| async move { Ok("from_parent".to_string()) }, None)
+                        .await?;
                     Ok(val)
                 })
             },
@@ -96,7 +98,11 @@ async fn context_validation_parent_in_step_handler(
 ) -> Result<String, DurableError> {
     // First, do a normal step on the parent context
     let _setup: String = ctx
-        .step_named("setup", |_| Ok("setup_done".to_string()), None)
+        .step_named(
+            "setup",
+            |_| async move { Ok("setup_done".to_string()) },
+            None,
+        )
         .await?;
 
     let parent_ctx = ctx.clone();
@@ -112,7 +118,7 @@ async fn context_validation_parent_in_step_handler(
                     let val: String = parent
                         .step_named(
                             "parent_step_in_child",
-                            |_| Ok("from_parent".to_string()),
+                            |_| async move { Ok("from_parent".to_string()) },
                             None,
                         )
                         .await?;
@@ -203,10 +209,13 @@ async fn context_validation_parent_in_wait_condition_handler(
                     let val: String = parent
                         .wait_for_condition(
                             |_state: &PollState, wait_ctx: &WaitForConditionContext| {
-                                if wait_ctx.attempt >= 1 {
-                                    Ok("condition_met".to_string())
-                                } else {
-                                    Err("not yet".into())
+                                let attempt = wait_ctx.attempt;
+                                async move {
+                                    if attempt >= 1 {
+                                        Ok("condition_met".to_string())
+                                    } else {
+                                        Err("not yet".into())
+                                    }
                                 }
                             },
                             config,

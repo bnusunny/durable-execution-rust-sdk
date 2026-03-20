@@ -43,7 +43,10 @@ pub async fn handler(
             |child_ctx, item: String, _index: usize| {
                 Box::pin(async move {
                     child_ctx
-                        .step(|_| Ok(format!("response_from_{}", item)), None)
+                        .step(
+                            |_| async move { Ok(format!("response_from_{}", item)) },
+                            None,
+                        )
                         .await
                 })
             },

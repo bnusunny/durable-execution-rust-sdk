@@ -42,9 +42,9 @@ async fn promise_all_macro_handler(
 
     let results = all!(
         ctx,
-        async move { ctx1.step(|_| Ok(10), None).await },
-        async move { ctx2.step(|_| Ok(20), None).await },
-        async move { ctx3.step(|_| Ok(30), None).await },
+        async move { ctx1.step(|_| async move { Ok(10) }, None).await },
+        async move { ctx2.step(|_| async move { Ok(20) }, None).await },
+        async move { ctx3.step(|_| async move { Ok(30) }, None).await },
     )
     .await?;
 
@@ -63,7 +63,7 @@ async fn promise_all_handler(
         .into_iter()
         .map(|v| {
             let ctx = ctx.clone();
-            async move { ctx.step(move |_| Ok(v), None).await }
+            async move { ctx.step(move |_| async move { Ok(v) }, None).await }
         })
         .collect();
 
@@ -84,7 +84,7 @@ async fn promise_all_map_handler(
         .map(
             values,
             |child_ctx: DurableContext, value: i32, _index: usize| {
-                Box::pin(async move { child_ctx.step(|_| Ok(value), None).await })
+                Box::pin(async move { child_ctx.step(|_| async move { Ok(value) }, None).await })
             },
             Some(MapConfig {
                 max_concurrency: Some(3),
@@ -247,12 +247,21 @@ async fn promise_all_settled_macro_handler(
 
     let batch = all_settled!(
         ctx,
-        async move { ctx1.step(|_| Ok("op1 success".to_string()), None).await },
         async move {
-            ctx2.step(|_| Err::<String, _>("op2 failed".into()), None)
+            ctx1.step(|_| async move { Ok("op1 success".to_string()) }, None)
                 .await
         },
-        async move { ctx3.step(|_| Ok("op3 success".to_string()), None).await },
+        async move {
+            ctx2.step(
+                |_| async move { Err::<String, _>("op2 failed".into()) },
+                None,
+            )
+            .await
+        },
+        async move {
+            ctx3.step(|_| async move { Ok("op3 success".to_string()) }, None)
+                .await
+        },
     )
     .await?;
 
@@ -286,12 +295,12 @@ async fn promise_all_settled_handler(
                 Box::pin(async move {
                     if should_succeed {
                         child_ctx
-                            .step(|_| Ok(format!("{} success", name)), None)
+                            .step(|_| async move { Ok(format!("{} success", name)) }, None)
                             .await
                     } else {
                         child_ctx
                             .step(
-                                |_| Err::<String, _>(format!("{} failed", name).into()),
+                                |_| async move { Err::<String, _>(format!("{} failed", name).into()) },
                                 None,
                             )
                             .await
@@ -397,16 +406,25 @@ async fn promise_any_macro_handler(
     let result = any!(
         ctx,
         async move {
-            ctx1.step(|_| Err::<String, _>("primary unavailable".into()), None)
-                .await
+            ctx1.step(
+                |_| async move { Err::<String, _>("primary unavailable".into()) },
+                None,
+            )
+            .await
         },
         async move {
-            ctx2.step(|_| Ok("data from secondary".to_string()), None)
-                .await
+            ctx2.step(
+                |_| async move { Ok("data from secondary".to_string()) },
+                None,
+            )
+            .await
         },
         async move {
-            ctx3.step(|_| Ok("data from fallback".to_string()), None)
-                .await
+            ctx3.step(
+                |_| async move { Ok("data from fallback".to_string()) },
+                None,
+            )
+            .await
         },
     )
     .await?;
@@ -438,12 +456,12 @@ async fn promise_any_handler(
                 Box::pin(async move {
                     if should_succeed {
                         child_ctx
-                            .step(|_| Ok(format!("{} succeeded", name)), None)
+                            .step(|_| async move { Ok(format!("{} succeeded", name)) }, None)
                             .await
                     } else {
                         child_ctx
                             .step(
-                                |_| Err::<String, _>(format!("{} failed", name).into()),
+                                |_| async move { Err::<String, _>(format!("{} failed", name).into()) },
                                 None,
                             )
                             .await
@@ -547,8 +565,14 @@ async fn promise_race_macro_handler(
 
     let result = race!(
         ctx,
-        async move { ctx1.step(|_| Ok("fast result".to_string()), None).await },
-        async move { ctx2.step(|_| Ok("slow result".to_string()), None).await },
+        async move {
+            ctx1.step(|_| async move { Ok("fast result".to_string()) }, None)
+                .await
+        },
+        async move {
+            ctx2.step(|_| async move { Ok("slow result".to_string()) }, None)
+                .await
+        },
     )
     .await?;
 
@@ -575,7 +599,7 @@ async fn promise_race_handler(
             |child_ctx: DurableContext, name: String, _index: usize| {
                 Box::pin(async move {
                     child_ctx
-                        .step(|_| Ok(format!("{} result", name)), None)
+                        .step(|_| async move { Ok(format!("{} result", name)) }, None)
                         .await
                 })
             },
@@ -598,12 +622,18 @@ async fn promise_race_timeout_handler(
     let result = race!(
         ctx,
         async move {
-            ctx1.step(|_| Ok("operation completed".to_string()), None)
-                .await
+            ctx1.step(
+                |_| async move { Ok("operation completed".to_string()) },
+                None,
+            )
+            .await
         },
         async move {
-            ctx2.step(|_| Err::<String, _>("operation timed out".into()), None)
-                .await
+            ctx2.step(
+                |_| async move { Err::<String, _>("operation timed out".into()) },
+                None,
+            )
+            .await
         },
     )
     .await;
@@ -754,9 +784,18 @@ async fn all_with_wait_handler(
 
     let results = all!(
         ctx,
-        async move { ctx1.step(|_| Ok("fast".to_string()), None).await },
-        async move { ctx2.step(|_| Ok("after_wait_1".to_string()), None).await },
-        async move { ctx3.step(|_| Ok("after_wait_2".to_string()), None).await },
+        async move {
+            ctx1.step(|_| async move { Ok("fast".to_string()) }, None)
+                .await
+        },
+        async move {
+            ctx2.step(|_| async move { Ok("after_wait_1".to_string()) }, None)
+                .await
+        },
+        async move {
+            ctx3.step(|_| async move { Ok("after_wait_2".to_string()) }, None)
+                .await
+        },
     )
     .await?;
 
@@ -816,10 +855,16 @@ async fn race_with_timeout_handler(
     let result = race!(
         ctx,
         async move {
-            ctx1.step(|_| Ok("operation completed".to_string()), None)
+            ctx1.step(
+                |_| async move { Ok("operation completed".to_string()) },
+                None,
+            )
+            .await
+        },
+        async move {
+            ctx2.step(|_| async move { Ok("timed out".to_string()) }, None)
                 .await
         },
-        async move { ctx2.step(|_| Ok("timed out".to_string()), None).await },
     )
     .await?;
 
@@ -890,9 +935,18 @@ async fn replay_behavior_handler(
 
     let all_results = all!(
         ctx,
-        async move { ctx1.step(|_| Ok("result_a".to_string()), None).await },
-        async move { ctx2.step(|_| Ok("result_b".to_string()), None).await },
-        async move { ctx3.step(|_| Ok("result_c".to_string()), None).await },
+        async move {
+            ctx1.step(|_| async move { Ok("result_a".to_string()) }, None)
+                .await
+        },
+        async move {
+            ctx2.step(|_| async move { Ok("result_b".to_string()) }, None)
+                .await
+        },
+        async move {
+            ctx3.step(|_| async move { Ok("result_c".to_string()) }, None)
+                .await
+        },
     )
     .await?;
 
@@ -902,8 +956,14 @@ async fn replay_behavior_handler(
 
     let race_result = race!(
         ctx,
-        async move { ctx4.step(|_| Ok("fast_path".to_string()), None).await },
-        async move { ctx5.step(|_| Ok("slow_path".to_string()), None).await },
+        async move {
+            ctx4.step(|_| async move { Ok("fast_path".to_string()) }, None)
+                .await
+        },
+        async move {
+            ctx5.step(|_| async move { Ok("slow_path".to_string()) }, None)
+                .await
+        },
     )
     .await?;
 

@@ -43,10 +43,13 @@ pub async fn handler(
                     let val: String = parent
                         .wait_for_condition(
                             |_state: &PollState, wait_ctx: &WaitForConditionContext| {
-                                if wait_ctx.attempt >= 1 {
-                                    Ok("condition_met".to_string())
-                                } else {
-                                    Err("not yet".into())
+                                let attempt = wait_ctx.attempt;
+                                async move {
+                                    if attempt >= 1 {
+                                        Ok("condition_met".to_string())
+                                    } else {
+                                        Err("not yet".into())
+                                    }
                                 }
                             },
                             config,

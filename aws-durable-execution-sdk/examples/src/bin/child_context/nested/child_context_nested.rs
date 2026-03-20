@@ -30,7 +30,7 @@ pub async fn handler(
                 Box::pin(async move {
                     let result: NestedResult = child_ctx
                         .step(
-                            |_| {
+                            |_| async move {
                                 Ok(NestedResult {
                                     level: 1,
                                     value: "level 1 complete".to_string(),
@@ -48,7 +48,7 @@ pub async fn handler(
                                 Box::pin(async move {
                                     nested_ctx
                                         .step(
-                                            |_| {
+                                            |_| async move {
                                                 Ok(NestedResult {
                                                     level: 2,
                                                     value: "level 2 complete".to_string(),

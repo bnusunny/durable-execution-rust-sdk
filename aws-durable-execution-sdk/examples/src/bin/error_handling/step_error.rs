@@ -32,7 +32,7 @@ pub async fn handler(
     let result = ctx
         .step_named(
             "process_value",
-            |_| {
+            |_| async move {
                 if event.should_fail {
                     Err("Processing failed due to invalid input".into())
                 } else {
@@ -69,7 +69,7 @@ pub async fn validation_handler(
     let is_valid: bool = ctx
         .step_named(
             "validate_input",
-            |_| Ok(event.value > 0 && event.value < 1000),
+            |_| async move { Ok(event.value > 0 && event.value < 1000) },
             None,
         )
         .await?;
@@ -82,7 +82,7 @@ pub async fn validation_handler(
 
     // Process valid input
     let result: i32 = ctx
-        .step_named("process", |_| Ok(event.value * 2), None)
+        .step_named("process", |_| async move { Ok(event.value * 2) }, None)
         .await?;
 
     Ok(ProcessingResult {

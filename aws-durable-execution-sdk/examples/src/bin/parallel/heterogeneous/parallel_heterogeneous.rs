@@ -28,7 +28,10 @@ pub async fn handler(
             |child_ctx| {
                 Box::pin(async move {
                     child_ctx
-                        .step(|_| Ok("inventory_available".to_string()), None)
+                        .step(
+                            |_| async move { Ok("inventory_available".to_string()) },
+                            None,
+                        )
                         .await
                 })
             },
@@ -46,7 +49,7 @@ pub async fn handler(
                         .wait(Duration::from_seconds(1), Some("payment_delay"))
                         .await?;
                     child_ctx
-                        .step(|_| Ok("payment_completed".to_string()), None)
+                        .step(|_| async move { Ok("payment_completed".to_string()) }, None)
                         .await
                 })
             },
@@ -60,7 +63,10 @@ pub async fn handler(
             |child_ctx| {
                 Box::pin(async move {
                     child_ctx
-                        .step(|_| Ok("shipping_calculated".to_string()), None)
+                        .step(
+                            |_| async move { Ok("shipping_calculated".to_string()) },
+                            None,
+                        )
                         .await
                 })
             },

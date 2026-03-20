@@ -103,7 +103,7 @@ pub async fn basic_payment_workflow(
     let validated = ctx
         .step_named(
             "validate",
-            |_| {
+            |_| async move {
                 if event.amount <= 0.0 {
                     return Err("Amount must be positive".into());
                 }

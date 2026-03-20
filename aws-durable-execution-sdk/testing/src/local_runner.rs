@@ -2501,7 +2501,7 @@ mod property_tests {
                             // Use step_named to provide a name for each step
                             let result = ctx.step_named(
                                 &step_name,
-                                |_| Ok(value * 2),
+                                |_| async move { Ok(value * 2) },
                                 None
                             ).await?;
                             results.push(result);

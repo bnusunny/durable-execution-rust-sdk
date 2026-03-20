@@ -16,7 +16,10 @@ pub async fn handler(
     ctx: DurableContext,
 ) -> Result<String, DurableError> {
     let result = ctx
-        .step(|_step_ctx| Ok("step completed".to_string()), None)
+        .step(
+            |_step_ctx| async move { Ok("step completed".to_string()) },
+            None,
+        )
         .await?;
 
     Ok(result)

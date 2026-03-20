@@ -13,35 +13,34 @@
 //! # Available Trait Aliases
 //!
 //! - [`DurableValue`]: For values that can be durably stored and retrieved
-//! - [`StepFn`]: For step function closures
+//! - [`StepError`]: The boxed error type returned by step functions
+//! - [`StepFuture`]: Type alias for the future returned by async step functions
 //!
 //! # Example
 //!
 //! ```rust
-//! use durable_execution_sdk::traits::{DurableValue, StepFn};
-//! use durable_execution_sdk::handlers::StepContext;
-//! use durable_execution_sdk::DurableError;
+//! use durable_execution_sdk::traits::DurableValue;
 //!
 //! // Using DurableValue in a generic function
 //! fn process_value<T: DurableValue>(value: T) -> String {
-//!     // T is guaranteed to be Serialize + DeserializeOwned + Send + Sync + 'static
+//!     // T is guaranteed to be Serialize + DeserializeOwned + Send
 //!     serde_json::to_string(&value).unwrap_or_default()
-//! }
-//!
-//! // Using StepFn for step function bounds
-//! fn execute_step<T, F>(func: F) -> Result<T, DurableError>
-//! where
-//!     T: DurableValue,
-//!     F: StepFn<T>,
-//! {
-//!     // F is guaranteed to be FnOnce(StepContext) -> Result<T, Box<dyn Error + Send + Sync>> + Send
-//!     todo!()
 //! }
 //! ```
 
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::handlers::StepContext;
+/// The error type returned by step functions.
+pub type StepError = Box<dyn std::error::Error + Send + Sync>;
+
+/// Type alias for the future returned by async step functions.
+///
+/// This simplifies signatures that would otherwise need:
+/// ```text
+/// Fut: Future<Output = Result<T, Box<dyn std::error::Error + Send + Sync>>> + Send
+/// ```
+pub type StepFuture<T> =
+    std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, StepError>> + Send>>;
 
 /// Trait alias for values that can be durably stored and retrieved.
 ///
@@ -96,62 +95,6 @@ pub trait DurableValue: Serialize + DeserializeOwned + Send {}
 
 /// Blanket implementation for all types meeting the bounds.
 impl<T> DurableValue for T where T: Serialize + DeserializeOwned + Send {}
-
-/// Trait alias for step function bounds.
-///
-/// This trait represents the bounds required for closures passed to the
-/// `DurableContext::step` method. A `StepFn<T>` is a function that:
-///
-/// - Takes a `StepContext` parameter
-/// - Returns `Result<T, Box<dyn Error + Send + Sync>>`
-/// - Can be sent between threads (`Send`)
-///
-/// # Equivalent Bounds
-///
-/// `StepFn<T>` is equivalent to:
-/// ```text
-/// FnOnce(StepContext) -> Result<T, Box<dyn std::error::Error + Send + Sync>> + Send
-/// ```
-///
-/// # Blanket Implementation
-///
-/// This trait is automatically implemented for all closures and functions
-/// that satisfy the bounds. You don't need to implement it manually.
-///
-/// # Example
-///
-/// ```rust
-/// use durable_execution_sdk::traits::StepFn;
-/// use durable_execution_sdk::handlers::StepContext;
-///
-/// // A closure that implements StepFn<i32>
-/// let step_fn = |_ctx: StepContext| -> Result<i32, Box<dyn std::error::Error + Send + Sync>> {
-///     Ok(42)
-/// };
-///
-/// // A named function that implements StepFn<String>
-/// fn process_data(ctx: StepContext) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-///     Ok(format!("Processed by operation {}", ctx.operation_id))
-/// }
-///
-/// // Use in generic functions
-/// fn execute<T, F: StepFn<T>>(func: F) {
-///     // func can be called with a StepContext
-/// }
-///
-/// execute(step_fn);
-/// execute(process_data);
-/// ```
-pub trait StepFn<T>:
-    FnOnce(StepContext) -> Result<T, Box<dyn std::error::Error + Send + Sync>> + Send
-{
-}
-
-/// Blanket implementation for all closures meeting the bounds.
-impl<T, F> StepFn<T> for F where
-    F: FnOnce(StepContext) -> Result<T, Box<dyn std::error::Error + Send + Sync>> + Send
-{
-}
 
 #[cfg(test)]
 mod tests {
@@ -215,82 +158,5 @@ mod tests {
         let restored: TestStruct = deserialize_value(&json);
 
         assert_eq!(original, restored);
-    }
-
-    #[test]
-    fn test_step_fn_closure() {
-        fn assert_step_fn<T, F: StepFn<T>>(_f: F) {}
-
-        // Test with a simple closure
-        let closure =
-            |_ctx: StepContext| -> Result<i32, Box<dyn std::error::Error + Send + Sync>> { Ok(42) };
-        assert_step_fn(closure);
-    }
-
-    #[test]
-    fn test_step_fn_with_capture() {
-        fn assert_step_fn<T, F: StepFn<T>>(_f: F) {}
-
-        let captured_value = 100;
-        let closure =
-            move |_ctx: StepContext| -> Result<i32, Box<dyn std::error::Error + Send + Sync>> {
-                Ok(captured_value)
-            };
-        assert_step_fn(closure);
-    }
-
-    #[test]
-    fn test_step_fn_returning_struct() {
-        fn assert_step_fn<T, F: StepFn<T>>(_f: F) {}
-
-        let closure =
-            |_ctx: StepContext| -> Result<TestStruct, Box<dyn std::error::Error + Send + Sync>> {
-                Ok(TestStruct {
-                    id: "test".to_string(),
-                    value: 1,
-                })
-            };
-        assert_step_fn(closure);
-    }
-
-    // Test that StepFn works with named functions
-    fn named_step_function(
-        _ctx: StepContext,
-    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-        Ok("result".to_string())
-    }
-
-    #[test]
-    fn test_step_fn_named_function() {
-        fn assert_step_fn<T, F: StepFn<T>>(_f: F) {}
-        assert_step_fn(named_step_function);
-    }
-
-    // Test type inference with trait aliases
-    #[test]
-    fn test_type_inference() {
-        fn process<T: DurableValue, F: StepFn<T>>(_f: F) -> &'static str {
-            "processed"
-        }
-
-        // Type inference should work without explicit type annotations
-        let result = process(|_ctx| Ok(42i32));
-        assert_eq!(result, "processed");
-
-        let result = process(|_ctx| Ok("hello".to_string()));
-        assert_eq!(result, "processed");
-    }
-
-    // Test that closures can borrow from environment (no 'static requirement)
-    #[test]
-    fn test_step_fn_borrowing_closure() {
-        fn assert_step_fn<T, F: StepFn<T>>(_f: F) {}
-
-        let external_data = "borrowed data".to_string();
-        let closure =
-            |_ctx: StepContext| -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-                Ok(external_data.clone())
-            };
-        assert_step_fn(closure);
     }
 }

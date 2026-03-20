@@ -33,7 +33,7 @@ pub async fn handler(
     let payment: PaymentResult = ctx
         .step_named(
             "charge_payment",
-            |_step_ctx| {
+            |_step_ctx| async move {
                 // Simulate payment processing
                 Ok(PaymentResult {
                     transaction_id: "txn_abc123".to_string(),
@@ -49,7 +49,7 @@ pub async fn handler(
     let _logged: bool = ctx
         .step_named(
             "log_transaction",
-            |_step_ctx| {
+            |_step_ctx| async move {
                 // Logging is idempotent - safe to retry
                 Ok(true)
             },

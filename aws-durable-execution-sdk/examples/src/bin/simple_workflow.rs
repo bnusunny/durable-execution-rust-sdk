@@ -114,7 +114,7 @@ pub async fn process_order(
     let validation: ValidationResult = ctx
         .step_named(
             "validate_order",
-            |_step_ctx| {
+            |_step_ctx| async move {
                 // In a real application, this would validate:
                 // - Customer exists and is in good standing
                 // - Items are in stock
@@ -160,7 +160,7 @@ pub async fn process_order(
     let payment: PaymentResult = ctx
         .step_named(
             "process_payment",
-            |_step_ctx| {
+            |_step_ctx| async move {
                 // In a real application, this would:
                 // - Call a payment gateway API
                 // - Handle payment failures and retries
@@ -196,7 +196,7 @@ pub async fn process_order(
     let fulfillment: FulfillmentResult = ctx
         .step_named(
             "fulfill_order",
-            |_step_ctx| {
+            |_step_ctx| async move {
                 // In a real application, this would:
                 // - Reserve inventory
                 // - Create shipping label

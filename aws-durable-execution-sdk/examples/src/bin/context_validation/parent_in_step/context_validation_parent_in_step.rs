@@ -21,7 +21,11 @@ pub async fn handler(
 ) -> Result<String, DurableError> {
     // First, do a normal step on the parent context
     let _setup: String = ctx
-        .step_named("setup", |_| Ok("setup_done".to_string()), None)
+        .step_named(
+            "setup",
+            |_| async move { Ok("setup_done".to_string()) },
+            None,
+        )
         .await?;
 
     let parent_ctx = ctx.clone();
@@ -37,7 +41,7 @@ pub async fn handler(
                     let val: String = parent
                         .step_named(
                             "parent_step_in_child",
-                            |_| Ok("from_parent".to_string()),
+                            |_| async move { Ok("from_parent".to_string()) },
                             None,
                         )
                         .await?;

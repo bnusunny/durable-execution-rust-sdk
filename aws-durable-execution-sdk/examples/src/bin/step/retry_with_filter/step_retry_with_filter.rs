@@ -29,7 +29,7 @@ pub async fn handler(
     let result: String = ctx
         .step_named(
             "filtered_operation",
-            |_step_ctx| Ok("filter_configured".to_string()),
+            |_step_ctx| async move { Ok("filter_configured".to_string()) },
             Some(config),
         )
         .await?;

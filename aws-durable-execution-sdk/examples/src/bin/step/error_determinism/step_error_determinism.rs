@@ -19,7 +19,7 @@ pub async fn handler(
     let result: String = ctx
         .step_named(
             "always_fails",
-            |_step_ctx| Err::<String, _>("deterministic_failure".into()),
+            |_step_ctx| async move { Err::<String, _>("deterministic_failure".into()) },
             None,
         )
         .await?;

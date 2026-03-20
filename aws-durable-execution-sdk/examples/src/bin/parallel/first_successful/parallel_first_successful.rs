@@ -36,7 +36,7 @@ pub async fn handler(
                     child_ctx
                         .step_named(
                             &format!("{}_db", source),
-                            |_| {
+                            |_| async move {
                                 Ok(DataResult {
                                     source: source.clone(),
                                     data: format!("data_from_{}", source),

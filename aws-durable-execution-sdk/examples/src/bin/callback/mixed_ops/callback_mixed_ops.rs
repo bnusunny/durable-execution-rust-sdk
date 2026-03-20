@@ -45,7 +45,11 @@ pub async fn handler(
 ) -> Result<MixedOpsResult, DurableError> {
     // Step 1: Prepare data
     let prepared_data = ctx
-        .step_named("prepare", |_| Ok("prepared_payload".to_string()), None)
+        .step_named(
+            "prepare",
+            |_| async move { Ok("prepared_payload".to_string()) },
+            None,
+        )
         .await?;
 
     // Step 2: Wait before creating callback

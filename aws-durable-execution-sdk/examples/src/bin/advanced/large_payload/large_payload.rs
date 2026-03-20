@@ -28,7 +28,7 @@ pub async fn handler(event: LargeInput, ctx: DurableContext) -> Result<LargeOutp
     let processed: String = ctx
         .step_named(
             "process_large_data",
-            |_step_ctx| {
+            |_step_ctx| async move {
                 // Simulate processing the large input
                 Ok(format!("processed_{}_bytes", event.data.len()))
             },

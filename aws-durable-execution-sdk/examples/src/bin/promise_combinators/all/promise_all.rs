@@ -36,9 +36,9 @@ pub async fn handler_with_macro(
 
     let results = all!(
         ctx,
-        async move { ctx1.step(|_| Ok(10), None).await },
-        async move { ctx2.step(|_| Ok(20), None).await },
-        async move { ctx3.step(|_| Ok(30), None).await },
+        async move { ctx1.step(|_| async move { Ok(10) }, None).await },
+        async move { ctx2.step(|_| async move { Ok(20) }, None).await },
+        async move { ctx3.step(|_| async move { Ok(30) }, None).await },
     )
     .await?;
 
@@ -63,7 +63,7 @@ pub async fn handler(
         .into_iter()
         .map(|v| {
             let ctx = ctx.clone();
-            async move { ctx.step(move |_| Ok(v), None).await }
+            async move { ctx.step(move |_| async move { Ok(v) }, None).await }
         })
         .collect();
 
@@ -89,7 +89,7 @@ pub async fn handler_with_map(
         .map(
             values,
             |child_ctx: DurableContext, value: i32, _index: usize| {
-                Box::pin(async move { child_ctx.step(|_| Ok(value), None).await })
+                Box::pin(async move { child_ctx.step(|_| async move { Ok(value) }, None).await })
             },
             Some(MapConfig {
                 max_concurrency: Some(3),

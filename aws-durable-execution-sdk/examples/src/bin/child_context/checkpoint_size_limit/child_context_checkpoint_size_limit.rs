@@ -31,7 +31,7 @@ pub async fn handler(
                     // Produce a moderately large result (~300KB)
                     let data: String = child_ctx
                         .step(
-                            |_| {
+                            |_| async move {
                                 let payload = "y".repeat(300_000);
                                 Ok(payload)
                             },

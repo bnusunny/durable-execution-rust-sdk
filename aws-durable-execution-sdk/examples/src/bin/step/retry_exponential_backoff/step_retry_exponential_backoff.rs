@@ -35,7 +35,7 @@ pub async fn handler(
     let result: String = ctx
         .step_named(
             "retryable_operation",
-            |_step_ctx| Ok("operation_succeeded".to_string()),
+            |_step_ctx| async move { Ok("operation_succeeded".to_string()) },
             Some(config),
         )
         .await?;

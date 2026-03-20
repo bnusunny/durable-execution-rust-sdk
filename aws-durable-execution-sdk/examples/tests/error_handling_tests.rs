@@ -28,10 +28,14 @@ async fn step_error_handler(
         .step_named(
             "process_value",
             |_| {
-                if event.should_fail {
-                    Err("Processing failed due to invalid input".into())
-                } else {
-                    Ok(event.value * 2)
+                let should_fail = event.should_fail;
+                let value = event.value;
+                async move {
+                    if should_fail {
+                        Err("Processing failed due to invalid input".into())
+                    } else {
+                        Ok(value * 2)
+                    }
                 }
             },
             None,

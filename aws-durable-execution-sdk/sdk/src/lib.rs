@@ -192,7 +192,7 @@
 //! let results = ctx.map(
 //!     vec![1, 2, 3, 4, 5],
 //!     |child_ctx, item, index| async move {
-//!         child_ctx.step(|_| Ok(item * 2), None).await
+//!         child_ctx.step(|_| async move { Ok(item * 2) }, None).await
 //!     },
 //!     Some(MapConfig {
 //!         max_concurrency: Some(5),
@@ -214,9 +214,9 @@
 //!
 //! let results = ctx.parallel(
 //!     vec![
-//!         |ctx| Box::pin(async move { ctx.step(|_| Ok("a"), None).await }),
-//!         |ctx| Box::pin(async move { ctx.step(|_| Ok("b"), None).await }),
-//!         |ctx| Box::pin(async move { ctx.step(|_| Ok("c"), None).await }),
+//!         |ctx| Box::pin(async move { ctx.step(|_| async move { Ok("a") }, None).await }),
+//!         |ctx| Box::pin(async move { ctx.step(|_| async move { Ok("b") }, None).await }),
+//!         |ctx| Box::pin(async move { ctx.step(|_| async move { Ok("c") }, None).await }),
 //!     ],
 //!     None,
 //! ).await?;
@@ -232,29 +232,29 @@
 //! async fn coordinate_operations(ctx: &DurableContext) -> Result<(), DurableError> {
 //!     // Wait for ALL operations to complete successfully
 //!     let results = ctx.all(vec![
-//!         ctx.step(|_| Ok(1), None),
-//!         ctx.step(|_| Ok(2), None),
-//!         ctx.step(|_| Ok(3), None),
+//!         ctx.step(|_| async move { Ok(1) }, None),
+//!         ctx.step(|_| async move { Ok(2) }, None),
+//!         ctx.step(|_| async move { Ok(3) }, None),
 //!     ]).await?;
 //!     // results = [1, 2, 3]
 //!
 //!     // Wait for ALL operations to settle (success or failure)
 //!     let batch_result = ctx.all_settled(vec![
-//!         ctx.step(|_| Ok("success"), None),
-//!         ctx.step(|_| Err("failure".into()), None),
+//!         ctx.step(|_| async move { Ok("success") }, None),
+//!         ctx.step(|_| async move { Err("failure".into()) }, None),
 //!     ]).await;
 //!     // batch_result contains both success and failure outcomes
 //!
 //!     // Return the FIRST operation to settle (success or failure)
 //!     let first = ctx.race(vec![
-//!         ctx.step(|_| Ok("fast"), None),
-//!         ctx.step(|_| Ok("slow"), None),
+//!         ctx.step(|_| async move { Ok("fast") }, None),
+//!         ctx.step(|_| async move { Ok("slow") }, None),
 //!     ]).await?;
 //!
 //!     // Return the FIRST operation to succeed
 //!     let first_success = ctx.any(vec![
-//!         ctx.step(|_| Err("fail".into()), None),
-//!         ctx.step(|_| Ok("success"), None),
+//!         ctx.step(|_| async move { Err("fail".into()) }, None),
+//!         ctx.step(|_| async move { Ok("success") }, None),
 //!     ]).await?;
 //!
 //!     Ok(())
@@ -625,7 +625,7 @@
 //!
 //! The [`DurableContext`] provides convenience methods for logging with automatic context:
 //!
-//! ```rust,ignore
+//! ```rust,no_run
 //! use durable_execution_sdk::{DurableContext, DurableError};
 //!
 //! async fn my_workflow(ctx: DurableContext) -> Result<(), DurableError> {
@@ -788,7 +788,7 @@
 //! - [`StepResult<T>`](StepResult): Alias for `Result<T, DurableError>` - step operation results
 //! - [`CheckpointResult<T>`](CheckpointResult): Alias for `Result<T, DurableError>` - checkpoint operation results
 //!
-//! ```rust,ignore
+//! ```rust,no_run
 //! use durable_execution_sdk::{DurableResult, StepResult, DurableError};
 //!
 //! // Use in function signatures for clarity

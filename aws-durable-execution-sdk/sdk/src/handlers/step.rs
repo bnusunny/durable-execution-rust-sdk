@@ -254,9 +254,7 @@ where
         StepSemantics::AtMostOncePerRetry => {
             execute_at_most_once(func, &params, skip_start_checkpoint).await
         }
-        StepSemantics::AtLeastOncePerRetry => {
-            execute_at_least_once(func, &params).await
-        }
+        StepSemantics::AtLeastOncePerRetry => execute_at_least_once(func, &params).await,
     };
 
     // Record status on completion
@@ -420,8 +418,8 @@ where
     F: FnOnce(StepContext) -> Fut + Send,
     Fut: std::future::Future<Output = Result<T, Box<dyn std::error::Error + Send + Sync>>> + Send,
 {
-    let mut log_info =
-        LogInfo::new(params.state.durable_execution_arn()).with_operation_id(&params.op_id.operation_id);
+    let mut log_info = LogInfo::new(params.state.durable_execution_arn())
+        .with_operation_id(&params.op_id.operation_id);
     if let Some(ref parent_id) = params.op_id.parent_id {
         log_info = log_info.with_parent_id(parent_id);
     }
@@ -429,7 +427,9 @@ where
     // Checkpoint START before execution (AT_MOST_ONCE semantics)
     // Skip if operation is in READY status (Requirements: 3.7)
     if !skip_start_checkpoint {
-        params.logger.debug("Checkpointing step start (AT_MOST_ONCE)", &log_info);
+        params
+            .logger
+            .debug("Checkpointing step start (AT_MOST_ONCE)", &log_info);
         let start_update = create_start_update(params.op_id);
         params.state.create_checkpoint(start_update, true).await?;
     } else {
@@ -440,7 +440,14 @@ where
     }
 
     // Execute the function
-    let result = execute_with_retry(func, params.step_ctx.clone(), params.config, params.logger, &log_info).await;
+    let result = execute_with_retry(
+        func,
+        params.step_ctx.clone(),
+        params.config,
+        params.logger,
+        &log_info,
+    )
+    .await;
 
     // Checkpoint the result
     checkpoint_result(result, params, &log_info).await
@@ -449,25 +456,31 @@ where
 /// Executes a step with AT_LEAST_ONCE_PER_RETRY semantics.
 ///
 /// Checkpoint is created AFTER execution to guarantee at least once execution.
-async fn execute_at_least_once<T, F, Fut>(
-    func: F,
-    params: &StepExecParams<'_, T>,
-) -> StepResult<T>
+async fn execute_at_least_once<T, F, Fut>(func: F, params: &StepExecParams<'_, T>) -> StepResult<T>
 where
     T: DurableValue,
     F: FnOnce(StepContext) -> Fut + Send,
     Fut: std::future::Future<Output = Result<T, Box<dyn std::error::Error + Send + Sync>>> + Send,
 {
-    let mut log_info =
-        LogInfo::new(params.state.durable_execution_arn()).with_operation_id(&params.op_id.operation_id);
+    let mut log_info = LogInfo::new(params.state.durable_execution_arn())
+        .with_operation_id(&params.op_id.operation_id);
     if let Some(ref parent_id) = params.op_id.parent_id {
         log_info = log_info.with_parent_id(parent_id);
     }
 
-    params.logger.debug("Executing step (AT_LEAST_ONCE)", &log_info);
+    params
+        .logger
+        .debug("Executing step (AT_LEAST_ONCE)", &log_info);
 
     // Execute the function first
-    let result = execute_with_retry(func, params.step_ctx.clone(), params.config, params.logger, &log_info).await;
+    let result = execute_with_retry(
+        func,
+        params.step_ctx.clone(),
+        params.config,
+        params.logger,
+        &log_info,
+    )
+    .await;
 
     // Checkpoint AFTER execution (AT_LEAST_ONCE semantics)
     checkpoint_result(result, params, &log_info).await
@@ -484,13 +497,12 @@ where
 {
     match result {
         Ok(value) => {
-            let serialized =
-                params
-                    .serdes
-                    .serialize(&value, params.serdes_ctx)
-                    .map_err(|e| DurableError::SerDes {
-                        message: format!("Failed to serialize step result: {}", e),
-                    })?;
+            let serialized = params
+                .serdes
+                .serialize(&value, params.serdes_ctx)
+                .map_err(|e| DurableError::SerDes {
+                    message: format!("Failed to serialize step result: {}", e),
+                })?;
 
             let succeed_update = create_succeed_update(params.op_id, Some(serialized));
             params.state.create_checkpoint(succeed_update, true).await?;
@@ -503,7 +515,9 @@ where
             let fail_update = create_fail_update(params.op_id, error_obj);
             params.state.create_checkpoint(fail_update, true).await?;
 
-            params.logger.error(&format!("Step failed: {}", error), log_info);
+            params
+                .logger
+                .error(&format!("Step failed: {}", error), log_info);
             Err(DurableError::UserCode {
                 message: error.to_string(),
                 error_type: "UserCodeError".to_string(),

@@ -25,7 +25,7 @@
 //! - **Promise Combinators**: Coordinate multiple durable promises with `all`, `any`, `race`, and `all_settled`.
 //! - **Replay-Safe Helpers**: Generate deterministic UUIDs and timestamps that are safe for replay.
 //! - **Configurable Checkpointing**: Choose between eager, batched, or optimistic checkpointing modes.
-//! - **Trait Aliases**: Cleaner function signatures with [`DurableValue`] trait alias.
+//! - **Trait Aliases**: Cleaner function signatures with [`DurableValue`], [`StepError`], and [`StepFuture`] type aliases.
 //! - **Sealed Traits**: Internal traits are sealed to allow API evolution without breaking changes.
 //!
 //! ## Important Documentation
@@ -50,7 +50,7 @@
 //!
 //! Here's a simple workflow that processes an order:
 //!
-//! ```rust,ignore
+//! ```rust,no_run
 //! use durable_execution_sdk::{durable_execution, DurableContext, DurableError, Duration};
 //! use serde::{Deserialize, Serialize};
 //!
@@ -69,7 +69,7 @@
 //! #[durable_execution]
 //! async fn process_order(event: OrderEvent, ctx: DurableContext) -> Result<OrderResult, DurableError> {
 //!     // Step 1: Validate the order (checkpointed automatically)
-//!     let is_valid: bool = ctx.step(|_step_ctx| {
+//!     let is_valid: bool = ctx.step(|_step_ctx| async move {
 //!         // Validation logic here
 //!         Ok(true)
 //!     }, None).await?;
@@ -79,7 +79,7 @@
 //!     }
 //!
 //!     // Step 2: Process payment (checkpointed automatically)
-//!     let payment_id: String = ctx.step(|_step_ctx| {
+//!     let payment_id: String = ctx.step(|_step_ctx| async move {
 //!         // Payment processing logic here
 //!         Ok("pay_123".to_string())
 //!     }, None).await?;
@@ -115,23 +115,25 @@
 //! automatically checkpointed, allowing the workflow to resume from the last
 //! completed step after interruptions.
 //!
-//! ```rust,ignore
+//! ```rust,no_run
+//! # use durable_execution_sdk::{DurableContext, StepConfig, StepSemantics};
+//! # async fn example(ctx: DurableContext) -> Result<(), Box<dyn std::error::Error>> {
 //! // Simple step
-//! let result: i32 = ctx.step(|_| Ok(42), None).await?;
+//! let result: i32 = ctx.step(|_| async move { Ok(42) }, None).await?;
 //!
 //! // Named step for better debugging
-//! let result: String = ctx.step_named("fetch_data", |_| {
+//! let result: String = ctx.step_named("fetch_data", |_| async move {
 //!     Ok("data".to_string())
 //! }, None).await?;
 //!
 //! // Step with custom configuration
-//! use durable_execution_sdk::{StepConfig, StepSemantics};
-//!
 //! let config = StepConfig {
 //!     step_semantics: StepSemantics::AtMostOncePerRetry,
 //!     ..Default::default()
 //! };
-//! let result: i32 = ctx.step(|_| Ok(42), Some(config)).await?;
+//! let result: i32 = ctx.step(|_| async move { Ok(42) }, Some(config)).await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ### Step Semantics
@@ -881,7 +883,7 @@ pub use state::{
 pub use types::{CallbackId, ExecutionArn, OperationId, ValidationError};
 
 // Re-export trait aliases for common bounds
-pub use traits::DurableValue;
+pub use traits::{DurableValue, StepError, StepFuture};
 
 // Re-export concurrency types
 pub use concurrency::{

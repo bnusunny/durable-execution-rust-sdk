@@ -13,6 +13,8 @@
 //! # Available Trait Aliases
 //!
 //! - [`DurableValue`]: For values that can be durably stored and retrieved
+//! - [`StepError`]: The boxed error type returned by step functions
+//! - [`StepFuture`]: Type alias for the future returned by async step functions
 //!
 //! # Example
 //!
@@ -27,6 +29,18 @@
 //! ```
 
 use serde::{de::DeserializeOwned, Serialize};
+
+/// The error type returned by step functions.
+pub type StepError = Box<dyn std::error::Error + Send + Sync>;
+
+/// Type alias for the future returned by async step functions.
+///
+/// This simplifies signatures that would otherwise need:
+/// ```text
+/// Fut: Future<Output = Result<T, Box<dyn std::error::Error + Send + Sync>>> + Send
+/// ```
+pub type StepFuture<T> =
+    std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, StepError>> + Send>>;
 
 /// Trait alias for values that can be durably stored and retrieved.
 ///

@@ -36,10 +36,10 @@ struct OrderResult {
 #[durable_execution]
 async fn process_order(event: OrderEvent, ctx: DurableContext) -> Result<OrderResult, DurableError> {
     // Step 1: Validate (automatically checkpointed)
-    let is_valid: bool = ctx.step(|_| Ok(true), None).await?;
+    let is_valid: bool = ctx.step(|_| async move { Ok(true) }, None).await?;
 
     // Step 2: Process payment (automatically checkpointed)
-    let payment_id: String = ctx.step(|_| Ok("pay_123".to_string()), None).await?;
+    let payment_id: String = ctx.step(|_| async move { Ok("pay_123".to_string()) }, None).await?;
 
     // Step 3: Wait for confirmation (suspends Lambda, resumes later)
     ctx.wait(Duration::from_seconds(5), Some("payment_confirmation")).await?;
@@ -79,7 +79,7 @@ let config = StepConfig {
     step_semantics: StepSemantics::AtMostOncePerRetry,
     ..Default::default()
 };
-let result = ctx.step(|_| Ok(42), Some(config)).await?;
+let result = ctx.step(|_| async move { Ok(42) }, Some(config)).await?;
 ```
 
 ## Parallel processing
@@ -90,7 +90,7 @@ use durable_execution_sdk::MapConfig;
 let results = ctx.map(
     vec![1, 2, 3, 4, 5],
     |child_ctx, item, _index| async move {
-        child_ctx.step(|_| Ok(item * 2), None).await
+        child_ctx.step(|_| async move { Ok(item * 2) }, None).await
     },
     Some(MapConfig {
         max_concurrency: Some(3),

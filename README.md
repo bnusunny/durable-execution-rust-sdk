@@ -50,10 +50,10 @@ struct OrderResult {
 #[durable_execution]
 async fn process_order(event: OrderEvent, ctx: DurableContext) -> Result<OrderResult, DurableError> {
     // Step 1: Validate (automatically checkpointed)
-    let is_valid: bool = ctx.step(|_| Ok(true), None).await?;
+    let is_valid: bool = ctx.step(|_| async move { Ok(true) }, None).await?;
 
     // Step 2: Process payment (automatically checkpointed)
-    let payment_id: String = ctx.step(|_| Ok("pay_123".to_string()), None).await?;
+    let payment_id: String = ctx.step(|_| async move { Ok("pay_123".to_string()) }, None).await?;
 
     // Step 3: Wait for confirmation (suspends Lambda, resumes later)
     ctx.wait(Duration::from_seconds(5), Some("payment_confirmation")).await?;
@@ -93,7 +93,7 @@ let config = StepConfig {
     step_semantics: StepSemantics::AtMostOncePerRetry,
     ..Default::default()
 };
-let result = ctx.step(|_| Ok(42), Some(config)).await?;
+let result = ctx.step(|_| async move { Ok(42) }, Some(config)).await?;
 ```
 
 ## Parallel Processing
@@ -106,7 +106,7 @@ use durable_execution_sdk::MapConfig;
 let results = ctx.map(
     vec![1, 2, 3, 4, 5],
     |child_ctx, item, _index| async move {
-        child_ctx.step(|_| Ok(item * 2), None).await
+        child_ctx.step(|_| async move { Ok(item * 2) }, None).await
     },
     Some(MapConfig {
         max_concurrency: Some(3),
@@ -125,7 +125,7 @@ use durable_execution_sdk::{MapConfig, ItemBatcher};
 let results = ctx.map(
     large_item_list,
     |child_ctx, item, _index| async move {
-        child_ctx.step(|_| Ok(process(item)), None).await
+        child_ctx.step(|_| async move { Ok(process(item)) }, None).await
     },
     Some(MapConfig {
         item_batcher: Some(ItemBatcher::new(100, 256 * 1024)), // 100 items or 256KB per batch
@@ -139,8 +139,8 @@ Execute independent branches concurrently:
 ```rust
 let results = ctx.parallel(
     vec![
-        |ctx| Box::pin(async move { ctx.step(|_| Ok("a"), None).await }),
-        |ctx| Box::pin(async move { ctx.step(|_| Ok("b"), None).await }),
+        |ctx| Box::pin(async move { ctx.step(|_| async move { Ok("a") }, None).await }),
+        |ctx| Box::pin(async move { ctx.step(|_| async move { Ok("b") }, None).await }),
     ],
     None,
 ).await?;
@@ -153,26 +153,26 @@ Coordinate multiple durable operations with promise-style combinators:
 ```rust
 // Wait for ALL operations to complete successfully
 let results = ctx.all(vec![
-    ctx.step(|_| Ok(1), None),
-    ctx.step(|_| Ok(2), None),
+    ctx.step(|_| async move { Ok(1) }, None),
+    ctx.step(|_| async move { Ok(2) }, None),
 ]).await?;
 
 // Wait for ALL operations to settle (success or failure)
 let batch_result = ctx.all_settled(vec![
-    ctx.step(|_| Ok("success"), None),
-    ctx.step(|_| Err("failure".into()), None),
+    ctx.step(|_| async move { Ok("success") }, None),
+    ctx.step(|_| async move { Err("failure".into()) }, None),
 ]).await;
 
 // Return the FIRST operation to settle
 let first = ctx.race(vec![
-    ctx.step(|_| Ok("fast"), None),
-    ctx.step(|_| Ok("slow"), None),
+    ctx.step(|_| async move { Ok("fast") }, None),
+    ctx.step(|_| async move { Ok("slow") }, None),
 ]).await?;
 
 // Return the FIRST operation to succeed
 let first_success = ctx.any(vec![
-    ctx.step(|_| Err("fail".into()), None),
-    ctx.step(|_| Ok("success"), None),
+    ctx.step(|_| async move { Err("fail".into()) }, None),
+    ctx.step(|_| async move { Ok("success") }, None),
 ]).await?;
 ```
 
@@ -206,7 +206,7 @@ let callback = ctx.create_callback::<ApprovalResponse>(Some(CallbackConfig {
 })).await?;
 
 // Wrap notification in a step for replay safety
-ctx.step_named("notify", |_| {
+ctx.step_named("notify", |_| async move {
     // Notification logic here
     Ok(())
 }, None).await?;

@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-alpha3](https://github.com/bnusunny/durable-execution-rust-sdk/compare/durable-execution-sdk-testing-v0.1.0-alpha2...durable-execution-sdk-testing-v0.1.0-alpha3) - 2026-03-25
+
+### Added
+
+- [**breaking**] accept async closures in step, step_named, and wait_for_condition
+
+### Fixed
+
+- generate WaitSucceeded events in local runner to match cloud behavior
+
+### Other
+
+- fix all 63 clippy warnings across the workspace
+- cargo fmt
+- Align local runner with cloud behavior, add cloud integration tests
+- Add cloud integration tests, align local runner with cloud behavior
+- Add NodeJS event history support to CloudDurableTestRunner
+- Fix integration tests: deploy via Lambda API, fix CloudDurableTestRunner
+
 ## [0.1.0-alpha2](https://github.com/bnusunny/durable-execution-rust-sdk/compare/durable-execution-sdk-testing-v0.1.0-alpha1...durable-execution-sdk-testing-v0.1.0-alpha2) - 2026-03-10
 
 ### Fixed

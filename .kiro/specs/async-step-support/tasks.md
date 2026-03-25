@@ -136,12 +136,12 @@ Modify `step`, `step_named`, and `wait_for_condition` in-place to accept async c
 - [x] 8. Checkpoint - Ensure all examples compile and integration tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 9. Add new tests with genuinely async closures
-  - [ ]* 9.1 Add unit test for step_handler with genuinely async closure
+- [x] 9. Add new tests with genuinely async closures
+  - [x] 9.1 Add unit test for step_handler with genuinely async closure
     - Add test in `handlers/step.rs` that uses `tokio::time::sleep` inside the async closure to verify `.await` works correctly end-to-end
     - _Requirements: 1.1, 1.4_
 
-  - [ ]* 9.2 Add unit test for wait_for_condition_handler with genuinely async closure
+  - [x] 9.2 Add unit test for wait_for_condition_handler with genuinely async closure
     - Add test in `handlers/wait_for_condition.rs` that uses `tokio::time::sleep` inside the async check closure
     - _Requirements: 1.3, 1.4, 10.4_
 

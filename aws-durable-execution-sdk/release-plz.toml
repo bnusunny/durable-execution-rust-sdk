@@ -5,6 +5,8 @@ changelog_config = "cliff.toml"
 git_tag_enable = true
 # Create GitHub releases
 git_release_enable = true
+# Auto-detect prerelease from version string (e.g. 0.1.0-alpha3)
+git_release_type = "auto"
 
 # Don't publish the examples package
 [[package]]

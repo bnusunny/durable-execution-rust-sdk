@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-alpha3](https://github.com/bnusunny/durable-execution-rust-sdk/compare/durable-execution-sdk-v0.1.0-alpha2...durable-execution-sdk-v0.1.0-alpha3) - 2026-03-25
+
+### Added
+
+- [**breaking**] accept async closures in step, step_named, and wait_for_condition
+
+### Other
+
+- Switch compilable doc examples from ignore to no_run
+- Update README and doc examples to use async closures
+- cargo fmt
+- Address PR #31 review feedback from jlizen
+- fix all 63 clippy warnings across the workspace
+
 ## [0.1.0-alpha2](https://github.com/bnusunny/durable-execution-rust-sdk/compare/durable-execution-sdk-v0.1.0-alpha1...durable-execution-sdk-v0.1.0-alpha2) - 2026-03-10
 
 ### Fixed

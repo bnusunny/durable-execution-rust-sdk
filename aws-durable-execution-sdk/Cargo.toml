@@ -8,10 +8,10 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0-alpha3"
+version = "0.1.0-alpha4"
 edition = "2021"
 license = "Apache-2.0"
-repository = "https://github.com/awslabs/durable-execution-sdk-rust"
+repository = "https://github.com/bnusunny/durable-execution-rust-sdk"
 
 [workspace.dependencies]
 # Async runtime
@@ -73,6 +73,6 @@ trybuild = "1.0"
 uuid = { version = "1.0", features = ["v4"] }
 
 # Internal crate dependencies
-durable-execution-sdk = { path = "sdk", version = "0.1.0-alpha3" }
-durable-execution-sdk-testing = { path = "testing", version = "0.1.0-alpha3" }
-durable-execution-sdk-macros = { path = "macros", version = "0.1.0-alpha3" }
+durable-execution-sdk = { path = "sdk", version = "0.1.0-alpha4" }
+durable-execution-sdk-testing = { path = "testing", version = "0.1.0-alpha4" }
+durable-execution-sdk-macros = { path = "macros", version = "0.1.0-alpha4" }

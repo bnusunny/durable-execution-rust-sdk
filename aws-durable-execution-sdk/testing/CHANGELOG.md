@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 0.1.0-alpha4 - 2026-11-05
+
+### Deprecated
+
+- This crate is deprecated in favor of the official [`aws-durable-execution-sdk`](https://crates.io/crates/aws-durable-execution-sdk). No further releases are planned.
+
 ## [0.1.0-alpha3](https://github.com/bnusunny/durable-execution-rust-sdk/compare/durable-execution-sdk-testing-v0.1.0-alpha2...durable-execution-sdk-testing-v0.1.0-alpha3) - 2026-03-25
 
 ### Added

@@ -1,5 +1,11 @@
 # AWS Durable Execution SDK for Rust
 
+> [!WARNING]
+> **This crate is deprecated and no longer maintained.** Use the official AWS SDK instead:
+> [`aws-durable-execution-sdk`](https://crates.io/crates/aws-durable-execution-sdk)
+> ([aws/aws-durable-execution-sdk-rust](https://github.com/aws/aws-durable-execution-sdk-rust)).
+> The official SDK's API differs from this crate's, so see its documentation when migrating.
+
 [![CI](https://github.com/aws/durable-execution-sdk-rust/actions/workflows/pr.yml/badge.svg)](https://github.com/aws/durable-execution-sdk-rust/actions/workflows/pr.yml)
 [![Crates.io](https://img.shields.io/crates/v/durable-execution-sdk.svg)](https://crates.io/crates/durable-execution-sdk)
 [![Documentation](https://docs.rs/durable-execution-sdk/badge.svg)](https://docs.rs/durable-execution-sdk)

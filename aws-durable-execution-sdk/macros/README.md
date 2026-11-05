@@ -1,5 +1,11 @@
 # durable-execution-sdk-macros
 
+> [!WARNING]
+> **This crate is deprecated and no longer maintained.** Use the official AWS SDK instead:
+> [`aws-durable-execution-sdk`](https://crates.io/crates/aws-durable-execution-sdk)
+> ([aws/aws-durable-execution-sdk-rust](https://github.com/aws/aws-durable-execution-sdk-rust)).
+> The official SDK's API differs from this crate's, so see its documentation when migrating.
+
 Procedural macros for the [AWS Durable Execution SDK](https://crates.io/crates/durable-execution-sdk).
 
 ## Overview
